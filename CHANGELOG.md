@@ -26,7 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **多 Agent 状态桥接层（Connector Hub）**：
   - 归一化事件流 (`src/connectors/contracts.py`)；
   - 本地事件总线 (`src/connectors/event_bus.py`)；
-  - Hermes 生命周期连接器 (`src/connectors/hermes_connector.py`)。
+  - Hermes 生命周期连接器 (`src/connectors/hermes_connector.py`)；
+  - 本地伴生体 HTTP 服务 (`src/connectors/http_server.py`)，暴露 `127.0.0.1:17321` 标准端点；
+  - **PI-Desktop 实时伴生桥接扩展 (`imported.pi-companion-bridge`)**，已接入并自动注册至 PI-Desktop 插件注册表。
 - **规范与文档图谱**：
   - `SPEC.md`、`docs/specs/SPEC.md`、`docs/specs/phase-1-runtime-and-bridge/SPEC.md`；
   - `DESIGN.md`（伴生体空间圣域准则）；
