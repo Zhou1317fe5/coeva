@@ -93,7 +93,9 @@
 - **代码与 Spec 强一致性**：
   - 禁止出现 `Code says one thing, Spec says another`；
   - 代码变更改变了产品行为、数据结构、接口契约或系统约束时，必须在同一个变更中同步更新对应 Spec，并运行 `spec_validate` 确认。
-
+- **缺陷排查与工程复盘（Bug Post-mortems & Handover）**：
+  - 在联调测试中发现的任何非浅层缺陷（如跨线程死锁、坐标裁剪、事件截获失效等），必须在解决后立即将**“现象、根因、修复方案”**记录到对应模块 `SPEC.md` 的 `Bug Post-mortems` 章节；
+  - 版本功能里程碑与缺陷修复必须实时同步记录到 `CHANGELOG.md`，确保团队交接与维护时有据可查、不重复踩坑。
 ---
 
 ## 6. Git & Commits（版本控制纪律）

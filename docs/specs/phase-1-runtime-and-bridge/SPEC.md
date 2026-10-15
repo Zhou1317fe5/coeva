@@ -13,6 +13,7 @@ tags:
   - growth-core
   - slice-feeding
   - python-native
+  - bugfix-postmortem
 ---
 
 # 第一阶段规范：独立常驻桌宠 Runtime、多 Agent 桥接与随手投喂 MVP
@@ -35,18 +36,19 @@ tags:
 ### 本阶段必须交付（In Scope）：
 1. **独立桌面身体底座（Desktop Body）**：
    - 基于 `openclaw-tamagotchi` 建立 Windows 11 下的完全独立常驻（开机自启、置顶、透明通道、点击穿透、闲置入睡）；
-   - 在其外部抽象出统一的 `Body Control API`，供 Growth Core 驱动动画与气泡。
+   - 在其外部抽象出统一的 `Body Control API`，供 Growth Core 驱动动画与气泡；
+   - 具备屏幕边界硬裁剪、30px 边缘磁吸收纳（Peek Docking）、光标悬停探头展开与离开自动缩回。
 2. **多 Agent 状态桥接（Connector Hub）**：
    - **Hermes 桥接**：利用 Hermes 生命周期 Hook（`pre_tool_call`, `post_tool_call`, `on_session_start`, `on_session_end`），向 Growth Core 汇报客观事件；
    - **Pi 桥接**：利用 Pi 的全局 extension 机制，向 Growth Core 汇报任务起止。
 3. **随手投喂切片输入（Slice Feeding MVP）**：
    - 建立 Python 全局快捷键监听（如双击 `Alt` 或 `Win+Shift+P`）；
-   - 呼出极简半透明输入框，输入文字后敲击回车追加写入 `data/raw_slices.jsonl`；
-   - 自动驱动桌宠做轻微点头动作或 3 秒气泡确认。
+   - 呼出可自由拖动与记忆位置的极简半透明输入框，输入文字后敲击回车追加写入 `data/raw_slices.jsonl`；
+   - 自动驱动桌宠做动作确认与温和气泡反馈。
 4. **轻量心智与守卫（Growth Core v0.1）**：
    - 统筹决策：Agent 事件先经过 Growth Core 决策，再下发给桌宠 Body；
    - 注入前 14 天冷启动限频状态机（Day 1~3、Day 4~7、Day 8~14 渐进式破冰）；
-   - 注入避风港模式（Sanctuary Mode）：检测到负面/抱怨情绪时，100% 保持安静，严禁说教；
+   - 注入避风港模式（Sanctuary Mode）：检测到负面/抱怨情绪时，100% 保持安静，严禁说教；提供“🍃 收到。先放一放，我陪着你...”的温和接纳气泡；
    - 监测连续工作时长与夜间客观节律。
 
 ---
@@ -56,8 +58,8 @@ tags:
 ### 3.1 Companion Body 控制契约（Body Control Contract）
 Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 socket）：
 - `set_state(state: str)`: `idle | thinking | working | happy | error | sleeping`
-- `say(text: str, ttl_ms: int = 4000)`: 在桌宠头顶弹出质朴气泡，ttl 后自动淡出
-- `perform_action(action_id: str)`: 播放特定动作动画（如 `wave`, `jump`, `nod`）
+- `say(text: str, ttl_ms: int = 4000)`: 在桌宠头顶弹出质朴气泡，ttl 后自动淡出（气泡自动做屏幕内安全边缘吸附，防止截断）
+- `perform_action(action_id: str)`: 播放特定动作动画（如 `wave`, `jump`, `nod`, `rest`）
 
 ### 3.2 随手投喂切片存储契约（`data/raw_slices.jsonl`）
 ```json
@@ -75,7 +77,41 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 
 ## 4. 验收标准（Acceptance Criteria）
 
-- [ ] **AC-1 (完全独立常驻)**：关闭所有 Agent 终端，桌面宠物依然在桌角自然呼吸、点击穿透、闲置入睡，内存维持在 60MB 左右（PySide6 进程）。
-- [ ] **AC-2 (Hermes / Pi 联动)**：启动 Hermes 或 Pi 跑任务，Growth Core 接收到事件并在 1 秒内驱动桌宠展示对应动作。
-- [ ] **AC-3 (随手投喂体验)**：按全局快捷键，200ms 内唤起半透明输入框，输入文字回车后窗口秒隐，`data/raw_slices.jsonl` 成功增加一条有效记录，桌宠点头确认。
-- [ ] **AC-4 (避风港熔断)**：在投喂中输入带有“烦死了”、“全搞砸了”等负面情绪切片，系统静默存盘，严禁触发任何说教气泡。
+- [x] **AC-1 (完全独立常驻)**：关闭所有 Agent 终端，桌面宠物依然在桌角自然呼吸、点击穿透、闲置入睡，内存维持在 60MB 左右（PySide6 进程）。
+- [x] **AC-2 (Hermes / Pi 联动)**：启动 Hermes 或 Pi 跑任务，Growth Core 接收到事件并在 1 秒内驱动桌宠展示对应动作。
+- [x] **AC-3 (随手投喂体验)**：按全局快捷键，200ms 内唤起半透明输入框，输入文字回车后窗口秒隐，`data/raw_slices.jsonl` 成功增加一条有效记录，桌宠点头确认。
+- [x] **AC-4 (避风港熔断)**：在投喂中输入带有“烦死了”、“全搞砸了”等负面情绪切片，系统静默存盘，严禁触发任何说教气泡，提供温和接纳反馈。
+
+---
+
+## 5. 缺陷排查与工程修复复盘（Bug Post-mortems）
+
+为便于团队开发、后续交接与架构审查，记录在实际桌面联调中排查的五个关键缺陷及根治方案：
+
+### 5.1 缺陷 1：全局热键与 GUI 线程死锁（Thread-safe Hotkey Bridge）
+- **现象**：按 `Alt + Space` 弹出输入框后，窗口卡死、未响应，无法输入文字。
+- **根因**：`pynput` 热键在 Windows 底层钩子工作线程触发，直接跨线程操作 Qt GUI 窗口方法，导致 Windows 消息泵与 Qt 事件循环死锁。
+- **修复方案**：引入 `_QtSignalBridge(QObject)`，热键线程仅触发 Qt Signal，由 Qt 内部调度机制安全排队至 GUI 主线程执行，彻底根治卡死。
+
+### 5.2 缺陷 2：窗口越界迷路与边缘探头收纳（Peek Docking & 30px Snap）
+- **现象**：小猫拖拽没有屏幕边界限制，拖到屏幕外后彻底丢失；贴边缺乏半身隐藏的探头收纳感。
+- **根因**：位移计算缺少 `screen.availableGeometry()` 裁剪；且全量包含在屏幕内，无法实现半身隐藏。
+- **修复方案**：
+  1. 增加屏幕可用区边界硬裁剪，严格保留至少 24px 在屏内，物理上不可能再被拖丢；
+  2. 确立 30px 贴边吸附阈值（`EDGE_SNAP_DISTANCE_PX = 30`），贴近边缘时自动向外收纳，仅露半身；
+  3. 托盘增加“📍 唤回伴生体 (居中重置)”应急菜单。
+
+### 5.3 缺陷 3：屏幕边缘气泡文字截断（Speech Bubble Edge Clamping）
+- **现象**：小猫靠右侧贴边时，头顶气泡依然按中心对称定位，导致气泡右半截被 Windows 屏幕右边界切断。
+- **根因**：气泡坐标计算未做屏幕边界判定。
+- **修复方案**：在 `SpeechBubble.anchor_to_pet` 中注入智能屏幕裁剪算法，右侧溢出时自动将气泡左推，保留 12px 安全边距；同时动态计算指示尾巴的相对横坐标（`_tail_relative_x`），使气泡文字完整居中的同时，尾巴依然精准指向小猫头部。
+
+### 5.4 缺陷 4：子控件截获导致 Hover 离开事件失效（Cursor Polling Watcher）
+- **现象**：小猫在边缘探头出来后，鼠标移开，小猫不会自动缩回。
+- **根因**：Qt 内部 `QLabel` 截获了鼠标进入，导致父窗体没有稳定接收到 `leaveEvent`。
+- **修复方案**：开启父子控件 `setMouseTracking(True)`，并引入 150ms 游标探针（`QCursor.pos()` 巡检），一旦鼠标脱离小猫与气泡包围盒，800ms 后必触发自动收纳。
+
+### 5.5 缺陷 5：避风港无反馈误解（Empathic Acknowledgment Bubble）
+- **现象**：输入心烦吐槽内容后，桌宠没有任何界面动作，用户无法确认系统是否响应。
+- **根因**：过早采取了 100% 绝对静默，缺少最起码的“情绪被接纳”确认。
+- **修复方案**：避风港状态下严禁任何说教或行动建议，但弹出非干预性温和气泡（`🍃 收到。先放一放，我陪着你...`），既守住底线，又消除了未响应的疑惑。
