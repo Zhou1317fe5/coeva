@@ -1,0 +1,16 @@
+{
+  "id": "imported.pi-companion-bridge",
+  "name": "pi-companion-bridge",
+  "version": "0.1.0",
+  "schemaVersion": 1,
+  "description": "Bridges PI-Desktop events to Co-evolving AI Companion desktop pet",
+  "main": "main.cjs",
+  "permissions": [
+    "agent.extension"
+  ],
+  "contributes": {
+    "agentExtensions": [
+      "index.js"
+    ]
+  }
+}

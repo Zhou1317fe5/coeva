@@ -13,6 +13,7 @@ from src.body.controller import BodyController
 from src.body.window import PetWindow
 from src.connectors.event_bus import LocalEventBus
 from src.connectors.hermes_connector import HermesConnector
+from src.connectors.http_server import CompanionHttpServer
 from src.core.cold_start import ColdStartPolicy
 from src.core.intervention import InterventionPolicy
 from src.core.sanctuary import SanctuaryGuard
@@ -63,6 +64,10 @@ class CompanionApp:
             on_state_suggested=lambda s: self.controller.set_state(s),
         )
         self.hermes = HermesConnector(self.bus)
+
+        # 5. Local HTTP Server for external Agents (PI-Desktop, Hermes, Codex)
+        self.http_server = CompanionHttpServer(self.bus, self.controller)
+        self.http_server.start()
 
         # Pet click interaction
         self.window.clicked.connect(self._on_pet_clicked)
@@ -190,6 +195,10 @@ class CompanionApp:
     def _on_quit(self) -> None:
         try:
             self.hotkey.stop()
+        except Exception:
+            pass
+        try:
+            self.http_server.stop()
         except Exception:
             pass
         self.window.close()
