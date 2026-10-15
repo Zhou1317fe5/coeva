@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 import pytest
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QApplication
 
 from src.body.animation import AnimationPlayer, SpriteSheet, SpriteSheetError
@@ -48,9 +48,6 @@ def test_spritesheet_invalid_frame_count(tmp_path: Path) -> None:
 def test_animation_player_logic() -> None:
     """Test AnimationPlayer frame emission."""
     image = QImage(20, 10, QImage.Format.Format_ARGB32)
-    # Directly build a SpriteSheet from QPixmap
-    from PySide6.QtGui import QPixmap
-
     pix = QPixmap.fromImage(image)
     sheet = SpriteSheet([pix, pix], frame_width=10, frame_height=10)
 
@@ -79,5 +76,19 @@ def test_body_controller_state_and_say() -> None:
     assert controller.current_state == PetState.SLEEPING
 
     controller.say("测试消息")
-    # Clean up window
+    window.close()
+
+
+def test_pet_window_clamping_and_reset() -> None:
+    """Test emergency position reset brings pet back into screen bounds."""
+    pet_dir = Path("assets") / "pets" / "claw"
+    window = PetWindow(pet_dir, scale=1)
+
+    # Force position way outside screen
+    window.move(99999, 99999)
+    assert window.x() == 99999
+
+    # Trigger emergency reset
+    window.reset_to_default_position()
+    assert window.x() < 5000  # brought back inside screen
     window.close()

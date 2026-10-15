@@ -51,7 +51,7 @@ class SliceFeederOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
 
-        self.setFixedSize(460, 160)
+        self.setFixedSize(480, 160)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(18, 14, 18, 14)
@@ -78,10 +78,11 @@ class SliceFeederOverlay(QWidget):
         self._input.setStyleSheet(
             "QPlainTextEdit {"
             "  color: #F8FAFC;"
-            "  background: rgba(15, 23, 42, 160);"
-            "  border: 1px solid rgba(148, 163, 184, 80);"
+            "  background: rgba(15, 23, 42, 180);"
+            "  border: 1px solid rgba(148, 163, 184, 90);"
             "  border-radius: 8px;"
             "  padding: 8px;"
+            "  font-size: 14px;"
             "  selection-background-color: #38BDF8;"
             "}"
         )
@@ -90,6 +91,13 @@ class SliceFeederOverlay(QWidget):
         self._input.submit_pressed.connect(self._on_submit)
         self._input.cancel_pressed.connect(self._on_cancel)
         main_layout.addWidget(self._input)
+
+    def toggle_or_show(self) -> None:
+        """Toggle visibility: if visible and active, close it; otherwise show centered."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show_centered()
 
     def show_centered(self) -> None:
         """Center the overlay on the active screen and focus input."""
@@ -124,8 +132,8 @@ class SliceFeederOverlay(QWidget):
         path.addRoundedRect(1.0, 1.0, float(self.width() - 2), float(self.height() - 2), 12.0, 12.0)
 
         # Dark frosted background
-        painter.fillPath(path, QColor(24, 28, 38, 230))
+        painter.fillPath(path, QColor(24, 28, 38, 235))
 
         # Subtle elegant border
-        painter.setPen(QColor(100, 116, 139, 140))
+        painter.setPen(QColor(100, 116, 139, 160))
         painter.drawPath(path)
