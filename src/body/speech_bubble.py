@@ -1,10 +1,10 @@
-"""Speech bubble overlay positioned above the pet."""
+"""Speech bubble overlay positioned above the pet with screen edge clamping."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPainterPath
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 
 class SpeechBubble(QWidget):
@@ -41,6 +41,7 @@ class SpeechBubble(QWidget):
         self._label.setFont(font)
         layout.addWidget(self._label)
 
+        self._tail_relative_x: float = 0.5  # relative position of pointer tail (0.0 to 1.0)
         self.setMaximumWidth(280)
         self.hide()
 
@@ -54,16 +55,35 @@ class SpeechBubble(QWidget):
             self._dismiss_timer.start(ttl_ms)
 
     def anchor_to_pet(self, pet_pos: QPoint, pet_width: int, pet_height: int) -> None:
-        """Move the bubble horizontally centered and sitting directly above the pet."""
+        """Move the bubble sitting above pet, strictly clamped within screen bounds."""
         bubble_width = self.width()
         bubble_height = self.height()
 
-        target_x = pet_pos.x() + (pet_width - bubble_width) // 2
+        ideal_center_x = pet_pos.x() + pet_width // 2
+        target_x = ideal_center_x - bubble_width // 2
         target_y = pet_pos.y() - bubble_height - 6
 
-        # Avoid placing outside the top screen margin
-        target_y = max(10, target_y)
+        # Smart Screen Clamping: keep bubble 100% visible on screen!
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is not None:
+            geom = screen.availableGeometry()
+            margin = 12
+
+            # Clamp horizontal position
+            target_x = max(
+                geom.left() + margin, min(target_x, geom.right() - bubble_width - margin)
+            )
+            # Clamp vertical position
+            target_y = max(geom.top() + margin, target_y)
+
+            # Adjust pointer tail so it still points directly at the pet's center
+            relative_x = (ideal_center_x - target_x) / max(1.0, float(bubble_width))
+            self._tail_relative_x = max(0.15, min(relative_x, 0.85))
+        else:
+            self._tail_relative_x = 0.5
+
         self.move(target_x, target_y)
+        self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         """Clicking on the bubble dismisses it immediately."""
@@ -72,7 +92,7 @@ class SpeechBubble(QWidget):
         super().mousePressEvent(event)
 
     def paintEvent(self, event: object) -> None:  # noqa: N802
-        """Draw a warm, soft-translucent bubble with rounded corners and a small tail."""
+        """Draw a warm, soft-translucent bubble with rounded corners and steered tail."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -83,15 +103,15 @@ class SpeechBubble(QWidget):
         path = QPainterPath()
         path.addRoundedRect(1.0, 1.0, w - 2.0, h - 2.0, 10.0, 10.0)
 
-        # Bottom pointer tail
-        tail_x = w / 2.0
+        # Dynamic bottom pointer tail pointing towards the pet
+        tail_x = w * self._tail_relative_x
         path.moveTo(tail_x - 6.0, h - 2.0)
         path.lineTo(tail_x, h + 5.0)
         path.lineTo(tail_x + 6.0, h - 2.0)
 
         # Background fill
-        painter.fillPath(path, QColor(255, 255, 255, 235))
+        painter.fillPath(path, QColor(255, 255, 255, 240))
 
         # Subtle border
-        painter.setPen(QColor(190, 190, 190, 180))
+        painter.setPen(QColor(180, 180, 180, 190))
         painter.drawPath(path)

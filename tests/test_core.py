@@ -83,6 +83,7 @@ def test_intervention_policy_3_gates() -> None:
     guard = SanctuaryGuard()
     policy = ColdStartPolicy(day_count=5)
     watcher = StateWatcher(overwork_threshold_hours=3.0)
+    watcher.is_late_night = lambda now=None: False  # type: ignore[method-assign]
     engine = InterventionPolicy(sanctuary=guard, cold_start=policy, watcher=watcher)
 
     # Normal state -> Observe by default (None)

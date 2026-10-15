@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QCloseEvent, QEnterEvent, QMouseEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QCursor, QEnterEvent, QMouseEvent, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from src.body.animation import AnimationPlayer, SpriteSheet, SpriteSheetError
@@ -14,7 +14,7 @@ from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
 
 CLICK_DRAG_THRESHOLD_PX = 4
-EDGE_SNAP_DISTANCE_PX = 60
+EDGE_SNAP_DISTANCE_PX = 30  # Snapping threshold set to 30px
 PEEK_REVEAL_WIDTH_PX = 24  # Width of half-body staying visible when docked
 DEFAULT_SCALE = 2
 
@@ -50,11 +50,13 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setStyleSheet("background: transparent;")
+        self.setMouseTracking(True)
 
         self._label = QLabel(self)
         self._label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._label.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self._label.setStyleSheet("background: transparent; border: 0;")
+        self._label.setMouseTracking(True)
 
         self._player = AnimationPlayer(self)
         self._player.frame_changed.connect(self._on_frame_changed)
@@ -72,6 +74,11 @@ class PetWindow(QWidget):
         self._retract_timer = QTimer(self)
         self._retract_timer.setSingleShot(True)
         self._retract_timer.timeout.connect(self._retract_to_dock)
+
+        # Polling watcher to ensure reliable leave detection across OS window borders
+        self._hover_poll_timer = QTimer(self)
+        self._hover_poll_timer.setInterval(150)
+        self._hover_poll_timer.timeout.connect(self._check_cursor_outside_polling)
 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
@@ -171,10 +178,9 @@ class PetWindow(QWidget):
                     saved_y = int(data.get("y", fallback_y))
                     self._docked_edge = data.get("docked_edge", None)
 
-                    clamped_x = max(
-                        geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX,
-                        min(saved_x, geom.right() - PEEK_REVEAL_WIDTH_PX),
-                    )
+                    min_clamped_x = geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX
+                    max_clamped_x = geom.right() - PEEK_REVEAL_WIDTH_PX
+                    clamped_x = max(min_clamped_x, min(saved_x, max_clamped_x))
                     clamped_y = max(geom.top(), min(saved_y, geom.bottom() - self.height()))
                     self.move(clamped_x, clamped_y)
                     return
@@ -207,8 +213,21 @@ class PetWindow(QWidget):
     def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
         """Mouse leave: schedule retracting back to docked peek state."""
         if self._docked_edge is not None and not self._has_moved:
-            self._retract_timer.start(1200)  # retract after 1.2s
+            if not self._retract_timer.isActive():
+                self._retract_timer.start(800)
         super().leaveEvent(event)
+
+    def _check_cursor_outside_polling(self) -> None:
+        """Reliable periodic check to detect cursor leaving pet and bubble area."""
+        if self._docked_edge is not None and self._is_peek_expanded and not self._has_moved:
+            cursor_pos = QCursor.pos()
+            in_pet = self.geometry().contains(cursor_pos)
+            in_bubble = self._bubble.isVisible() and self._bubble.geometry().contains(cursor_pos)
+            if not in_pet and not in_bubble:
+                if not self._retract_timer.isActive():
+                    self._retract_timer.start(800)  # retract after 800ms
+            else:
+                self._retract_timer.stop()
 
     def _expand_from_dock(self) -> None:
         """Slide fully out of the edge so user can see whole pet body."""
@@ -221,6 +240,7 @@ class PetWindow(QWidget):
         elif self._docked_edge == "left":
             self.move(geom.left(), self.y())
         self._is_peek_expanded = True
+        self._hover_poll_timer.start()
         if self._bubble.isVisible():
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
 
@@ -235,6 +255,7 @@ class PetWindow(QWidget):
         elif self._docked_edge == "left":
             self.move(geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX, self.y())
         self._is_peek_expanded = False
+        self._hover_poll_timer.stop()
         self._save_position()
 
     # ------------------------------------------------------------------
@@ -259,7 +280,6 @@ class PetWindow(QWidget):
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:
                     geom = screen.availableGeometry()
-                    # Keep at least PEEK_REVEAL_WIDTH_PX visible when dragging near edge
                     min_x = geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX
                     max_x = geom.right() - PEEK_REVEAL_WIDTH_PX
                     clamped_x = max(min_x, min(desired_pos.x(), max_x))
@@ -297,7 +317,6 @@ class PetWindow(QWidget):
                         self._retract_to_dock()
                     else:
                         self._docked_edge = None
-                        # Check bottom snap
                         if abs(geom.bottom() - self.height() - cur_y) < EDGE_SNAP_DISTANCE_PX:
                             cur_y = geom.bottom() - self.height()
                             self.move(cur_x, cur_y)
@@ -309,6 +328,7 @@ class PetWindow(QWidget):
             event.accept()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        self._hover_poll_timer.stop()
         self._retract_timer.stop()
         self._bubble.close()
         self._player.stop()
