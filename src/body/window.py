@@ -1,12 +1,12 @@
-"""Transparent, frameless, always-on-top window hosting the companion pet."""
+"""Transparent, frameless, always-on-top window hosting the companion pet with edge peek docking."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QCloseEvent, QMouseEvent, QPixmap
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
+from PySide6.QtGui import QCloseEvent, QEnterEvent, QMouseEvent, QPixmap
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from src.body.animation import AnimationPlayer, SpriteSheet, SpriteSheetError
@@ -14,12 +14,15 @@ from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
 
 CLICK_DRAG_THRESHOLD_PX = 4
-EDGE_SNAP_DISTANCE_PX = 30
+EDGE_SNAP_DISTANCE_PX = 60
+PEEK_REVEAL_WIDTH_PX = 24  # Width of half-body staying visible when docked
 DEFAULT_SCALE = 2
 
 
 class PetWindow(QWidget):
-    """The desktop pet window with animation player, speech bubble, dragging, and edge clamping."""
+    """The desktop pet window with animation player, speech bubble, dragging,
+    and half-hidden edge peek docking.
+    """
 
     clicked = Signal()
     position_changed = Signal(int, int)
@@ -63,6 +66,13 @@ class PetWindow(QWidget):
         self._press_pos: QPoint | None = None
         self._has_moved = False
 
+        # Edge Docking (Peek Mode) state
+        self._docked_edge: str | None = None  # "right", "left", or None
+        self._is_peek_expanded = False
+        self._retract_timer = QTimer(self)
+        self._retract_timer.setSingleShot(True)
+        self._retract_timer.timeout.connect(self._retract_to_dock)
+
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
         self._load_spritesheets()
@@ -95,7 +105,7 @@ class PetWindow(QWidget):
                     pass
 
     def apply_state(self, state: PetState) -> None:
-        """Switch the pet's animated state with distinct visual rhythms."""
+        """Switch the pet's animated state."""
         self._current_state = state
 
         sheet_key = "idle"
@@ -105,22 +115,9 @@ class PetWindow(QWidget):
         if state == PetState.SLEEPING:
             sheet_key = "sleep" if "sleep" in self._loaded_sheets else "idle"
             fps = 3
-        elif state == PetState.THINKING:
-            # Thoughtful slower breathing rhythm (calm, not frantic walking)
+        else:
             sheet_key = "idle"
-            fps = 4
-        elif state == PetState.WORKING:
-            # Tool working: lively walking/typing rhythm
-            sheet_key = "walk" if "walk" in self._loaded_sheets else "idle"
-            fps = 8
-        elif state == PetState.HAPPY:
-            # Cheerful quick cadence
-            sheet_key = "idle"
-            fps = 10
-        elif state == PetState.ERROR:
-            # Alert pace
-            sheet_key = "idle"
-            fps = 12
+            fps = 6
 
         sheet = self._loaded_sheets.get(sheet_key) or self._loaded_sheets.get("idle")
         if sheet is not None:
@@ -128,6 +125,10 @@ class PetWindow(QWidget):
 
     def say(self, text: str, *, ttl_ms: int = 4000) -> None:
         """Display a speech bubble above the pet."""
+        if self._docked_edge is not None and not self._is_peek_expanded:
+            self._expand_from_dock()
+            self._retract_timer.start(ttl_ms + 1000)
+
         self._bubble.show_message(text, ttl_ms=ttl_ms)
         self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
 
@@ -136,8 +137,10 @@ class PetWindow(QWidget):
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
             geom = screen.availableGeometry()
-            new_x = geom.right() - self.width() - 30
-            new_y = geom.bottom() - self.height() - 20
+            new_x = geom.right() - self.width() - 25
+            new_y = geom.bottom() - self.height() - 15
+            self._docked_edge = None
+            self._is_peek_expanded = False
             self.move(new_x, new_y)
             self._save_position()
             if self._bubble.isVisible():
@@ -158,7 +161,6 @@ class PetWindow(QWidget):
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
             geom = screen.availableGeometry()
-            # Default fall back
             fallback_x = geom.right() - 220
             fallback_y = geom.bottom() - 200
 
@@ -167,10 +169,13 @@ class PetWindow(QWidget):
                     data = json.loads(cfg.read_text("utf-8"))
                     saved_x = int(data.get("x", fallback_x))
                     saved_y = int(data.get("y", fallback_y))
+                    self._docked_edge = data.get("docked_edge", None)
 
-                    # Safety check: ensure saved position is inside the visible screen!
-                    clamped_x = max(geom.left(), min(saved_x, geom.right() - 100))
-                    clamped_y = max(geom.top(), min(saved_y, geom.bottom() - 100))
+                    clamped_x = max(
+                        geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX,
+                        min(saved_x, geom.right() - PEEK_REVEAL_WIDTH_PX),
+                    )
+                    clamped_y = max(geom.top(), min(saved_y, geom.bottom() - self.height()))
                     self.move(clamped_x, clamped_y)
                     return
                 except (json.JSONDecodeError, ValueError, OSError):
@@ -182,12 +187,58 @@ class PetWindow(QWidget):
         cfg = self._get_config_path()
         try:
             cfg.parent.mkdir(parents=True, exist_ok=True)
-            cfg.write_text(json.dumps({"x": self.x(), "y": self.y()}), "utf-8")
+            cfg.write_text(
+                json.dumps({"x": self.x(), "y": self.y(), "docked_edge": self._docked_edge}),
+                "utf-8",
+            )
         except OSError:
             pass
 
     # ------------------------------------------------------------------
-    # Mouse interaction (Screen-clamped Dragging and Snapping)
+    # Peek Docking & Hover Animations
+    # ------------------------------------------------------------------
+    def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802
+        """Mouse hover: peek out if docked at the edge."""
+        if self._docked_edge is not None:
+            self._retract_timer.stop()
+            self._expand_from_dock()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
+        """Mouse leave: schedule retracting back to docked peek state."""
+        if self._docked_edge is not None and not self._has_moved:
+            self._retract_timer.start(1200)  # retract after 1.2s
+        super().leaveEvent(event)
+
+    def _expand_from_dock(self) -> None:
+        """Slide fully out of the edge so user can see whole pet body."""
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None or self._docked_edge is None:
+            return
+        geom = screen.availableGeometry()
+        if self._docked_edge == "right":
+            self.move(geom.right() - self.width() + 1, self.y())
+        elif self._docked_edge == "left":
+            self.move(geom.left(), self.y())
+        self._is_peek_expanded = True
+        if self._bubble.isVisible():
+            self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+
+    def _retract_to_dock(self) -> None:
+        """Slide half-body into screen edge, leaving only the head peeking out."""
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None or self._docked_edge is None:
+            return
+        geom = screen.availableGeometry()
+        if self._docked_edge == "right":
+            self.move(geom.right() - PEEK_REVEAL_WIDTH_PX, self.y())
+        elif self._docked_edge == "left":
+            self.move(geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX, self.y())
+        self._is_peek_expanded = False
+        self._save_position()
+
+    # ------------------------------------------------------------------
+    # Mouse interaction (Screen-clamped Dragging and Edge Snapping)
     # ------------------------------------------------------------------
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
@@ -205,11 +256,13 @@ class PetWindow(QWidget):
                 self._has_moved = True
                 desired_pos = cur_pos - self._drag_offset
 
-                # Clamp strictly to the available screen boundary! (Never lost off-screen)
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:
                     geom = screen.availableGeometry()
-                    clamped_x = max(geom.left(), min(desired_pos.x(), geom.right() - self.width()))
+                    # Keep at least PEEK_REVEAL_WIDTH_PX visible when dragging near edge
+                    min_x = geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX
+                    max_x = geom.right() - PEEK_REVEAL_WIDTH_PX
+                    clamped_x = max(min_x, min(desired_pos.x(), max_x))
                     clamped_y = max(geom.top(), min(desired_pos.y(), geom.bottom() - self.height()))
                     self.move(clamped_x, clamped_y)
                     self.position_changed.emit(clamped_x, clamped_y)
@@ -225,31 +278,38 @@ class PetWindow(QWidget):
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             self._drag_offset = None
             if self._has_moved:
-                # Snap to edge if within snapping threshold
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:
                     geom = screen.availableGeometry()
                     cur_x = self.x()
                     cur_y = self.y()
 
-                    # Right edge snap
-                    if abs(geom.right() - self.width() - cur_x) < EDGE_SNAP_DISTANCE_PX:
-                        cur_x = geom.right() - self.width()
-                    # Left edge snap
-                    elif abs(cur_x - geom.left()) < EDGE_SNAP_DISTANCE_PX:
-                        cur_x = geom.left()
-                    # Bottom edge snap
-                    if abs(geom.bottom() - self.height() - cur_y) < EDGE_SNAP_DISTANCE_PX:
-                        cur_y = geom.bottom() - self.height()
-
-                    self.move(cur_x, cur_y)
-
-                self._save_position()
+                    # Check Right Edge Docking
+                    if (
+                        abs(geom.right() - self.width() - cur_x) < EDGE_SNAP_DISTANCE_PX
+                        or cur_x > geom.right() - self.width()
+                    ):
+                        self._docked_edge = "right"
+                        self._retract_to_dock()
+                    # Check Left Edge Docking
+                    elif abs(cur_x - geom.left()) < EDGE_SNAP_DISTANCE_PX or cur_x < geom.left():
+                        self._docked_edge = "left"
+                        self._retract_to_dock()
+                    else:
+                        self._docked_edge = None
+                        # Check bottom snap
+                        if abs(geom.bottom() - self.height() - cur_y) < EDGE_SNAP_DISTANCE_PX:
+                            cur_y = geom.bottom() - self.height()
+                            self.move(cur_x, cur_y)
+                        self._save_position()
+                else:
+                    self._save_position()
             else:
                 self.clicked.emit()
             event.accept()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        self._retract_timer.stop()
         self._bubble.close()
         self._player.stop()
         super().closeEvent(event)

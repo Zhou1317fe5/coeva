@@ -1,9 +1,12 @@
-"""Transient, frosted-glass overlay for quick slice feeding."""
+"""Transient, frosted-glass overlay for quick slice feeding with draggable support."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter, QPainterPath
+import json
+from pathlib import Path
+
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QKeyEvent, QMouseEvent, QPainter, QPainterPath
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -35,7 +38,7 @@ class _FeederInput(QPlainTextEdit):
 
 
 class SliceFeederOverlay(QWidget):
-    """Semi-transparent transient modal for instant slice feeding."""
+    """Semi-transparent transient modal for instant slice feeding, fully draggable."""
 
     slice_submitted = Signal(str)
     cancelled = Signal()
@@ -51,22 +54,22 @@ class SliceFeederOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
 
-        self.setFixedSize(480, 160)
+        self.setFixedSize(500, 160)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(18, 14, 18, 14)
+        main_layout.setContentsMargins(18, 12, 18, 14)
         main_layout.setSpacing(8)
 
-        # Header bar
+        # Header bar (serves as drag handle)
         header_layout = QHBoxLayout()
-        title_label = QLabel("🌱 随手投喂切片 (Slice Feed)", self)
+        title_label = QLabel("🌱 随手投喂切片 (按住顶部可拖动)", self)
         title_label.setStyleSheet("color: #E2E8F0; font-weight: bold;")
         font = QFont("Segoe UI", 10)
         font.setBold(True)
         title_label.setFont(font)
         header_layout.addWidget(title_label)
 
-        hint_label = QLabel("Enter 发送 · Esc 取消", self)
+        hint_label = QLabel("Enter 发送 · Esc 退出", self)
         hint_label.setStyleSheet("color: #94A3B8; font-size: 11px;")
         header_layout.addStretch()
         header_layout.addWidget(hint_label)
@@ -78,7 +81,7 @@ class SliceFeederOverlay(QWidget):
         self._input.setStyleSheet(
             "QPlainTextEdit {"
             "  color: #F8FAFC;"
-            "  background: rgba(15, 23, 42, 180);"
+            "  background: rgba(15, 23, 42, 190);"
             "  border: 1px solid rgba(148, 163, 184, 90);"
             "  border-radius: 8px;"
             "  padding: 8px;"
@@ -92,26 +95,88 @@ class SliceFeederOverlay(QWidget):
         self._input.cancel_pressed.connect(self._on_cancel)
         main_layout.addWidget(self._input)
 
+        # Drag tracking
+        self._drag_offset: QPoint | None = None
+
+    def _get_pos_file(self) -> Path:
+        return Path("data") / "feeder_position.json"
+
     def toggle_or_show(self) -> None:
-        """Toggle visibility: if visible and active, close it; otherwise show centered."""
+        """Toggle visibility: if visible, hide; otherwise show and focus."""
         if self.isVisible():
             self.hide()
         else:
-            self.show_centered()
+            self.show_at_saved_or_center()
 
-    def show_centered(self) -> None:
-        """Center the overlay on the active screen and focus input."""
+    def show_at_saved_or_center(self) -> None:
+        """Show overlay restoring last dragged position, or centered by default."""
+        pos_file = self._get_pos_file()
         screen = QApplication.primaryScreen()
+        default_x, default_y = 300, 300
         if screen is not None:
             geom = screen.availableGeometry()
-            x = geom.center().x() - self.width() // 2
-            y = geom.center().y() - self.height() // 2 - 80
-            self.move(x, y)
+            default_x = geom.center().x() - self.width() // 2
+            default_y = geom.center().y() - self.height() // 2 - 80
+
+        if pos_file.is_file():
+            try:
+                data = json.loads(pos_file.read_text("utf-8"))
+                target_x = int(data.get("x", default_x))
+                target_y = int(data.get("y", default_y))
+                # Validate in screen
+                if screen is not None:
+                    geom = screen.availableGeometry()
+                    target_x = max(geom.left(), min(target_x, geom.right() - self.width()))
+                    target_y = max(geom.top(), min(target_y, geom.bottom() - self.height()))
+                self.move(target_x, target_y)
+            except Exception:
+                self.move(default_x, default_y)
+        else:
+            self.move(default_x, default_y)
+
         self._input.clear()
         self.show()
         self.raise_()
         self.activateWindow()
         self._input.setFocus()
+
+    def show_centered(self) -> None:
+        self.show_at_saved_or_center()
+
+    def _save_pos(self) -> None:
+        try:
+            pos_file = self._get_pos_file()
+            pos_file.parent.mkdir(parents=True, exist_ok=True)
+            pos_file.write_text(json.dumps({"x": self.x(), "y": self.y()}), "utf-8")
+        except Exception:
+            pass
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        """Allow dragging the input overlay from anywhere except the inner input box."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self._drag_offset is not None:
+            cur_pos = event.globalPosition().toPoint()
+            new_pos = cur_pos - self._drag_offset
+            # Clamp to screen
+            screen = self.screen() or QApplication.primaryScreen()
+            if screen is not None:
+                geom = screen.availableGeometry()
+                clamped_x = max(geom.left(), min(new_pos.x(), geom.right() - self.width()))
+                clamped_y = max(geom.top(), min(new_pos.y(), geom.bottom() - self.height()))
+                self.move(clamped_x, clamped_y)
+            else:
+                self.move(new_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = None
+            self._save_pos()
+            event.accept()
 
     def _on_submit(self) -> None:
         text = self._input.toPlainText().strip()
@@ -124,7 +189,7 @@ class SliceFeederOverlay(QWidget):
         self.hide()
 
     def paintEvent(self, event: object) -> None:  # noqa: N802
-        """Draw a frosted glass dark pill container."""
+        """Draw a frosted glass dark pill container with top drag bar indicator."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -132,7 +197,7 @@ class SliceFeederOverlay(QWidget):
         path.addRoundedRect(1.0, 1.0, float(self.width() - 2), float(self.height() - 2), 12.0, 12.0)
 
         # Dark frosted background
-        painter.fillPath(path, QColor(24, 28, 38, 235))
+        painter.fillPath(path, QColor(24, 28, 38, 240))
 
         # Subtle elegant border
         painter.setPen(QColor(100, 116, 139, 160))

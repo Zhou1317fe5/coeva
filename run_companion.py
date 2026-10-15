@@ -179,12 +179,13 @@ class CompanionApp:
 
         # 2. Check Sanctuary mode
         if is_distressed:
-            # AC-4: 100% silence when distressed, just a gentle nod
+            # AC-4: Enter Sanctuary mode with a gentle, non-preaching acknowledgment bubble
             self.controller.perform_action("rest")
+            self.controller.say("🍃 收到。先放一放，我陪着你...", ttl_ms=3500)
         else:
-            # AC-3: Acknowledge with happy nod and short text
+            # AC-3: Acknowledge normal slice with gentle confirmation
             self.controller.perform_action("jump")
-            self.controller.say("记下了，存进档案库了", ttl_ms=2500)
+            self.controller.say("✨ 记下了，存进档案库了", ttl_ms=2500)
 
     def _on_quit(self) -> None:
         try:
