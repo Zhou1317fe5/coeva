@@ -102,21 +102,31 @@ Vasu 不记录机械的流水账，也不做 Life Logging 监控。
 
 ---
 
-## 敏捷路线图
+## 项目状态与路线图
 
-- [ ] **Sprint 1：活着且能看见 (The Living Shell)**
-  - 接入成熟开源桌面挂件底座（透明通道、轻量状态机）；
+当前进度：**Phase 1 与 Phase 2A 已完成**，桌面伴生体与证据档案库均已落地并通过测试。
+
+- [x] **Phase 1：活着且能看见 (The Living Shell)** — 已完成
+  - 独立常驻桌面挂件（透明通道、点击穿透、置顶、闲置入睡）；
   - 全局极简投喂输入框（快捷键呼出、本地存储）；
-  - Hermes 运行状态桥接与基础动作反馈；
-  - 前 14 天冷启动发言频次与行为控制。
-- [ ] **Sprint 2：状态关怀与避风港 (State Care & Sanctuary)**
-  - 连续工作与夜间节律无感监测；
-  - 避风港模式熔断机制；
-  - 基于 WebDAV / S3 的轻量 Markdown 档案同步（手机端可读）。
-- [ ] **Sprint 3：认知内核与人生章节 (Cognitive Core & Chapters)**
-  - 周期性（周/月频）大模型心智反思与模式识别；
-  - 双向校准轻量对话能力；
-  - 首期“人生章节”共同沉淀展示。
+  - 多 Agent 桥接（Hermes / PI-Desktop / Codex / Claude Code）与基础动作反馈；
+  - 冷启动发言频次控制、避风港熔断、介入策略三道门。
+- [x] **Phase 2A：证据档案库与归因门 (Chronicle Foundation)** — 已完成
+  - 本地 SQLite 档案库（`slices` / `events` 两张表 + `evidence` 视图），WAL 模式；
+  - Agent 事件持久化与归因门（只有 `user_prompt` 具备用户归因）；
+  - 只读 Chronicle HTTP 端点（回环限定）；
+  - 证据按 `retention_class` 每日衰减，切片永不删除。
+- [ ] **Phase 2B：发展记忆 (Developmental Memory)** — 待启动
+  - **启动门**：持久化 Episode 累计 ≥ 100 且跨度 ≥ 4 周（阈值需要真实数据支撑，不靠猜）；
+  - Pattern Builder 与 Hypothesis Engine（含反证存储）。
+- [ ] **Phase 2C：共同自我模型 (Shared Self Model)** — 待启动
+  - 用户校准（Calibration）、Confirmed Insight 及其退休、Growth Themes。
+- [ ] **Phase 2D：人生章节 (Growth Chapters)** — 待启动
+  - 章节资格门、LLM 生成、Narrative Firewall、共同命名与回忆录视图。
+
+> Phase 2B/2C/2D 的每一项及其**启动条件**都记录在
+> [`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md) §8 待做清单中，
+> 以避免"已设计"被误读为"已承诺"。
 
 ---
 

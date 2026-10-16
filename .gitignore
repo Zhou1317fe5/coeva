@@ -55,3 +55,8 @@ Desktop.ini
 # the Chronicle database, machine-local window/agent settings and the SQLite WAL files.
 # The app recreates this directory and its files on first run.
 data/
+
+# Working notes that stay local: product/character strategy, business plans and
+# asset production plans. These are not part of the open-source project, and the
+# repository is public, so anything here must never be committed by accident.
+private/
