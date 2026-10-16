@@ -7,9 +7,63 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 
+# Alpha values at or below this are treated as transparent. Matches the mask
+# threshold used when trimming empty frames.
+_ALPHA_THRESHOLD = 8
+
 
 class SpriteSheetError(RuntimeError):
     """Raised when a spritesheet cannot be loaded or sliced."""
+
+
+def measure_art_padding(image: QImage, *, cols: int, rows: int) -> tuple[int, int]:
+    """Return (left_pad, right_pad) of the union of all non-empty frames.
+
+    Petdex atlases bake generous transparent margins around the artwork, so the
+    frame edges are empty. Anything that reveals a fixed number of pixels from a
+    frame edge therefore reveals *transparency* once the margin exceeds that
+    number -- which is why a docked pet became invisible at larger scales.
+    Callers use this to reveal margin + a visible sliver, instead of guessing.
+
+    The scan is column-wise `max()` over Qt's own alpha buffer: measuring the
+    whole atlas takes tens of milliseconds, versus seconds for a per-pixel loop.
+    """
+    if cols < 1 or rows < 1:
+        raise SpriteSheetError(f"Atlas grid must be positive, got {cols}x{rows}")
+    frame_w = image.width() // cols
+    frame_h = image.height() // rows
+    if frame_w < 1 or frame_h < 1:
+        raise SpriteSheetError(
+            f"Atlas {image.width()}x{image.height()} is smaller than its {cols}x{rows} grid"
+        )
+    alpha = image.convertToFormat(QImage.Format.Format_Alpha8)
+    bytes_per_line = alpha.bytesPerLine()
+    buffer = alpha.constBits()
+
+    lefts: list[int] = []
+    rights: list[int] = []
+    for row in range(rows):
+        y0 = row * frame_h
+        for col in range(cols):
+            x0 = col * frame_w
+            frame_left: int | None = None
+            frame_right = -1
+            for offset in range(frame_w):
+                column = buffer[x0 + offset :: bytes_per_line]
+                if max(column[y0 : y0 + frame_h], default=0) > _ALPHA_THRESHOLD:
+                    if frame_left is None:
+                        frame_left = offset
+                    frame_right = offset
+            if frame_left is None:
+                continue  # an entirely empty frame carries no artwork
+            lefts.append(frame_left)
+            rights.append(frame_w - 1 - frame_right)
+
+    if not lefts:
+        return 0, 0  # a fully transparent atlas has no margin to clear
+    # The worst case over frames: whatever is displayed must clear the widest
+    # margin that any frame in this sheet can have.
+    return max(lefts), max(rights)
 
 
 class SpriteSheet:

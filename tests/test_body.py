@@ -185,6 +185,254 @@ def test_builtin_pets_loading(tmp_path: Path) -> None:
 
     window.close()
 
+def test_docked_peek_keeps_artwork_visible_at_every_scale(tmp_path: Path) -> None:
+    """A docked pet must show real artwork, not just transparent margin.
+
+    Regression guard: the reveal used to be a fixed 24px, but Petdex atlases bake
+    transparent margins (tiko up to 32px, wangcai 19px) that grow with scale. Once
+    the margin exceeded 24px the docked window showed nothing but transparency, so
+    a larger pet vanished at the screen edge.
+    """
+    from PySide6.QtGui import QImage
+
+    for pet, expected_padding in (
+        ("tiko", (31, 32)),
+        ("wangcai", (18, 19)),
+        ("debug-duck", (14, 15)),
+    ):
+        pet_dir = Path("assets") / "pets" / pet
+        # 1. The measured margin must match the atlas' real transparent border.
+        for scale in (1.0, 2.0, 3.0):
+            window = _isolated_window(pet_dir, tmp_path, scale=scale)
+            measured_left, measured_right = window._art_padding_px
+            # Padding scales with the sprite, so compare against the scaled margin.
+            expected_left = round(expected_padding[0] * scale)
+            expected_right = round(expected_padding[1] * scale)
+            assert abs(measured_left - expected_left) <= 1
+            assert abs(measured_right - expected_right) <= 1
+
+            # 2. The reveal must clear the margin, leaving a visible sliver.
+            assert window._peek_reveal_px("right") > measured_right
+            assert window._peek_reveal_px("left") > measured_left
+            window.close()
+
+        # 3. Real pixels must survive in the on-screen sliver, at every scale.
+        import json as _json
+
+        meta = _json.loads((pet_dir / "pet.json").read_text(encoding="utf-8"))
+        atlas = QImage(str(pet_dir / meta["spritesheetPath"]))
+        cols = int(meta.get("cols", 8))
+        rows = int(meta.get("rows", 9))
+        frame_w, frame_h = atlas.width() // cols, atlas.height() // rows
+
+        for scale in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0):
+            window = _isolated_window(pet_dir, tmp_path, scale=scale)
+            scaled = atlas.copy(0, 0, frame_w, frame_h).scaled(
+                int(frame_w * scale), int(frame_h * scale)
+            )
+            width, height = scaled.width(), scaled.height()
+
+            for edge in ("right", "left"):
+                reveal = window._peek_reveal_px(edge)
+                columns = range(width - reveal, width) if edge == "right" else range(reveal)
+                visible = sum(
+                    1
+                    for x in columns
+                    for y in range(height)
+                    if ((scaled.pixel(x, y) >> 24) & 0xFF) > 8
+                )
+                assert visible > 0, (
+                    f"{pet} @scale={scale} docked {edge}: no artwork visible "
+                    f"(reveal={reveal}px)"
+                )
+            window.close()
+
+
+def test_panel_action_buttons_all_map_to_a_real_state(tmp_path: Path) -> None:
+    """Every action id the PI-Desktop panel posts must drive a real state.
+
+    Regression guard: the panel offered thinking / working / celebrating while the
+    controller only knew think / work / jump, so three of its four buttons silently
+    did nothing. This reads the panel itself, so the two can never drift apart.
+    """
+    import re
+
+    from src.body.controller import ACTION_STATES
+
+    panel = (
+        Path("plugins") / "pi-companion-bridge" / "renderer" / "index.html"
+    ).read_text(encoding="utf-8")
+    action_ids = set(re.findall(r'data-action="([A-Za-z_]+)"', panel))
+
+    assert action_ids, "panel should declare data-action buttons"
+    unknown = sorted(action_id for action_id in action_ids if action_id not in ACTION_STATES)
+    assert not unknown, f"panel actions missing from ACTION_STATES: {unknown}"
+
+    # And each one must not be a silent no-op: the mapped state must be the one
+    # the pet actually reaches.
+    pet_dir = Path("assets") / "pets" / "tiko"
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
+    controller = BodyController(window)
+    for action_id in sorted(action_ids):
+        controller.perform_action("rest")  # reset to a known state
+        assert controller.current_state == PetState.IDLE
+        controller.perform_action(action_id)
+        assert controller.current_state == ACTION_STATES[action_id]
+    window.close()
+
+
+def test_core_status_page_reports_live_state_not_static_prose(tmp_path: Path) -> None:
+    """Page 3 must report the real Growth Core state, not fixed marketing copy."""
+    from src.core.cold_start import ColdStartPolicy
+    from src.core.sanctuary import SanctuaryGuard
+
+    guard = SanctuaryGuard()
+    policy = ColdStartPolicy(day_count=5)
+    window = _settings_window(tmp_path)
+    window.set_core_handles(sanctuary=guard, cold_start=policy)
+
+    # Day 5 = stage 2, quota 2, no psychological analysis allowed.
+    assert "第 5 天" in window.coldstart_status.text()
+    assert "Stage 2" in window.coldstart_status.text()
+    assert "剩余 2 次" in window.coldstart_status.text()
+    assert "禁止" in window.coldstart_status.text()
+
+    # Consuming quota must be reflected the next time the page is shown.
+    assert policy.record_speech()
+    window.refresh_core_status()
+    assert "剩余 1 次" in window.coldstart_status.text()
+
+    # Sanctuary must flip the indicator on real state.
+    assert "未激活" in window.sanctuary_status.text()
+    guard.evaluate_text("烦死了，全搞砸了")
+    window.refresh_core_status()
+    assert "已激活" in window.sanctuary_status.text()
+    window.close()
+
+
+def test_core_status_page_says_so_when_core_is_not_attached(tmp_path: Path) -> None:
+    """Without handles the page must say '未接入' rather than imply it is live."""
+    window = _settings_window(tmp_path)
+    assert "未接入" in window.sanctuary_status.text()
+    assert "未接入" in window.coldstart_status.text()
+    window.close()
+
+
+def test_idle_sleep_and_hover_greeting(tmp_path: Path) -> None:
+    """Idle doze after a quiet minute, and a single wave on hover.
+
+    Regression guard for the two P2 DESIGN debts: nothing ever slept from
+    inactivity (the pet slept only when an agent session ended, so its rhythm
+    belonged to the agent), and hovering revealed the pet without greeting.
+    """
+    from src.body.window import IDLE_SLEEP_AFTER_MS
+
+    tiko_dir = Path("assets") / "pets" / "tiko"
+    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
+
+    # The configured idle wait is the documented 60s.
+    assert IDLE_SLEEP_AFTER_MS == 60_000
+    assert window._sleep_timer.interval() == IDLE_SLEEP_AFTER_MS
+    # A fresh pet is awake and its countdown is running.
+    assert window.current_state == PetState.IDLE
+    assert window._sleep_timer.isActive()
+
+    # Idle timeout puts it to sleep.
+    window._doze_off()
+    assert window.current_state == PetState.SLEEPING
+    # Sleeping is stable: the countdown must not re-arm and re-trigger.
+    assert not window._sleep_timer.isActive()
+
+    # Activity wakes it and restarts the countdown.
+    window._wake_up()
+    assert window.current_state == PetState.IDLE
+    assert window._sleep_timer.isActive()
+
+    # Hovering greets with a wave, then settles back on its own.
+    window._start_greeting()
+    assert window.current_state == PetState.HAPPY
+    assert window._greeting_active
+    window._finish_greeting()
+    assert window.current_state == PetState.IDLE
+    assert not window._greeting_active
+
+    # A sleeping pet must not be jolted awake by the greeting path itself.
+    window._doze_off()
+    assert window.current_state == PetState.SLEEPING
+    window._start_greeting()
+    assert not window._greeting_active
+
+    window.close()
+
+
+def test_docked_pet_retracts_again_after_being_dragged_to_the_edge(tmp_path: Path) -> None:
+    """A pet docked by dragging must still auto-retract after a hover peek.
+
+    Regression guard: `_has_moved` is set while dragging and both auto-retract
+    paths require it to be False, but it was never cleared on release. So a pet the
+    user dragged to the edge peeked out on hover and then stayed out forever, as if
+    it were no longer docked. Restoring a dock from disk (the only path that worked)
+    hid the bug, because that never sets the flag.
+    """
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    pet_dir = Path("assets") / "pets" / "tiko"
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
+    screen = (window.screen() or QApplication.primaryScreen()).availableGeometry()
+
+    def _mouse(kind: QMouseEvent.Type, gx: float, gy: float, button: Qt.MouseButton) -> QMouseEvent:
+        return QMouseEvent(
+            kind,
+            QPointF(1, 1),
+            QPointF(gx, gy),
+            button,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+    # Dock it the way a user does: press, drag to the right edge, release.
+    window.mousePressEvent(
+        _mouse(
+            QMouseEvent.Type.MouseButtonPress,
+            window.x() + 10,
+            window.y() + 10,
+            Qt.MouseButton.LeftButton,
+        )
+    )
+    window.mouseMoveEvent(
+        _mouse(
+            QMouseEvent.Type.MouseMove,
+            screen.right() - 2,
+            window.y() + 40,
+            Qt.MouseButton.NoButton,
+        )
+    )
+    window.mouseReleaseEvent(
+        _mouse(
+            QMouseEvent.Type.MouseButtonRelease,
+            screen.right() - 2,
+            window.y() + 40,
+            Qt.MouseButton.LeftButton,
+        )
+    )
+    assert window._docked_edge == "right"
+    assert not window._has_moved, "the drag is over, the flag must not stick"
+
+    # Hover: it peeks out.
+    window._expand_from_dock()
+    assert window._is_peek_expanded
+
+    # Leaving must schedule the retract, and the retract must really move it back.
+    window.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert window._retract_timer.isActive(), "leaving the pet must re-arm auto-retract"
+    window._retract_to_dock()
+    assert not window._is_peek_expanded
+    assert window.x() == screen.right() - window._peek_reveal_px("right")
+    window.close()
+
+
 def test_pet_window_scale_adjustment(tmp_path: Path) -> None:
     """Test dynamic scaling adjustment and persistence for pet body."""
     tiko_dir = Path("assets") / "pets" / "tiko"

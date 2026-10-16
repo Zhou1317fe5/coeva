@@ -6,6 +6,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Fix: 贴边消失 / 闲置入睡 / 面板按钮 / 设置页状态
+### 🔧 Changed（行为调整）
+- **默认尺寸改为 50%**：`DEFAULT_SCALE` 由 `1.0` 改为 `0.5`，并移除 `run_companion.py` /
+  `src/body/main.py` 中显式传入的 `scale=1`（它覆盖了默认值，导致改常量无效）。
+  首次启动的伴生体更小巧、更不打扰；用户仍可通过设置面板、托盘菜单或 `Ctrl + 滚轮` 放大。
+  已保存过尺寸的用户不受影响——`data/body_position.json` 中的偏好会覆盖该默认值。
+
+### 🐛 Fixed（缺陷修复）
+- **拖拽贴边后不再自动收纳（P0 · 用户报告）**：`_has_moved` 仅在鼠标按下时重置，拖动结束
+  (`mouseReleaseEvent`) 后从未复位；而 `leaveEvent` 与 150ms 游标轮询两条自动收纳路径都要求
+  `not self._has_moved`。因此**只要用拖拽把宠物贴到边缘，收纳逻辑就被永久关闭** ——
+  鼠标悬停时弹出，移开后却一直杵在原地，看起来像"忘了自己贴边"。
+  仅从磁盘恢复贴边的路径（不设该标志）正常，所以这个 bug 一直被掩盖。
+  现于释放时清除该标志（它本就只用于"拖动过程中"抑制收纳）。
+  回归测试 `test_docked_pet_retracts_again_after_being_dragged_to_the_edge` 完整走
+  按下 → 拖到边缘 → 释放 → 悬停 → 移开 → 收纳，并断言窗位移回贴边位置；
+  已用"还原修复 → 测试失败并指出 `_has_moved` 未清除 → 恢复后通过"验证有效。
+- **大尺寸贴边后整体消失（P0 · 用户报告）**：贴边收纳时只保留固定 `PEEK_REVEAL_WIDTH_PX = 24px`，
+  而 Petdex 图集自带**透明留白**且留白随缩放放大（实测 tiko 32px、wangcai 19px、debug-duck 15px）。
+  一旦 `留白 × 缩放 ≥ 24`，留着的那 24px 全是透明像素，宠物即不可见 —— tiko 在 0.92 倍以上、
+  wangcai 在 1.85 倍以上必然"消失"，与"变大后贴边就没了"完全对应。
+  现新增 `measure_art_padding()`（列向 max 扫描 Qt alpha 缓冲，整张图集约 40ms）在装载与缩放时
+  测量**最坏帧**的左右留白，贴边露出量改为 `留白 + PEEK_VISIBLE_ART_PX`（按边计算），
+  6 处固定常量用法全部改走 `_peek_reveal_px()`。回归验证覆盖 3 宠物 × 8 缩放 × 左右两侧
+  共 48 组合，真实美术像素全部 > 0；旧逻辑在同等组合下多处为 0（不可见）。
+- **面板动作按钮 3/4 失效（P1）**：PI-Desktop 控制台发送 `thinking` / `working` / `celebrating`，
+  而 `BodyController` 只认 `think` / `work` / `jump`，三者在 `action_map.get()` 中全部回落 IDLE，
+  点了没反应。现将动作表提为模块级 `ACTION_STATES` 并补齐这些别名；
+  新增契约测试**直接解析面板 HTML**，任何按钮 id 与动作表漂移即测试失败
+  （已用"注入漂移 → 测试报出三个缺失 id → 还原后通过"验证）。
+- **设置页第 3 页为纯静态文案（P1）**：避风港与冷启动两张卡片写着固定说明，看着像配置项却不可配、
+  也不反映真实状态。现改为**实时状态显示**：避风港显示"已激活 / 未激活"，
+  冷启动显示"第 N 天 · 当前阶段 · 今日配额与剩余次数 · 深度心理分析是否允许"，
+  每次切换到该页刷新（`refresh_core_status()`）；未接入实例时明确显示"未接入"而非假装可用。
+
+### ✨ Added（新增功能）
+- **闲置 60 秒自动入睡（P2）**：DESIGN §2.1 早有要求，但全仓无任何闲置定时器，入睡只能由
+  `session_end` 或托盘菜单触发，等于桌宠作息被 Agent 生命周期绑架。现实现
+  `IDLE_SLEEP_AFTER_MS = 60_000` 单次定时器：任何状态变化重置计时；入睡后仅"真活动"
+  （鼠标悬停、点击、收到气泡）唤醒。顺带修正 `assets/pets/claw/pet.yaml` 中矛盾的
+  `sleep_after_idle_sec: 120`（该文件从未被代码读取）与 DESIGN 的 60 秒对齐。
+- **探头招手（P2）**：DESIGN §2.1 的"悬停时探出头向用户招手"此前只做了位移、没有动作。
+  现鼠标进入时播放一次招手（HAPPY 帧，1.4s 后自动归于 IDLE），且不会覆盖入睡状态与进行中的招手。
+
+### 📝 Docs（规范与决策）
+- **DESIGN §2.1** 标注眼球跟随（Eye-tracking）**延后原因**：现有 Petdex 素材是扁平烘焙图
+  （单张 atlas，192×208/帧，无独立眼睛图层），瞳孔与身体烤在一起无法单独平移，
+  强做会露出透明空洞；需美术提供独立眼睛图层或瞳孔偏移变体后才能实现。
+- **Phase 2 SPEC 新增 §4.5 切片双写契约**：明确 Chronicle 为唯一事实源、
+  `data/raw_slices.jsonl` 为可重建的人类可读导出/手机同步通道；新读取路径只准读 Chronicle。
+  对应待做项由"待确认"改为"已决定保留双写"。
+
+### 🧪 Tests（新增测试，80 项全绿）
+- `tests/test_body.py`：贴边可见性（3 宠物 × 6 缩放 × 两侧真实像素断言）、
+  动作按钮契约（解析面板 HTML）、设置页实时状态（含未接入分支）、闲置入睡与招手。
+
+---
+
 ## [Unreleased] - Fix: Agent 事件直连桌宠（静默陪伴回归）
 
 ### 🐛 Fixed（缺陷修复）
@@ -33,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/state` 未知状态劫持用户归因（P1）**：原先默认 `user_prompt`（唯一 `user_action`/`durable`
   事件类型），会让 Agent 遥测冒充用户主动决策；现默认降级为 `pre_tool_use`。
 
-### 🧪 Tests（新增测试，70 项全绿）
+### 🧪 Tests（新增测试，当时全库 75 项全绿）
 - `tests/test_core.py`：`allow_agent_bubble` 的 3 道门（常规遥测静默、冷却到期、Sanctuary 与
   配额熔断）；
 - `tests/test_http_server.py`：端到端回归——模拟完整回合（prompt → tool call → turn end）

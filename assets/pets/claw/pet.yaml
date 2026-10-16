@@ -23,7 +23,7 @@ sprites:
 behavior:
   idle_to_walk_chance: 0.3
   walk_speed_px_per_sec: 40
-  sleep_after_idle_sec: 120
+  sleep_after_idle_sec: 60  # DESIGN.md section 2.1; was 120, contradicting the spec
   speech_interval_sec: [12, 30]
 
 stats:

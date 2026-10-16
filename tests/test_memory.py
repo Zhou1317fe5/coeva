@@ -124,7 +124,10 @@ def test_ac4_evidence_is_traceable_to_its_source_row() -> None:
             mood_flag="neutral",
         )
     )
-    store.record_event(_event(AgentEventType.PRE_TOOL_USE, session="s9"))
+    # Build the event once: AgentEvent.create stamps datetime.now(UTC) per call, so
+    # recomputing it later would produce a different id and make this test flaky.
+    event = _event(AgentEventType.PRE_TOOL_USE, session="s9")
+    store.record_event(event)
 
     rows = store.list_evidence(limit=10)
     by_source: dict[str, list[dict[str, object]]] = {}
@@ -140,7 +143,7 @@ def test_ac4_evidence_is_traceable_to_its_source_row() -> None:
 
     # The event-derived row must resolve to the stored event.
     event_row = by_source["event"][0]
-    assert event_row["id"] == event_id(_event(AgentEventType.PRE_TOOL_USE, session="s9"))
+    assert event_row["id"] == event_id(event)
     assert event_row["content"] == "pre_tool_use:bash"
 
 

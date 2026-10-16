@@ -61,7 +61,7 @@ class CompanionApp:
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "claw"
 
-        self.window = PetWindow(assets_dir, scale=1)
+        self.window = PetWindow(assets_dir)
         self.controller = BodyController(self.window)
 
         # 2. Slice Feeder & Chronicle Store
@@ -79,6 +79,10 @@ class CompanionApp:
             sanctuary=self.guard,
             cold_start=self.cold_start,
             watcher=self.watcher,
+        )
+        # Page 3 reports these live states, so it must share the real instances.
+        self.settings_window.set_core_handles(
+            sanctuary=self.guard, cold_start=self.cold_start
         )
 
         # 4. Connectors & Event Bus

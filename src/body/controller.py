@@ -9,6 +9,25 @@ from src.body.contracts import PetState
 if TYPE_CHECKING:
     from src.body.window import PetWindow
 
+# Body Control Contract action vocabulary, plus the state names the PI-Desktop
+# panel sends. The panel used to post `thinking` / `working` / `celebrating`,
+# none of which the controller knew, so three of its four buttons silently did
+# nothing but fall back to IDLE. Unknown ids are a contract violation, and
+# `tests/test_body.py` fails when the panel and this table drift apart.
+ACTION_STATES: dict[str, PetState] = {
+    "jump": PetState.HAPPY,
+    "wave": PetState.HAPPY,
+    "celebrating": PetState.HAPPY,
+    "work": PetState.WORKING,
+    "working": PetState.WORKING,
+    "think": PetState.THINKING,
+    "thinking": PetState.THINKING,
+    "error": PetState.ERROR,
+    "sleep": PetState.SLEEPING,
+    "rest": PetState.IDLE,
+    "idle": PetState.IDLE,
+}
+
 
 class BodyController:
     """Controller exposing high-level commands to control the pet body."""
@@ -37,14 +56,5 @@ class BodyController:
 
     def perform_action(self, action_id: str) -> None:
         """Trigger a specific one-shot or sustained action."""
-        action_map = {
-            "jump": PetState.HAPPY,
-            "wave": PetState.HAPPY,
-            "work": PetState.WORKING,
-            "think": PetState.THINKING,
-            "error": PetState.ERROR,
-            "sleep": PetState.SLEEPING,
-            "rest": PetState.IDLE,
-        }
-        target_state = action_map.get(action_id.lower(), PetState.IDLE)
+        target_state = ACTION_STATES.get(action_id.lower(), PetState.IDLE)
         self.set_state(target_state)

@@ -184,6 +184,26 @@ MVP 使用 `LIKE '%kw%'`，不做 FTS5。
 shortcut: LIKE 全表扫描，切片 > 10k 时换 FTS5 + 中文分词器（见 §8）
 ```
 
+### 4.5 切片双写契约（Chronicle + JSONL）
+
+用户主动投喂的一条切片被**有意写入两处**，职责不同、不构成事实源分裂：
+
+| 目标 | 角色 | 事实源？ | 可重建？ |
+| :--- | :--- | :--- | :--- |
+| `data/companion_chronicle.db` (`slices` 表) | 结构化查询、归因、Episode、衰减 | **是（唯一）** | 否 |
+| `data/raw_slices.jsonl` | 人类可读的 append-only 导出流 | 否 | 是（可由 Chronicle 重建） |
+
+判定依据：
+1. `raw_slices.jsonl` 是 Phase 1 遗留的平铺格式（SPEC.md §3.2），SUPER.md §5 的
+   "轻量移动端同步"目标需要一个**不依赖 SQLite**、可直接被手机端只读翻阅的载体；
+2. 二者写入的都是同一条 `RawSlice`（同一 id / timestamp），`import_slices_jsonl()` 按 id
+   `INSERT OR IGNORE`，因此 JSONL 丢失或损坏时可由 Chronicle 反向导出恢复；
+3. 反向不成立（JSONL 无法表达 `provenance` / `retention_class` / events），
+   故 Chronicle 是唯一事实源，JSONL 只是投影。
+
+> 硬约束：任何**新的**读取路径（推理、Pattern、Chapter）必须只读 Chronicle；
+> JSONL 仅允许被导出类功能读取。若将来引入手机端写回，写回目标也必须是 Chronicle。
+
 ---
 
 ## 5. 归因门规则
@@ -263,7 +283,7 @@ Phase 1 暴露的只是 Agent 开关；2A 的端点会暴露**用户原始切片
 | 精细衰减分层 | 存储 | 两档 TTL 不够用时 |
 | 端到端事件去重 | 存储 | hook 载荷携带稳定 id/时间戳之后（当前见 §4.3 限制） |
 | `prune()` 的定时触发 | 存储 | **已完成**：`CompanionApp._setup_decay()` 在启动时与每 24 小时调用 |
-| 切片写入 Chronicle 的接线 | 归因 | `run_companion._on_slice_submitted` 已写 `RawSlice` 并存档案库；`SliceStore`（jsonl）仍为 Phase 1 遗留双写，待确认是否保留为导出通道 |
+| 切片写入 Chronicle 的接线 | 归因 | **已决定保留双写**（见 §4.5）：Chronicle 为唯一事实源，`data/raw_slices.jsonl` 作为人类可读导出/手机同步通道保留，不再是待定项 |
 
 ---
 

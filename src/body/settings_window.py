@@ -28,6 +28,8 @@ from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, hotkey_display, hotkey_from
 
 if TYPE_CHECKING:
     from src.connectors.settings import AgentSettingsStore
+    from src.core.cold_start import ColdStartPolicy
+    from src.core.sanctuary import SanctuaryGuard
 
 
 class _HotkeyRecorderEdit(QLineEdit):
@@ -108,10 +110,18 @@ class SettingsWindow(QWidget):
         settings_store: AgentSettingsStore,
         hook_manager: AgentHookManager | None = None,
         parent: QWidget | None = None,
+        *,
+        sanctuary: SanctuaryGuard | None = None,
+        cold_start: ColdStartPolicy | None = None,
     ) -> None:
         super().__init__(parent)
         self.store = settings_store
         self.hook_manager = hook_manager or AgentHookManager()
+        # Live Growth Core handles. When absent the page reports "未接入" instead of
+        # pretending these switches are configurable (they are not: Sanctuary is a
+        # safety floor, and the cold-start stage is derived from real elapsed days).
+        self._sanctuary = sanctuary
+        self._cold_start = cold_start
         self.setWindowTitle("桌面伴生体设置 (Companion Settings)")
         self.resize(720, 520)
         self.setMinimumSize(640, 460)
@@ -250,6 +260,8 @@ class SettingsWindow(QWidget):
         self.stack.setCurrentIndex(index)
         if index == 0:
             self.refresh_agents()
+        elif index == 2:
+            self.refresh_core_status()  # page 3 shows live state, never stale
 
     # ── Page 1: Multi-Agent Management (Like Clawd on Desk) ──
     def _build_agents_page(self) -> QWidget:
@@ -689,12 +701,20 @@ class SettingsWindow(QWidget):
         layout.setContentsMargins(24, 20, 24, 20)
         layout.setSpacing(14)
 
-        header = QLabel("长盛心智与避风港哲学")
+        header = QLabel("长盛心智与避风港状态")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         header.setFont(title_font)
         layout.addWidget(header)
+
+        note = QLabel(
+            "以下为运行时的真实状态，供你确认系统当前的行为边界；"
+            "这里不提供开关——避风港是安全底线，冷启动阶段按真实天数自动推进。"
+        )
+        note.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        note.setWordWrap(True)
+        layout.addWidget(note)
 
         # Sanctuary Card
         sanc_card = QFrame()
@@ -702,13 +722,15 @@ class SettingsWindow(QWidget):
         sanc_layout = QVBoxLayout(sanc_card)
         sanc_title = QLabel("🍃 情绪避风港守卫 (Sanctuary Guard)")
         sanc_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        self.sanctuary_status = QLabel()
+        self.sanctuary_status.setStyleSheet("font-size: 13px; font-weight: 600;")
         sanc_desc = QLabel(
-            "当识别到剧烈挫败、崩溃或疲惫时，系统自动熔断 100% 的分析说教逻辑，"
-            "转为温和静默陪伴。伴生体严禁扮演说教者。"
+            "激活时 100% 熔断一切分析、说教与 Agent 气泡，只保留安静陪伴。"
         )
         sanc_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
         sanc_desc.setWordWrap(True)
         sanc_layout.addWidget(sanc_title)
+        sanc_layout.addWidget(self.sanctuary_status)
         sanc_layout.addWidget(sanc_desc)
         layout.addWidget(sanc_card)
 
@@ -716,20 +738,79 @@ class SettingsWindow(QWidget):
         cold_card = QFrame()
         cold_card.setProperty("class", "cardFrame")
         cold_layout = QVBoxLayout(cold_card)
-        cold_title = QLabel("🧊 前 14 天冷启动破冰策略 (Cold Start)")
+        cold_title = QLabel("🧊 冷启动破冰策略 (Cold Start)")
         cold_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        self.coldstart_status = QLabel()
+        self.coldstart_status.setStyleSheet("font-size: 13px; font-weight: 600;")
         cold_desc = QLabel(
-            "严格控制初生期打扰频次：Day 1~3 每日最多主动发言 1 次；"
-            "Day 4~7 每日 2 次；Day 8~14 每日 3 次。严禁热度泛滥。"
+            "Day 1~3 每日主动发言上限 1 次；Day 4~7 上限 2 次；Day 8~14 上限 3 次；"
+            "第 15 天起进入成熟期。上限同时约束 Agent 事件触发的气泡。"
         )
         cold_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
         cold_desc.setWordWrap(True)
         cold_layout.addWidget(cold_title)
+        cold_layout.addWidget(self.coldstart_status)
         cold_layout.addWidget(cold_desc)
         layout.addWidget(cold_card)
 
         layout.addStretch()
+        self.refresh_core_status()
         return container
+
+    def set_core_handles(
+        self, sanctuary: SanctuaryGuard, cold_start: ColdStartPolicy
+    ) -> None:
+        """Attach the live Growth Core instances for the status page.
+
+        Called after construction because the runner builds the settings window
+        before it builds the Growth Core; the page then reports real state instead
+        of static prose.
+        """
+        self._sanctuary = sanctuary
+        self._cold_start = cold_start
+        self.refresh_core_status()
+
+    def refresh_core_status(self) -> None:
+        """Re-read the Growth Core state, so the page never shows stale facts."""
+        muted = "font-size: 13px; font-weight: 600; color: #9ca3af;"
+        active = "font-size: 13px; font-weight: 600; color: #34d399;"
+
+        if self._sanctuary is None:
+            self.sanctuary_status.setText("⚪ 未接入（当前进程未提供避风港实例）")
+            self.sanctuary_status.setStyleSheet(muted)
+        elif self._sanctuary.is_active:
+            self.sanctuary_status.setText("🟢 已激活 · 正在静默陪伴，暂停一切主动发言")
+            self.sanctuary_status.setStyleSheet(active)
+        else:
+            self.sanctuary_status.setText("⚪ 未激活 · 常规观察中")
+            self.sanctuary_status.setStyleSheet(muted)
+
+        if self._cold_start is None:
+            self.coldstart_status.setText("⚪ 未接入（当前进程未提供冷启动实例）")
+            self.coldstart_status.setStyleSheet(muted)
+            return
+
+        policy = self._cold_start
+        remaining = max(0, policy.daily_speech_quota - policy.speeches_today)
+        stage_labels = {
+            "stage_1_presence": "Stage 1 · 纯动作陪伴",
+            "stage_2_fact_mirror": "Stage 2 · 状态关怀 + 切片回响",
+            "stage_3_calibration": "Stage 3 · 允许一次试探性习惯询问",
+            "stage_mature": "成熟期 · 完整发展策略",
+        }
+        stage = str(policy.stage)
+        label = stage_labels.get(stage, stage)
+        analysis = (
+            "允许"
+            if policy.allows_psychological_analysis
+            else "禁止（前两阶段严禁心理分析）"
+        )
+        self.coldstart_status.setText(
+            f"第 {policy.day_count} 天 · {label}\n"
+            f"今日主动发言配额 {policy.daily_speech_quota} 次，剩余 {remaining} 次"
+            f" · 深度心理分析：{analysis}"
+        )
+        self.coldstart_status.setStyleSheet("font-size: 13px; font-weight: 600; color: #60a5fa;")
 
     # ── Page 4: About ──
     def _build_about_page(self) -> QWidget:

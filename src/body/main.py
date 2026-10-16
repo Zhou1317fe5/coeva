@@ -33,7 +33,7 @@ def main() -> int:
     if assets_root is None:
         assets_root = Path("assets") / "pets" / "tiko"
 
-    window = PetWindow(assets_root, scale=1)
+    window = PetWindow(assets_root)
     controller = BodyController(window)
 
     # System Tray
