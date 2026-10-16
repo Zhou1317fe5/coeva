@@ -96,7 +96,7 @@ tags:
 ## 4. 系统核心硬约束（System Invariants）
 
 1. **Invariant 1 (Host Inversion)**: Companion Body 是唯一常驻桌面宿主，任何 Agent 的启动或退出不影响桌宠的生存与待机状态。
-2. **Invariant 2 (Attribution First)**: 严禁将 Agent 的自主重试或长链路循环直接推断为用户人格。进入心智模型的必须是 `User Choice`。
+2. **Invariant 2 (Attribution First)**: 严禁将 Agent 的自主重试或长链路循环直接推断为用户人格；严禁采集或用 Agent 对话 Prompt 文本分析用户性格（Prompt 是高度工具化且被提示工程扭曲的指令，信噪比极低且破坏安全圣域；真实心智只在具体阻力面前的行为选择与自愿随手切片中沉淀，详见 `docs/concepts/04` §35）。进入心智模型的必须是 `User Choice`。
 3. **Invariant 3 (Observe by Default)**: 默认观察，90% 的检测信号静默吞掉。不得频繁弹窗说教。
 4. **Invariant 4 (Sanctuary Guard)**: 检测到负面情绪或心烦意乱时，自动熔断一切反思和引导逻辑，100% 保持安静。
 5. **Invariant 5 (Minimal & Decaying Data)**: 原始切片与事件必须随时间衰减，长期档案只沉淀提炼后的高阶章节（Growth Chapters）。
