@@ -21,8 +21,10 @@ class MultiAgentHistoryHarvester:
         self,
         parsers: dict[str, BaseSessionParser] | None = None,
     ) -> None:
+        pi_parser = PiDesktopParser()
         self.parsers: dict[str, BaseSessionParser] = parsers or {
-            "pi-desktop": PiDesktopParser(),
+            "pi": pi_parser,
+            "pi-desktop": pi_parser,
             "codex": CodexCliParser(),
             "hermes": HermesDbParser(),
         }
@@ -140,8 +142,8 @@ def build_cli_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sources",
         type=str,
-        default="pi-desktop,codex,hermes",
-        help="Comma-separated agent sources to harvest (default: pi-desktop,codex,hermes)",
+        default="pi,codex,hermes",
+        help="Comma-separated agent sources to harvest (default: pi,codex,hermes)",
     )
     parser.add_argument(
         "--limit",

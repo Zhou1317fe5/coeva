@@ -24,8 +24,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.body.harvest_dialog import HarvestHistoryDialog
 from src.connectors.hook_manager import AgentHookManager
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, hotkey_display, hotkey_from_qt
+from src.memory.store import ChronicleStore
 
 if TYPE_CHECKING:
     from src.connectors.settings import AgentSettingsStore
@@ -114,10 +116,12 @@ class SettingsWindow(QWidget):
         *,
         sanctuary: SanctuaryGuard | None = None,
         cold_start: ColdStartPolicy | None = None,
+        chronicle_store: ChronicleStore | None = None,
     ) -> None:
         super().__init__(parent)
         self.store = settings_store
         self.hook_manager = hook_manager or AgentHookManager()
+        self.chronicle = chronicle_store
         # Live Growth Core handles. When absent the page reports "未接入" instead of
         # pretending these switches are configurable (they are not: Sanctuary is a
         # safety floor, and the cold-start stage is derived from real elapsed days).
@@ -287,6 +291,11 @@ class SettingsWindow(QWidget):
         wsl_btn.setToolTip("自动检测 WSL 并在 Linux 家目录下一键挂载伴生体 Hook")
         wsl_btn.clicked.connect(self._scan_and_deploy_all_wsl)
         header_row.addWidget(wsl_btn)
+        harvest_btn = QPushButton("📦 历史会话收割...")
+        harvest_btn.setToolTip("从本机与 WSL 中收割历史会话客观事件入库")
+        harvest_btn.clicked.connect(self._open_harvest_dialog)
+        header_row.addWidget(harvest_btn)
+
         layout.addLayout(header_row)
 
         desc = QLabel(
@@ -856,3 +865,9 @@ class SettingsWindow(QWidget):
 
         layout.addStretch()
         return container
+
+    def _open_harvest_dialog(self) -> None:
+        """Open the multi-agent historical session harvesting dialog."""
+        store = self.chronicle or ChronicleStore()
+        dlg = HarvestHistoryDialog(store, parent=self)
+        dlg.exec()

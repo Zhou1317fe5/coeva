@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from src.body.harvest_dialog import HarvestHistoryDialog
 from src.core.hypotheses import (
     DevelopmentHypothesis,
     HypothesisEngine,
@@ -85,6 +86,16 @@ class ChronicleViewerWindow(QWidget):
         )
         header_layout.addWidget(self.stats_badge)
         header_layout.addStretch()
+
+        self.harvest_btn = QPushButton("📦 导入历史会话...")
+        self.harvest_btn.setFixedHeight(28)
+        self.harvest_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.harvest_btn.setStyleSheet(
+            "background-color: #27272a; color: #10b981; "
+            "border: 1px solid #059669; border-radius: 6px; padding: 0 10px;"
+        )
+        self.harvest_btn.clicked.connect(self._open_harvest_dialog)
+        header_layout.addWidget(self.harvest_btn)
 
         self.refresh_btn = QPushButton("🔄 刷新")
         self.refresh_btn.setFixedHeight(28)
@@ -523,3 +534,9 @@ class ChronicleViewerWindow(QWidget):
         }
         QMessageBox.information(self, "校准完成", action_names.get(response, "校准已记录"))
         self._refresh_self_model()
+
+    def _open_harvest_dialog(self) -> None:
+        """Open the historical session harvesting dialog and refresh upon completion."""
+        dlg = HarvestHistoryDialog(self.store, parent=self)
+        dlg.harvest_completed.connect(lambda _count: self.refresh_all())
+        dlg.exec()

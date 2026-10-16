@@ -93,6 +93,7 @@ class CompanionApp:
         self.settings_window.set_core_handles(
             sanctuary=self.guard, cold_start=self.cold_start
         )
+        self.settings_window.chronicle = self.chronicle
 
         # 4. Connectors & Event Bus
         # Data Plane: Agent events record rhythm (watcher) and persist evidence (chronicle).

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - Vasu Phase 1: 生产契约与标准形象锁定
 
 ### 📝 Docs（规范与决策）
-- 新增 `docs/specs/vasu/SPEC.md`：明确三张参考图的优先级、Vasu 身份约束、资产目录、Codex 九行核心动画与 Coeva 专有扩展动画边界；本阶段未制作动画素材。
+- 更新 `docs/specs/vasu/SPEC.md`：明确 Vasu 与用户安静共处、独立观察、做事、休息、玩耍及温和回应的美术动作语言；本阶段未制作动画素材。
 
 ## [Unreleased] - Architecture: 彻底切断 Agent 执行与桌宠身体姿态的直连（物理隔离）
 

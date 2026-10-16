@@ -87,7 +87,7 @@ def test_pi_desktop_parser_zero_leakage_and_failures(tmp_path: Path) -> None:
     session = parser.parse_session(sess_file)
     assert session is not None
     assert session.session_id == "pi-sess-1"
-    assert session.agent_id == "pi-desktop"
+    assert session.agent_id in ("pi", "pi-desktop")
 
     # Verify zero text leakage
     for ev in session.events:
@@ -307,3 +307,113 @@ def test_cold_start_policy_relational_anchor_preservation(tmp_path: Path) -> Non
     assert policy_after.day_count == 1
     assert policy_after.daily_speech_quota == 1
     assert not policy_after.allows_psychological_analysis
+
+def test_pi_cli_nested_message_format(tmp_path: Path) -> None:
+    """Verify PiDesktopParser correctly parses Pi CLI nested message structure."""
+    sess_file = tmp_path / "pi-cli-session.jsonl"
+    lines = [
+        {"type": "session", "id": "pi-cli-01", "timestamp": "2026-09-28T10:00:00Z"},
+        {
+            "type": "message",
+            "timestamp": "2026-09-28T10:01:00Z",
+            "message": {
+                "role": "user",
+                "content": "SECRET_USER_PROMPT_NEVER_LEAK",
+            },
+        },
+        {
+            "type": "message",
+            "timestamp": "2026-09-28T10:02:00Z",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {"type": "toolCall", "name": "write", "id": "t1"},
+                    {"type": "toolCall", "name": "bash", "id": "t2"},
+                ],
+            },
+        },
+        {
+            "type": "message",
+            "timestamp": "2026-09-28T10:03:00Z",
+            "message": {
+                "role": "toolResult",
+                "toolName": "write",
+                "isError": False,
+            },
+        },
+        {
+            "type": "message",
+            "timestamp": "2026-09-28T10:04:00Z",
+            "message": {
+                "role": "toolResult",
+                "toolName": "bash",
+                "isError": True,
+            },
+        },
+    ]
+    with open(sess_file, "w", encoding="utf-8") as f:
+        for item in lines:
+            f.write(json.dumps(item) + "\n")
+
+    parser = PiDesktopParser(sessions_dir=tmp_path)
+    session = parser.parse_session(sess_file)
+    assert session is not None
+    assert session.session_id == "pi-cli-01"
+
+    types = [e.event_type for e in session.events]
+    assert types == [
+        AgentEventType.SESSION_START,
+        AgentEventType.USER_PROMPT,
+        AgentEventType.PRE_TOOL_USE,
+        AgentEventType.PRE_TOOL_USE,
+        AgentEventType.POST_TOOL_USE,
+        AgentEventType.TOOL_FAILURE,
+        AgentEventType.SESSION_END,
+    ]
+
+    # Ensure zero prompt leakage
+    for e in session.events:
+        assert "SECRET_USER_PROMPT" not in e.tool_name
+        assert "SECRET_USER_PROMPT" not in e.error_message
+
+
+def test_harvest_history_dialog_preview_and_controls(tmp_path: Path) -> None:
+    """Verify HarvestHistoryDialog UI controls and preview generation."""
+    import os
+
+    from PySide6.QtWidgets import QApplication
+
+    from src.body.harvest_dialog import HarvestHistoryDialog
+
+    app = QApplication.instance()
+    if app is None:
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+        app = QApplication([])
+
+    db_path = tmp_path / "dialog_test.db"
+    store = ChronicleStore(db_path)
+    dialog = HarvestHistoryDialog(store)
+
+    assert dialog.cb_pi.isChecked()
+    assert dialog.cb_codex.isChecked()
+    assert dialog.cb_hermes.isChecked()
+    assert dialog.spin_limit.value() == 30
+
+    # Test source filtering
+    dialog.cb_pi.setChecked(False)
+    sources = dialog._selected_sources()
+    assert "pi" not in sources
+    assert "codex" in sources
+    assert "hermes" in sources
+
+    dialog.cb_pi.setChecked(True)
+    dialog.spin_limit.setValue(2)
+
+    # Test preview trigger
+    dialog._on_preview_clicked()
+    log_text = dialog.log_display.toPlainText()
+    assert "扫描预览结果" in log_text
+    assert "合计发现会话" in log_text
+
+    dialog.close()
+    store.close()
