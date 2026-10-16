@@ -7,11 +7,13 @@ honoring the Clean Stage and Non-Judgmental Mirror disciplines.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -28,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.body.harvest_dialog import HarvestHistoryDialog
+from src.core.chapters import ChapterEligibilityGate, ChapterGenerator, GrowthChapter
 from src.core.hypotheses import (
     DevelopmentHypothesis,
     HypothesisEngine,
@@ -51,6 +54,7 @@ class ChronicleViewerWindow(QWidget):
         super().__init__(parent)
         self.store = store
         self.model_mgr = SelfModelManager()
+        self.chapter_generator = ChapterGenerator(self.store)
         self.setWindowTitle("📖 记忆与切片档案 (Chronicle Archive)")
         self.resize(760, 560)
         self.setMinimumSize(600, 420)
@@ -117,6 +121,7 @@ class ChronicleViewerWindow(QWidget):
         self.nav_list.addItem("🧭 经历会话 (Episodes)")
         self.nav_list.addItem("🔍 记忆检索 (Search)")
         self.nav_list.addItem("🌿 共同认知 (Self Model)")
+        self.nav_list.addItem("📖 人生章节 (Chapters)")
         self.nav_list.currentRowChanged.connect(self._on_tab_changed)
         splitter.addWidget(self.nav_list)
 
@@ -126,7 +131,7 @@ class ChronicleViewerWindow(QWidget):
         self.stack.addWidget(self._build_episodes_page())
         self.stack.addWidget(self._build_search_page())
         self.stack.addWidget(self._build_self_model_page())
-        splitter.addWidget(self.stack)
+        self.stack.addWidget(self._build_chapters_page())
 
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -341,7 +346,8 @@ class ChronicleViewerWindow(QWidget):
             self._refresh_episodes()
         elif index == 3:
             self._refresh_self_model()
-
+        elif index == 4:
+            self._refresh_chapters()
     def refresh_all(self) -> None:
         """Reload all statistics and active list data from the database."""
         stats = self.store.stats()
@@ -352,7 +358,7 @@ class ChronicleViewerWindow(QWidget):
         )
         self._refresh_slices()
         self._refresh_episodes()
-
+        self._refresh_chapters()
     def _refresh_slices(self) -> None:
         self.slices_list.clear()
         slices: list[SliceRecord] = self.store.list_slices(limit=100)
@@ -540,3 +546,196 @@ class ChronicleViewerWindow(QWidget):
         dlg = HarvestHistoryDialog(self.store, parent=self)
         dlg.harvest_completed.connect(lambda _count: self.refresh_all())
         dlg.exec()
+
+    # ── Page 5: Growth Chapters (Phase 2D) ──
+    def _build_chapters_page(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # Header: Title + Create Chapter Button
+        top_row = QHBoxLayout()
+        tip = QLabel("📖 人生章节：与伴生体共同经历凝练的成长纪实（由大模型与叙事防火墙共创）")
+        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        top_row.addWidget(tip)
+        top_row.addStretch()
+
+        self.btn_gen_chapter = QPushButton("✨ 共同撰写新章节...")
+        self.btn_gen_chapter.setStyleSheet(
+            "background-color: #059669; color: #ffffff; font-weight: bold; "
+            "border-radius: 6px; padding: 4px 12px;"
+        )
+        self.btn_gen_chapter.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gen_chapter.clicked.connect(self._generate_new_chapter)
+        top_row.addWidget(self.btn_gen_chapter)
+        layout.addLayout(top_row)
+
+        # Chapter Splitter: Left chapter list, Right reading & reflection editor
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(1)
+
+        # Left Column: Chapters List
+        left_box = QWidget()
+        l_layout = QVBoxLayout(left_box)
+        l_layout.setContentsMargins(0, 0, 8, 0)
+        l_layout.setSpacing(6)
+
+        c_list_title = QLabel("📚 历史章节列表")
+        c_list_title.setStyleSheet("font-size: 12px; font-weight: 600; color: #60a5fa;")
+        l_layout.addWidget(c_list_title)
+
+        self.chapter_list = QListWidget()
+        self.chapter_list.setObjectName("dataList")
+        self.chapter_list.itemClicked.connect(self._on_chapter_selected)
+        l_layout.addWidget(self.chapter_list, 1)
+        splitter.addWidget(left_box)
+
+        # Right Column: Chapter Content Viewer + Reflection Input
+        right_box = QWidget()
+        r_layout = QVBoxLayout(right_box)
+        r_layout.setContentsMargins(8, 0, 0, 0)
+        r_layout.setSpacing(8)
+
+        # Title & Action bar for active chapter
+        r_top = QHBoxLayout()
+        self.chapter_title_label = QLabel("选择左侧章节查看正文")
+        self.chapter_title_label.setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #f3f4f6;"
+        )
+        r_top.addWidget(self.chapter_title_label)
+        r_top.addStretch()
+
+        self.btn_export_md = QPushButton("📤 导出 Markdown")
+        self.btn_export_md.clicked.connect(self._export_chapter_markdown)
+        r_top.addWidget(self.btn_export_md)
+        r_layout.addLayout(r_top)
+
+        # Markdown Text Browser
+        self.chapter_content_view = QTextEdit()
+        self.chapter_content_view.setReadOnly(True)
+        r_layout.addWidget(self.chapter_content_view, 1)
+
+        # Human Reflection Editor
+        refl_title = QLabel("✍️ 用户手记与共同反思（双人共写留白 · 自动沉淀入章节）：")
+        refl_title.setStyleSheet("font-size: 12px; color: #34d399; font-weight: 600;")
+        r_layout.addWidget(refl_title)
+
+        refl_row = QHBoxLayout()
+        self.chapter_refl_edit = QLineEdit()
+        self.chapter_refl_edit.setPlaceholderText("在此写下这段时期你对工作方式或心智转变的真实感悟...")
+        refl_row.addWidget(self.chapter_refl_edit, 1)
+
+        self.btn_save_refl = QPushButton("💾 保存手记")
+        self.btn_save_refl.clicked.connect(self._save_chapter_reflection)
+        refl_row.addWidget(self.btn_save_refl)
+        r_layout.addLayout(refl_row)
+
+        splitter.addWidget(right_box)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        layout.addWidget(splitter, 1)
+
+        self._active_chapter: GrowthChapter | None = None
+        return container
+
+    def _refresh_chapters(self) -> None:
+        """Load and display all persisted growth chapters from disk."""
+        self.chapter_list.clear()
+        chapters = self.chapter_generator.list_chapters()
+        for chap in chapters:
+            item_text = f"📖 {chap.title}\n   周期: {chap.period_start} -> {chap.period_end}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, chap)
+            self.chapter_list.addItem(item)
+
+        if chapters and not self._active_chapter:
+            self.chapter_list.setCurrentRow(0)
+            self._on_chapter_selected(self.chapter_list.item(0))
+
+    def _on_chapter_selected(self, item: QListWidgetItem) -> None:
+        chap: GrowthChapter | None = item.data(Qt.ItemDataRole.UserRole)
+        if not chap or not isinstance(chap, GrowthChapter):
+            return
+        self._active_chapter = chap
+        self.chapter_title_label.setText(f"📖 {chap.title}")
+        self.chapter_content_view.setMarkdown(chap.to_markdown())
+        self.chapter_refl_edit.setText(chap.human_reflection)
+
+    def _generate_new_chapter(self) -> None:
+        """Evaluate eligibility gates and guide user through co-authoring a new chapter."""
+        gate = ChapterEligibilityGate()
+        eligible, report = gate.evaluate(self.store)
+
+        if not eligible:
+            s_info = report["sustained"]
+            msg = (
+                "当前尚未完全满足人生章节生成资格门（Chapter Eligibility Gates）：\n\n"
+                f"• 持续性门: 会话数 {s_info['episodes_count']}/{s_info['min_episodes']}, "
+                f"跨度 {s_info['span_days']}/{s_info['min_span_days']} 天\n"
+                f"• 结构性门: 模式数 {report['structural']['patterns_count']}, "
+                f"共识洞察 {report['structural']['insights_count']}\n"
+                f"• 多样性门: 涵盖 Agent 终端 {report['diversity']['agents_count']} 种\n\n"
+                "是否仍要强制触发撰写？"
+            )
+            reply = QMessageBox.question(
+                self,
+                "章节资格评估",
+                msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        # Prompt user for optional initial reflection note
+        text, ok = QInputDialog.getMultiLineText(
+            self,
+            "共同撰写章节",
+            "在这段工作周期里，你有什么想记录的心智转变或反思？\n（可留空，后续随时编辑补充）",
+            "",
+        )
+        if not ok:
+            return
+
+        QMessageBox.information(
+            self, "正在撰写", "伴生体正在调用大模型并流经叙事防火墙生成章节，请稍候..."
+        )
+        chapter, _ = self.chapter_generator.generate_chapter(
+            force=True, user_reflection=text.strip()
+        )
+
+        if chapter:
+            self._active_chapter = chapter
+            self._refresh_chapters()
+            self.chapter_title_label.setText(f"📖 {chapter.title}")
+            self.chapter_content_view.setMarkdown(chapter.to_markdown())
+            self.chapter_refl_edit.setText(chapter.human_reflection)
+            QMessageBox.information(
+                self, "章节生成成功", f"新章节《{chapter.title}》已生成并存入本地档案！"
+            )
+        else:
+            QMessageBox.critical(self, "生成失败", "未能成功生成章节，请检查大模型配置是否连通。")
+
+    def _save_chapter_reflection(self) -> None:
+        if not self._active_chapter:
+            QMessageBox.information(self, "提示", "请先在左侧选择一个章节。")
+            return
+        new_refl = self.chapter_refl_edit.text().strip()
+        self._active_chapter.human_reflection = new_refl
+        self._active_chapter.save(self.chapter_generator.chapters_dir)
+        self.chapter_content_view.setMarkdown(self._active_chapter.to_markdown())
+        QMessageBox.information(self, "保存成功", "用户手记已沉淀入该章节 Markdown 文件！")
+
+    def _export_chapter_markdown(self) -> None:
+        if not self._active_chapter:
+            QMessageBox.information(self, "提示", "请先在左侧选择一个要导出的章节。")
+            return
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出章节 Markdown",
+            f"chapter_{self._active_chapter.chapter_id}.md",
+            "Markdown Files (*.md)",
+        )
+        if save_path:
+            Path(save_path).write_text(self._active_chapter.to_markdown(), encoding="utf-8")
+            QMessageBox.information(self, "导出成功", f"章节已导出至:\n{save_path}")

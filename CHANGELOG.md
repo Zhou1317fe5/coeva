@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 2A: 动作语言与关键姿态评审
+
+### 📝 Art Production（美术制作）
+- 新增 `assets/vasu/production/` 的六姿态静态草图、朝右行走基准姿态、64px 对比图与评审记录。朝右轮廓可作为 Phase 2B 的试行动画依据；观察、做事、休息、玩耍和回应仍需按评审意见修订。未制作动画行或图集。
+
 ## [Unreleased] - Vasu Phase 1: 生产契约与标准形象锁定
 
 ### 📝 Docs（规范与决策）
@@ -72,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   每次切换到该页刷新（`refresh_core_status()`）；未接入实例时明确显示"未接入"而非假装可用。
 
 ### ✨ Added（新增功能）
+- **Phase 2D 人生章节生成与双人共写（Growth Chapters & Narrative Co-authoring）**：
+  - **标准 OpenAI 兼容 LLM 客户端（`src/core/llm_client.py`）**：采用 Python 3.11+ 原生标准库实现，零第三方臃肿框架依赖，支持官方 API、DeepSeek、本地 Ollama / vLLM 以及自定义代理；配置安全保存在 `data/llm_config.json`；
+  - **在软件设置面板新增「🧠 大模型服务」页面**：提供常用服务商快速预设（DeepSeek, OpenAI, Ollama 本地等）、密码掩码保护及异步毫秒级连通性测试按钮；
+  - **章节生成四大资格门（`ChapterEligibilityGate`）**：严格校验持续性（跨度 ≥ 28 天且 Episodes ≥ 30）、结构性模式存在、多源环境多样性与自愿发起；
+  - **叙事防火墙硬约束（`NarrativeFirewall`）**：过滤谄媚吹捧与人生导师式说教，通篇锁定工坊战友并肩作战口吻，所有转变必须锚定真实底层行为证据；
+  - **档案库新增「📖 人生章节」浏览与共写界面（`ChronicleViewerWindow` Tab 5）**：支持一键触发共创、Markdown 精美排版渲染、留白用户手记在线编辑沉淀，以及本地 Markdown 文件一键导出。
 - **多 Agent 历史会话收割器（Multi-Agent History Harvester）**：
   - **架构实现**：在 `src/connectors/history/` 落地三大日志转译器（`PiDesktopParser`、`CodexCliParser`、`HermesDbParser`），自动扫描发现 Windows 和 WSL 下沉淀的 500+ 个历史会话日志；
   - **严格零文本隐私与时间序因果（AC-1 ~ AC-3）**：100% 物理隔离用户的 Prompt 输入正文、思维链（CoT）与工具输出细节，仅提取行为时间脉冲，支持 SHA-1 幂等导入；

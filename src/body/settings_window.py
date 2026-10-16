@@ -4,11 +4,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtGui import QFocusEvent, QFont, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
+    QDoubleSpinBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QSpinBox,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -26,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from src.body.harvest_dialog import HarvestHistoryDialog
 from src.connectors.hook_manager import AgentHookManager
+from src.core.llm_client import PRESET_PROVIDERS, LLMClient, LLMConfig
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, hotkey_display, hotkey_from_qt
 from src.memory.store import ChronicleStore
 
@@ -100,6 +103,19 @@ class _HotkeyRecorderEdit(QLineEdit):
         self.hotkey_captured.emit(spec.spec)
         self.clearFocus()
 
+class _LLMPingThread(QThread):
+    """Background worker for testing LLM API connection without blocking GUI."""
+
+    finished_ping = Signal(bool, str, float)
+
+    def __init__(self, client: LLMClient, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.client = client
+
+    def run(self) -> None:
+        ok, msg, lat = self.client.test_connection()
+        self.finished_ping.emit(ok, msg, lat)
+
 
 class SettingsWindow(QWidget):
     """Full-featured preferences and multi-agent management dialog."""
@@ -146,6 +162,7 @@ class SettingsWindow(QWidget):
 
         items = [
             ("🤖  多 Agent 接入", "agents"),
+            ("🧠  大模型服务", "llm"),
             ("🐾  桌面身体偏好", "body"),
             ("🍃  心智与避风港", "core"),
             ("ℹ️  关于与规范", "about"),
@@ -166,15 +183,19 @@ class SettingsWindow(QWidget):
         self.agents_page = self._build_agents_page()
         self.stack.addWidget(self.agents_page)
 
-        # Page 2: Body Preferences
+        # Page 2: LLM Service Config (Phase 2D)
+        self.llm_page = self._build_llm_page()
+        self.stack.addWidget(self.llm_page)
+
+        # Page 3: Body Preferences
         self.body_page = self._build_body_page()
         self.stack.addWidget(self.body_page)
 
-        # Page 3: Mind & Sanctuary
+        # Page 4: Mind & Sanctuary
         self.core_page = self._build_core_page()
         self.stack.addWidget(self.core_page)
 
-        # Page 4: About
+        # Page 5: About
         self.about_page = self._build_about_page()
         self.stack.addWidget(self.about_page)
 
@@ -263,10 +284,12 @@ class SettingsWindow(QWidget):
 
     def _on_tab_changed(self, index: int) -> None:
         self.stack.setCurrentIndex(index)
-        if index == 0:
+        item = self.nav_list.item(index)
+        key = str(item.data(Qt.ItemDataRole.UserRole)) if item else ""
+        if key == "agents":
             self.refresh_agents()
-        elif index == 2:
-            self.refresh_core_status()  # page 3 shows live state, never stale
+        elif key == "core":
+            self.refresh_core_status()
 
     # ── Page 1: Multi-Agent Management (Like Clawd on Desk) ──
     def _build_agents_page(self) -> QWidget:
@@ -511,7 +534,202 @@ class SettingsWindow(QWidget):
                 self.store.update_instance(aid, iid, enabled=True)
         self.refresh_agents()
 
-    # ── Page 2: Desktop Body Preferences ──
+    # ── Page 2: LLM Service Config (Phase 2D) ──
+    def _build_llm_page(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+
+        header = QLabel("大模型服务与章节叙事配置")
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        header.setFont(title_font)
+        layout.addWidget(header)
+
+        desc = QLabel(
+            "配置 OpenAI 兼容格式大模型接口，用于生成人生章节（Growth Chapters）与深度心智反思。\n"
+            "支持官方 API、DeepSeek、本地 Ollama / vLLM 或第三方代理。Key 安全保存在本地。"
+        )
+        desc.setStyleSheet("color: #9ca3af; font-size: 12px; line-height: 1.4;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # Provider Quick Presets
+        preset_box = QFrame()
+        preset_box.setProperty("class", "cardFrame")
+        p_layout = QVBoxLayout(preset_box)
+        p_layout.setSpacing(8)
+
+        p_title = QLabel("🚀 常用服务商快速预设 (Presets)")
+        p_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #e4e4e7;")
+        p_layout.addWidget(p_title)
+
+        p_row = QHBoxLayout()
+        p_row.setSpacing(8)
+        for name, p_data in PRESET_PROVIDERS.items():
+            btn = QPushButton(name)
+            btn.setFixedHeight(28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            u_val = p_data["base_url"]
+            m_val = p_data["default_model"]
+            btn.clicked.connect(lambda _c, u=u_val, m=m_val: self._apply_llm_preset(u, m))
+            p_row.addWidget(btn)
+        p_row.addStretch()
+        p_layout.addLayout(p_row)
+        layout.addWidget(preset_box)
+
+        # Parameters Card
+        card = QFrame()
+        card.setProperty("class", "cardFrame")
+        c_layout = QVBoxLayout(card)
+        c_layout.setSpacing(10)
+
+        self.llm_config = LLMConfig.load()
+
+        # Base URL
+        url_lbl = QLabel("接口地址 (Base URL):")
+        url_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        c_layout.addWidget(url_lbl)
+        self.llm_url_edit = QLineEdit(self.llm_config.base_url)
+        self.llm_url_edit.setPlaceholderText("https://api.openai.com/v1 或 http://localhost:11434/v1")
+        c_layout.addWidget(self.llm_url_edit)
+
+        # API Key
+        key_lbl = QLabel("API Key (密码掩码):")
+        key_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        c_layout.addWidget(key_lbl)
+        key_row = QHBoxLayout()
+        self.llm_key_edit = QLineEdit(self.llm_config.api_key)
+        self.llm_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.llm_key_edit.setPlaceholderText("sk-...")
+        key_row.addWidget(self.llm_key_edit)
+        self.btn_toggle_key = QPushButton("👁️")
+        self.btn_toggle_key.setFixedWidth(36)
+        self.btn_toggle_key.clicked.connect(self._toggle_key_visibility)
+        key_row.addWidget(self.btn_toggle_key)
+        c_layout.addLayout(key_row)
+
+        # Model Name
+        model_lbl = QLabel("模型名称 (Model):")
+        model_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        c_layout.addWidget(model_lbl)
+        self.llm_model_edit = QLineEdit(self.llm_config.model)
+        self.llm_model_edit.setPlaceholderText("例如: gpt-4o, deepseek-chat, gemini-3.8-flash")
+        c_layout.addWidget(self.llm_model_edit)
+
+        # Temperature & Max Tokens
+        param_row = QHBoxLayout()
+        param_row.setSpacing(16)
+
+        temp_col = QVBoxLayout()
+        temp_lbl = QLabel("温度 (Temperature):")
+        temp_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        temp_col.addWidget(temp_lbl)
+        self.llm_temp_spin = QDoubleSpinBox()
+        self.llm_temp_spin.setRange(0.0, 2.0)
+        self.llm_temp_spin.setSingleStep(0.1)
+        self.llm_temp_spin.setValue(self.llm_config.temperature)
+        temp_col.addWidget(self.llm_temp_spin)
+        param_row.addLayout(temp_col)
+
+        tok_col = QVBoxLayout()
+        tok_lbl = QLabel("单次最大 Token (Max Tokens):")
+        tok_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        tok_col.addWidget(tok_lbl)
+        self.llm_tok_spin = QSpinBox()
+        self.llm_tok_spin.setRange(256, 16384)
+        self.llm_tok_spin.setValue(self.llm_config.max_tokens)
+        tok_col.addWidget(self.llm_tok_spin)
+        param_row.addLayout(tok_col)
+
+        c_layout.addLayout(param_row)
+        layout.addWidget(card)
+
+        # Status badge & actions row
+        action_row = QHBoxLayout()
+        action_row.setSpacing(12)
+
+        self.btn_test_llm = QPushButton("⚡ 测试连接 (Test Connection)")
+        self.btn_test_llm.setFixedHeight(32)
+        self.btn_test_llm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_test_llm.clicked.connect(self._test_llm_connection)
+        action_row.addWidget(self.btn_test_llm)
+
+        self.btn_save_llm = QPushButton("💾 保存配置 (Save)")
+        self.btn_save_llm.setFixedHeight(32)
+        self.btn_save_llm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_llm.setStyleSheet(
+            "background-color: #059669; color: #ffffff; font-weight: bold; "
+            "border-radius: 6px; padding: 0 16px;"
+        )
+        self.btn_save_llm.clicked.connect(self._save_llm_config)
+        action_row.addWidget(self.btn_save_llm)
+
+        self.llm_status_badge = QLabel("就绪")
+        self.llm_status_badge.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        action_row.addWidget(self.llm_status_badge)
+
+        action_row.addStretch()
+        layout.addLayout(action_row)
+
+        layout.addStretch()
+        scroll.setWidget(container)
+        return scroll
+
+    def _apply_llm_preset(self, url: str, model: str) -> None:
+        self.llm_url_edit.setText(url)
+        self.llm_model_edit.setText(model)
+        self.llm_status_badge.setText(f"已填入预设 ({model})，请输入 API Key 并保存")
+
+    def _toggle_key_visibility(self) -> None:
+        if self.llm_key_edit.echoMode() == QLineEdit.EchoMode.Password:
+            self.llm_key_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.llm_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def _save_llm_config(self) -> None:
+        cfg = LLMConfig(
+            base_url=self.llm_url_edit.text().strip(),
+            api_key=self.llm_key_edit.text().strip(),
+            model=self.llm_model_edit.text().strip(),
+            temperature=self.llm_temp_spin.value(),
+            max_tokens=self.llm_tok_spin.value(),
+        )
+        cfg.save()
+        self.llm_config = cfg
+        self.llm_status_badge.setText("✅ 配置已安全保存至 data/llm_config.json")
+        self.llm_status_badge.setStyleSheet("color: #10b981; font-weight: bold;")
+
+    def _test_llm_connection(self) -> None:
+        cfg = LLMConfig(
+            base_url=self.llm_url_edit.text().strip(),
+            api_key=self.llm_key_edit.text().strip(),
+            model=self.llm_model_edit.text().strip(),
+            temperature=0.0,
+            timeout_seconds=10.0,
+        )
+        self.llm_status_badge.setText("⏳ 正在测试连通性...")
+        self.llm_status_badge.setStyleSheet("color: #9ca3af;")
+        self.btn_test_llm.setEnabled(False)
+        self._llm_thread = _LLMPingThread(LLMClient(cfg), parent=self)
+        self._llm_thread.finished_ping.connect(self._on_llm_ping_finished)
+        self._llm_thread.start()
+
+    def _on_llm_ping_finished(self, ok: bool, msg: str, latency: float) -> None:
+        self.btn_test_llm.setEnabled(True)
+        if ok:
+            self.llm_status_badge.setText(f"✅ 连通正常！延迟: {latency:.0f}ms")
+            self.llm_status_badge.setStyleSheet("color: #10b981; font-weight: bold;")
+        else:
+            self.llm_status_badge.setText(f"❌ 失败: {msg[:40]}")
+            self.llm_status_badge.setStyleSheet("color: #ef4444;")
+
+    # ── Page 3: Desktop Body Preferences ──
     def _build_body_page(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
