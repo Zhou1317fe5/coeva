@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -16,6 +17,7 @@ from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
+from src.connectors.contracts import AgentEvent, AgentEventType
 from src.connectors.event_bus import LocalEventBus
 from src.connectors.hermes_connector import HermesConnector
 from src.connectors.hook_manager import AgentHookManager
@@ -33,6 +35,11 @@ from src.memory.store import ChronicleStore, SliceRecord
 
 # Evidence decay runs at startup and once a day thereafter.
 _PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+# Low-frequency State Care intervention check (overwork & late-night nudge).
+# Evaluates the 3 Gates every 5 minutes; stays 100% silent if in flight or quota full.
+_CARE_CHECK_INTERVAL_MS = 5 * 60 * 1000
+_IN_FLIGHT_COOLDOWN_SECONDS = 30.0
 
 
 class CompanionApp:
@@ -91,8 +98,9 @@ class CompanionApp:
         # Data Plane: Agent events record rhythm (watcher) and persist evidence (chronicle).
         # Control Plane is decoupled: agent events NEVER directly drive pet body state,
         # preventing state thrashing and multi-agent posture collisions (AGENTS.md section 4).
+        self._last_agent_active_at: datetime | None = None
         self.bus = LocalEventBus(
-            on_event_received=lambda e: self.watcher.record_activity(),
+            on_event_received=self._on_agent_event_received,
             store=self.chronicle,
         )
         self.hermes = HermesConnector(self.bus)
@@ -114,6 +122,7 @@ class CompanionApp:
         self._setup_tray(assets_dir)
         self._setup_hotkey()
         self._setup_decay()
+        self._setup_state_care()
 
     def _setup_hotkey(self) -> None:
         """Register the configured global hotkey that summons the slice feeder.
@@ -157,6 +166,39 @@ class CompanionApp:
         except sqlite3.Error:
             # A locked database must not take the companion down; retry next interval.
             pass
+
+    def _on_agent_event_received(self, event: AgentEvent) -> None:
+        """Data Plane tap: record continuous activity and track busy/idle timing."""
+        self.watcher.record_activity()
+        if event.event_type in (AgentEventType.PRE_TOOL_USE, AgentEventType.USER_PROMPT):
+            self._last_agent_active_at = datetime.now()
+
+    def _is_task_in_flight(self, now: datetime | None = None) -> bool:
+        """Timing Gate: true when an agent is actively executing tools or reasoning.
+
+        Intervention nudges MUST stay silent during active high-cognitive tasks
+        so user flow is never broken (DESIGN.md 2.3, Timing Gate).
+        """
+        if self._last_agent_active_at is None:
+            return False
+        current = now or datetime.now()
+        elapsed = (current - self._last_agent_active_at).total_seconds()
+        return elapsed < _IN_FLIGHT_COOLDOWN_SECONDS
+
+    def _setup_state_care(self) -> None:
+        """Low-frequency check for overwork and late-night health nudges."""
+        self.care_timer = QTimer(self.window)
+        self.care_timer.setInterval(_CARE_CHECK_INTERVAL_MS)
+        self.care_timer.timeout.connect(self._check_state_care)
+        self.care_timer.start()
+
+    def _check_state_care(self) -> None:
+        """Evaluate the 3 Gates; speak gently only when overworking or late night."""
+        in_flight = self._is_task_in_flight()
+        nudge = self.intervention.evaluate_intervention(is_task_in_flight=in_flight)
+        if nudge:
+            self.controller.perform_action("rest")
+            self.controller.say(nudge, ttl_ms=4500)
 
     def _setup_tray(self, assets_dir: Path) -> None:
         """Create a full-featured tray menu for manual inspection and testing."""
