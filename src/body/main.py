@@ -22,7 +22,7 @@ def main() -> int:
     app.setQuitOnLastWindowClosed(False)
 
     # Default pet is Tiko, with fallback to debug-duck, wangcai, or claw
-    preferred_pets = ["tiko", "debug-duck", "wangcai", "claw", "dachshund"]
+    preferred_pets = ["tiko", "debug-duck", "wangcai", "claw"]
     assets_root: Path | None = None
     for pet_name in preferred_pets:
         cand = Path("assets") / "pets" / pet_name
