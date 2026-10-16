@@ -58,11 +58,14 @@ tags:
 ### 3.1 Companion Body 控制契约（Body Control Contract）
 Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 socket）：
 - `set_state(state: str)`: `idle | thinking | working | happy | error | sleeping`
+  **调用约束（硬·控制面与数据面彻底解绑）**：
+  Agent 发送的任何高频微观工具事件（`Read` / `Bash` 耗时数十毫秒）、提示轮次变化均属于**只读数据面（Data Plane）**，
+  100% 只静默落库（Chronicle）并供心智感知（StateWatcher），**严禁直接调用 `set_state` 驱动桌宠变幻姿态**。
+  桌宠身体姿态的控制权（Control Plane）彻底归还人类交互（投喂切片、点击、闲置 60s 打瞌睡），
+  从架构上根治了多 Agent 姿态踩踏与每分钟数百次高频抽搐奔跑。
 - `say(text: str, ttl_ms: int = 4000)`: 在桌宠头顶弹出质朴气泡，ttl 后自动淡出（气泡自动做屏幕内安全边缘吸附，防止截断）。
   **调用约束（硬）**：气泡属控制面，任何来源（含 Agent 事件）都必须先经 Growth Core 审批。
-  Agent 事件走 `InterventionPolicy.allow_agent_bubble(event_type)`：常规遥测只驱动 `set_state`，
-  绝不发声；仅值得注意的事件（当前为 `tool_failure`）可发声，且受 Sanctuary / 每日配额 / 冷却三道门约束。
-  `set_state` 属数据面投影，可直通（DESIGN §2.3 的 80/15/5 比例由此保证）。
+  常规 Agent 遥测绝不发声；仅值得注意的极端事件（如 `tool_failure`）可发声，且受 Sanctuary / 每日配额 / 冷却三道门约束。
 - `perform_action(action_id: str)`: 播放特定动作动画（如 `wave`, `jump`, `nod`, `rest`）
 
 ### 3.2 随手投喂切片存储契约（`data/raw_slices.jsonl`）
@@ -97,7 +100,7 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 ## 4. 验收标准（Acceptance Criteria）
 
 - [x] **AC-1 (完全独立常驻)**：关闭所有 Agent 终端，桌面宠物依然在桌角自然呼吸、点击穿透、闲置入睡，内存维持在 60MB 左右（PySide6 进程）。
-- [x] **AC-2 (Hermes / Pi 联动)**：启动 Hermes 或 Pi 跑任务，Growth Core 接收到事件并在 1 秒内驱动桌宠展示对应动作。
+- [x] **AC-2 (多 Agent 数据面静默解绑)**：启动 Hermes、Pi、Codex 执行多步高频工具任务，所有事件 100% 完整、静默存盘进本地数据库（Chronicle）并供客观节律感知（StateWatcher），表现层桌宠身体姿态保持静止微呼吸（零 UI 频繁重绘与抽搐扰动），多 Agent 并发时不发生姿态踩踏。
 - [x] **AC-3 (随手投喂体验)**：按全局快捷键，200ms 内唤起半透明输入框，输入文字回车后窗口秒隐，`data/raw_slices.jsonl` 成功增加一条有效记录，桌宠点头确认。
 - [x] **AC-4 (避风港熔断)**：在投喂中输入带有“烦死了”、“全搞砸了”等负面情绪切片，系统静默存盘，严禁触发任何说教气泡，提供温和接纳反馈。
 - [x] **AC-5 (快捷键可自定义)**：设置「桌面身体偏好 → 随手投喂切片」以录制式录入新组合键；保存后 `data/agent_settings.json` 的 `feeder_hotkey` 写入 canonical 串并**立即生效无需重启**；无修饰键的组合被拒绝且磁盘值不变；「↺ 恢复默认」回到 `Alt + Space`；托盘菜单与气泡文案跟随当前值；磁盘值非法或缺失时启动回退默认且不崩溃。
@@ -183,3 +186,16 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 - **回归测试**：`tests/test_core.py` 覆盖三道门；`tests/test_http_server.py` 端到端断言
   「完整回合状态照常流转、气泡零输出」，并锁定 `idle` 不庆祝与静音后 `/bubble` 被过滤。
   另以临时 harness 做变异验证：关闭闸门时同一回合产出 3 条气泡，开启后为 0，状态序列一致。
+
+### 5.11 缺陷 11：Agent 微观工具事件绑定桌宠姿态导致高频抽搐与多 Agent 冲突（数据面与控制面彻底物理解绑）
+- **现象**：Agent 在执行任务时，小猫在桌角极度频繁地乱动抽搐。实测一段 2 分钟对话中，1129 条事件引发了高达 **734 次状态切换**（`10:46:05.342` `pre_tool_use` WORKING -> 仅过 23ms `turn_end` IDLE -> 几秒后下一个工具 `pre_tool_use` WORKING）。
+- **根因**：
+  1. **微观工具粒度失配**：PI-Desktop 每执行完一个底层工具调用（如 `Read` 耗时 30ms），就会触发一次微观的 `turn_end`。系统把 `turn_end` 映射到 `IDLE`、把 `tool_call` 映射到 `WORKING`，导致小猫每调用一个工具就疯狂奔跑几十毫秒，接着立刻闪回待机，如此往复循环；
+  2. **多 Agent 状态踩踏**：当后台有 Hermes 执行长任务、前台有 Pi 处于对话空闲、IDE 侧有其它代码补全 Agent 时，多个 Agent 的微观数据包毫秒级交替到达，桌宠姿态被强行覆盖，沦为混乱的数据包指示灯；
+  3. **违背立项哲学**：系统违背了 `AGENTS.md §4` 规定的“控制面与数据面物理分离”硬约束，把 Agent 的只读工作遥测当成了驱动桌面实体表演的开关，严重干扰用户心流。
+- **修复方案**：
+  1. **彻底解绑**：移除 `run_companion.py` 中 `LocalEventBus` 对 `controller.set_state` 的直连回调，移除 `http_server.py` 中 `_handle_event_on_main_thread` 对桌宠姿态的篡改调用；
+  2. **数据面与控制面归位**：
+     - **Data Plane（数据面）**：所有 Agent 发来的高频微观工具调用、思考、报错或轮次结束，**100% 只作为只读证据静默存入 Chronicle 档案库与 StateWatcher 中，对桌面表现层零干扰**；
+     - **Control Plane（表现层）**：桌宠姿态主权彻底回归**人类与桌面自然节律**（正常工作时静默微呼吸 Idle、投喂切片时跳跃确认 Jump、离开 60 秒自然打瞌睡 Sleep、鼠标触碰或点击自然唤醒），不再沦为任何 Agent CLI 的低级进度条外壳。
+- **回归测试**：`tests/test_http_server.py::test_agent_events_do_not_override_pet_posture_nor_print_bubbles` 完整模拟 Agent 包含 prompt -> 多个 tool calls -> turn end 的多步任务流，断言控制面 `controller.states == []`（姿态保持安宁，不产生任何抽搐乱动），且数据面 `len(bus.history) == 3` 完整无漏静默落盘。

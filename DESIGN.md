@@ -55,10 +55,11 @@ Companion 不是一个传统的操作面板，它是一个住在桌面角色的�
 
 1. **角色美术（Character Sprite）**：
    - 优先采用柔和、温暖、低对比度的像素精灵（Pixel Art），确保在 Windows 深色/浅色壁纸下均清晰可辨且不刺眼。
-2. **状态色彩语义（Status Accents）**：
-   - 思考中（Thinking）：柔和天蓝/紫灰光效或托腮动效；
-   - 工具执行（Working）：轻微敲键盘或书本动效；
-   - 报错与重试（Error）：轻微挠头或冒烟（克制表现，不制造恐慌感）；
-   - 任务完成（Done）：微小的星星或轻轻举手。
+2. **状态色彩语义与解绑纪律（Status Accents & Decoupling Discipline）**：
+   - **绝对解绑 Agent 微观执行**：Agent 的底层工具执行（`Read` / `Bash` / `Grep` 耗时 50ms）属于只读数据面，**绝对严禁直接驱动桌宠变幻姿态**，避免 50ms 级的狂奔-待机抽搐与多 Agent 状态踩踏；
+   - **常态（The Baseline）**：用户在电脑前工作时，桌宠始终保持安静祥和的微呼吸（`Idle`），不抢夺用户视线与心流；
+   - **主动交互（User-initiated）**：用户投喂切片时轻快跳跃/点头（`Happy`），点击互动时温和反馈；
+   - **自然节律（Natural Rhythm）**：用户离开 60 秒后平滑打瞌睡（`Sleeping`）；
+   - **宏观心智介入（Growth Core Intervention）**：仅在极低频（5%临界点）由心智审批触发时，呈现克制反馈（如深夜长时间连续工作时的关切托腮，绝不使用全速狂奔动画制造焦虑）。
 3. **层级原则（Elevation）**：
    - 桌宠窗口置顶（`AlwaysOnTop`），但设置 `WindowDoesNotAcceptFocus`，确保无论何时点击它，都不会夺走当前正在打字的 IDE 或浏览器的输入焦点。
