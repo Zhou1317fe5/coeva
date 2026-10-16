@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Fix: Agent 事件直连桌宠（静默陪伴回归）
+
+### 🐛 Fixed（缺陷修复）
+- **Agent 气泡绕过 Growth Core 三道门（P0）**：`/api/event` 曾把每条带 `message` 的事件无条件
+  交给 `controller.say`，而 `InterventionPolicy.evaluate_intervention` 在生产代码中零调用方，
+  文案硬编码在桥接侧。一次 27 回合的编码会话实测会弹 ≈111 条气泡（每次工具调用一条），
+  气泡 TTL 3s 且新消息重置计时，导致气泡常驻不消失，桌宠退化为 Agent 日志直播机。
+  现新增 `InterventionPolicy.allow_agent_bubble(event_type)`：常规遥测（prompt / tool call /
+  turn end / session end）一律**只动状态不发声**，仅 `tool_failure` 这类值得注意的事件可发声，
+  且受 60s 冷却 + 每日主动配额双重约束，同时满足 DESIGN §2.3 的 80/15/5 比例与
+  SPEC §2.6「沉默是有效的成功状态」。**状态动画保持直通，反应速度不变。**
+- **Sanctuary 不覆盖 Agent 事件路径（P0）**：`guard.is_active` 原先只在切片投喂与桌宠点击两条
+  路径被检查，用户处于情绪熔断状态时 Agent 仍会弹气泡。现 `allow_agent_bubble` 第一道门即
+  Sanctuary 检查，熔断期间 Agent 事件 100% 静默（仅动画）。
+- **`apply_state` 同状态重播导致动画抖动（P1）**：`apply_state` 原先无条件 `play()`，把帧索引
+  重置为 0；Agent 每回合重复下发同一状态（每次工具调用一次），使跑动/工作动画反复抽回首帧。
+  现同状态为 no-op，仅在 `force=True`（首次绘制、换装、换缩放）时重播。
+- **Petdex `idle` 被误映射为「回合完成」（P1）**：`POST /state` 曾把 `idle` 与 `completed` 合并为
+  `task_complete`，Agent 一空闲就触发庆祝动画与气泡。现 `idle → session_end`（安静休息），
+  `needs_input` 映射到新增的 `AgentEventType.NEEDS_INPUT`（`waiting` 动画）。
+- **`/bubble` 与 `/state` 绕过权限门控（P1）**：两处端点原先不检查 Agent 开关与气泡开关。
+  现共用 `_agent_may_speak()`，与 `/api/event` 走同一套 enable / instance / allow_bubble 判定。
+- **未知事件类型会让 Qt 槽抛异常（P1）**：`dispatch_json` 现对未知 `event_type` 保守降级为
+  `pre_tool_use`（agent_context），不再让外部进程传入的脏值在渲染槽中抛错。
+- **`/state` 未知状态劫持用户归因（P1）**：原先默认 `user_prompt`（唯一 `user_action`/`durable`
+  事件类型），会让 Agent 遥测冒充用户主动决策；现默认降级为 `pre_tool_use`。
+
+### 🧪 Tests（新增测试，70 项全绿）
+- `tests/test_core.py`：`allow_agent_bubble` 的 3 道门（常规遥测静默、冷却到期、Sanctuary 与
+  配额熔断）；
+- `tests/test_http_server.py`：端到端回归——模拟完整回合（prompt → tool call → turn end）
+  断言「状态照常流转、气泡零输出」；Petdex `idle` 不庆祝、Agent 静音后 `/bubble` 被过滤。
+
+---
+
 ## [Unreleased] - Phase 2A (Chronicle Foundation)
 
 ### 🚀 Added（新增）

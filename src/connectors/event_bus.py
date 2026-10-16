@@ -18,6 +18,7 @@ _EVENT_TO_STATE: dict[AgentEventType, PetState] = {
     AgentEventType.POST_TOOL_USE: PetState.WORKING,
     AgentEventType.TOOL_FAILURE: PetState.ERROR,
     AgentEventType.TASK_COMPLETE: PetState.HAPPY,
+    AgentEventType.NEEDS_INPUT: PetState.WAITING,
     AgentEventType.SESSION_END: PetState.SLEEPING,
 }
 
@@ -64,10 +65,18 @@ class LocalEventBus:
             data = json.loads(raw_json)
         else:
             data = raw_json
+        # An unknown event_type must degrade to conservative agent context rather
+        # than raise: the value arrives from an external process, and an exception
+        # here would fire inside the Qt slot that renders the pet.
+        raw_type = str(data.get("event_type", AgentEventType.USER_PROMPT))
+        try:
+            event_type = AgentEventType(raw_type.lower())
+        except ValueError:
+            event_type = AgentEventType.PRE_TOOL_USE
 
         event = AgentEvent.create(
             agent_id=data.get("agent_id", "unknown"),
-            event_type=data.get("event_type", "user_prompt"),
+            event_type=event_type,
             session_id=data.get("session_id", "default"),
             tool_name=data.get("tool_name", ""),
             error_message=data.get("error_message", ""),

@@ -96,6 +96,7 @@ class CompanionApp:
             settings_store=self.agent_settings,
             hook_manager=self.hook_manager,
             store=self.chronicle,
+            intervention=self.intervention,
         )
         self.http_server.start()
         # Pet click interaction

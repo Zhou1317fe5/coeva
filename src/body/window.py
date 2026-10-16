@@ -90,7 +90,7 @@ class PetWindow(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
         self._load_spritesheets()
-        self.apply_state(PetState.IDLE)
+        self.apply_state(PetState.IDLE, force=True)  # first paint of the sprite
         self._restore_position()
 
     @property
@@ -108,7 +108,7 @@ class PetWindow(QWidget):
             return
         self._scale = clamped
         self._load_spritesheets()
-        self.apply_state(self._current_state)
+        self.apply_state(self._current_state, force=True)  # sheets were re-sliced
         self._save_position()
         self.scale_changed.emit(self._scale)
 
@@ -118,7 +118,7 @@ class PetWindow(QWidget):
         self.pet_dir = pet_dir
         self._loaded_sheets.clear()
         self._load_spritesheets()
-        self.apply_state(self._current_state)
+        self.apply_state(self._current_state, force=True)  # sheets were replaced
 
     def _load_spritesheets(self) -> None:
         """Preload sprite sheets from Petdex atlas or legacy sprites directory."""
@@ -182,8 +182,16 @@ class PetWindow(QWidget):
                 except SpriteSheetError:
                     pass
 
-    def apply_state(self, state: PetState) -> None:
-        """Switch the pet's animated state."""
+    def apply_state(self, state: PetState, *, force: bool = False) -> None:
+        """Switch the pet's animated state.
+
+        Re-applying the state already playing is a no-op unless `force` is set.
+        Agent telemetry repeats the same state many times per turn (one event per
+        tool call), and replaying the sheet each time reset the frame index to 0,
+        so the pet visibly stuttered back to the first frame instead of running.
+        """
+        if state == self._current_state and not force:
+            return
         self._current_state = state
 
         state_candidates: dict[PetState, tuple[list[str], int, bool]] = {

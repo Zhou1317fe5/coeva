@@ -17,6 +17,7 @@ class AgentEventType(StrEnum):
     TOOL_FAILURE = "tool_failure"
     TASK_COMPLETE = "task_complete"
     SESSION_END = "session_end"
+    NEEDS_INPUT = "needs_input"
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ from src.connectors.settings import AgentSettingsStore
 if TYPE_CHECKING:
     from src.body.controller import BodyController
     from src.connectors.event_bus import LocalEventBus
+    from src.core.intervention import InterventionPolicy
     from src.memory.store import ChronicleStore
 
 
@@ -59,6 +60,19 @@ class _CompanionHandler(BaseHTTPRequestHandler):
     hook_manager: AgentHookManager
     store: ChronicleStore | None
     timeout: ClassVar[float | None] = 5.0
+
+    def _agent_may_speak(self, agent_id: str, platform: str | None, distro: str | None) -> bool:
+        """True when this agent instance is enabled and allowed to show bubbles.
+
+        Shared by /state and /bubble so both honour the same switches the
+        /api/event path and the settings panel expose.
+        """
+        instance_id = "windows"
+        if platform == "wsl":
+            instance_id = f"wsl:{distro}" if distro else "wsl"
+        return self.settings_store.is_agent_enabled(
+            agent_id, instance_id=instance_id
+        ) and self.settings_store.can_show_bubble(agent_id)
 
     def _is_loopback_client(self) -> bool:
         """True when the request came from this machine (SPEC section 7.2)."""
@@ -248,22 +262,35 @@ class _CompanionHandler(BaseHTTPRequestHandler):
 
         elif self.path == "/api/chronicle/slices/search":
             self._handle_chronicle_search(data)
-
         # ── Petdex Compatible Endpoints ──
         elif self.path == "/state":
-            # Map Petdex wire state (running, idle, needs_input, completed, failed)
+            # Map Petdex wire state (running, idle, needs_input, completed, failed).
+            # `idle` means the agent went quiet, not that a turn succeeded: mapping
+            # it to task_complete made the pet celebrate whenever an agent paused.
             raw_state = str(data.get("state", "idle")).strip().lower()
             aid = str(data.get("agent_id") or data.get("agent", "hermes")).strip()
             platform = str(data.get("platform", "")).strip().lower() or None
             distro = str(data.get("distro", "")).strip() or None
 
-            event_type = "user_prompt"
-            if raw_state == "running":
-                event_type = "pre_tool_use"
-            elif raw_state in ("completed", "idle"):
+            # An unrecognised or absent state must not claim user attribution:
+            # `user_prompt` is the one durable, user-owned event type, so defaulting
+            # to it would let agent telemetry masquerade as a user action.
+            if raw_state == "completed":
                 event_type = "task_complete"
+            elif raw_state == "idle":
+                event_type = "session_end"  # went quiet: rest, do not celebrate
             elif raw_state == "failed":
                 event_type = "tool_failure"
+            elif raw_state == "needs_input":
+                event_type = "needs_input"
+            else:
+                event_type = "pre_tool_use"  # running and anything unknown
+
+            self.settings_store.record_heartbeat(aid, platform=platform, distro=distro)
+            if not self._agent_may_speak(aid, platform, distro):
+                payload = {"ok": True, "state": raw_state, "petdex": True, "filtered": True}
+                self._send_json(200, payload)
+                return
 
             transformed = {
                 "agent_id": aid,
@@ -271,21 +298,32 @@ class _CompanionHandler(BaseHTTPRequestHandler):
                 "platform": platform,
                 "distro": distro,
                 "message": data.get("message"),
+                "_allow_bubble": self.settings_store.can_show_bubble(aid),
+                "_allow_action": self.settings_store.can_perform_action(aid),
             }
-            self.settings_store.record_heartbeat(aid, platform=platform, distro=distro)
             self.bridge.event_received.emit(transformed)
             self._send_json(200, {"ok": True, "state": raw_state, "petdex": True})
 
         elif self.path == "/bubble":
-            # Map Petdex bubble post
+            # Map Petdex bubble post. Gated exactly like /api/event, otherwise a
+            # user who switched an agent's bubble off would still be interrupted.
+            aid = str(data.get("agent_id") or data.get("agent", "hermes")).strip()
             text = str(data.get("text") or data.get("bubble", "")).strip()
             ttl_ms = int(data.get("ttl_ms", 3500))
-            if text:
-                self.bridge.say_received.emit(text, ttl_ms)
-                self._send_json(200, {"ok": True, "said": text, "petdex": True})
-            else:
+            if not text:
                 self._send_json(400, {"ok": False, "error": "Empty bubble text"})
+                return
 
+            platform = str(data.get("platform", "")).strip().lower() or None
+            distro = str(data.get("distro", "")).strip() or None
+            self.settings_store.record_heartbeat(aid, platform=platform, distro=distro)
+            if not self._agent_may_speak(aid, platform, distro):
+                payload = {"ok": True, "filtered": True, "reason": f"Agent '{aid}' is muted"}
+                self._send_json(200, payload)
+                return
+
+            self.bridge.say_received.emit(text, ttl_ms)
+            self._send_json(200, {"ok": True, "said": text, "petdex": True})
         else:
             self._send_json(404, {"ok": False, "error": "Unknown endpoint"})
 
@@ -301,6 +339,7 @@ class CompanionHttpServer:
         hook_manager: AgentHookManager | None = None,
         *,
         store: ChronicleStore | None = None,
+        intervention: InterventionPolicy | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
     ) -> None:
@@ -309,6 +348,7 @@ class CompanionHttpServer:
         self.settings_store = settings_store or AgentSettingsStore()
         self.hook_manager = hook_manager or AgentHookManager()
         self.store = store
+        self.intervention = intervention
         self.host = host
         self.port = port
         self.bridge = _QtHttpBridge()
@@ -323,15 +363,30 @@ class CompanionHttpServer:
         self._thread: threading.Thread | None = None
 
     def _handle_event_on_main_thread(self, data: dict[str, Any]) -> None:
-        """Executed safely on the Qt GUI main loop."""
+        """Executed safely on the Qt GUI main loop.
+
+        State animation stays a direct projection of agent telemetry, but a
+        bubble is a control-plane act: it must pass the Growth Core gates. A
+        routine tool call therefore moves the pet silently instead of printing
+        an agent log line over the user's work (DESIGN.md section 2.3).
+        """
         suggested_state = self.bus.dispatch_json(data)
-        if self.controller is not None:
-            if data.get("_allow_action", True):
-                self.controller.set_state(suggested_state)
-            msg = data.get("message")
-            if msg and data.get("_allow_bubble", True):
-                ttl_ms = int(data.get("ttl_ms", 3000))
-                self.controller.say(str(msg), ttl_ms=ttl_ms)
+        if self.controller is None:
+            return
+
+        if data.get("_allow_action", True):
+            self.controller.set_state(suggested_state)
+
+        msg = data.get("message")
+        if not msg or not data.get("_allow_bubble", True):
+            return
+
+        event_type = str(data.get("event_type", ""))
+        if self.intervention is not None and not self.intervention.allow_agent_bubble(event_type):
+            return
+
+        ttl_ms = int(data.get("ttl_ms", 3000))
+        self.controller.say(str(msg), ttl_ms=ttl_ms)
 
     def start(self) -> bool:
         """Start listening on the background thread."""

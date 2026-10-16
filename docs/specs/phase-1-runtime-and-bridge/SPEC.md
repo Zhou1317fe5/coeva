@@ -58,7 +58,11 @@ tags:
 ### 3.1 Companion Body 控制契约（Body Control Contract）
 Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 socket）：
 - `set_state(state: str)`: `idle | thinking | working | happy | error | sleeping`
-- `say(text: str, ttl_ms: int = 4000)`: 在桌宠头顶弹出质朴气泡，ttl 后自动淡出（气泡自动做屏幕内安全边缘吸附，防止截断）
+- `say(text: str, ttl_ms: int = 4000)`: 在桌宠头顶弹出质朴气泡，ttl 后自动淡出（气泡自动做屏幕内安全边缘吸附，防止截断）。
+  **调用约束（硬）**：气泡属控制面，任何来源（含 Agent 事件）都必须先经 Growth Core 审批。
+  Agent 事件走 `InterventionPolicy.allow_agent_bubble(event_type)`：常规遥测只驱动 `set_state`，
+  绝不发声；仅值得注意的事件（当前为 `tool_failure`）可发声，且受 Sanctuary / 每日配额 / 冷却三道门约束。
+  `set_state` 属数据面投影，可直通（DESIGN §2.3 的 80/15/5 比例由此保证）。
 - `perform_action(action_id: str)`: 播放特定动作动画（如 `wave`, `jump`, `nod`, `rest`）
 
 ### 3.2 随手投喂切片存储契约（`data/raw_slices.jsonl`）
@@ -151,3 +155,31 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 - **现象**：在设置中自定义投喂快捷键并保存后，理论上旧组合应失效；但若热键在监听线程尚未完成启动时被替换，旧组合仍可能保持注册状态，出现新旧两个热键同时可用。
 - **根因**：`GlobalHotkeyListener` 的监听器对象由工作线程在 `_run()` 内赋值。当 `stop()` 早于该赋值执行时，`stop()` 看到 `_listener is None` 便直接返回，而工作线程随后仍会创建并进入 `listener.join()`，使这个「已被替换」的监听器长期存活。
 - **修复方案**：在 `_run()` 内创建监听器后检查 `self._running`——若已被停止，立即退出 `with` 块（触发 `GlobalHotKeys` 上下文清理），确保被替换的热键绝不残留；`stop()` 改为等待工作线程收尾（`join(timeout=2.0)`）并统一清空 `_listener` / `_thread` 引用，使「停止即完全释放」成为确定行为。回归测试 `test_listener_stop_releases_a_worker_that_has_not_started_yet` 锁定该顺序；已验证旧逻辑下该断言失败（监听器确实泄漏），新逻辑通过。
+
+### 5.10 缺陷 10：Agent 事件直连气泡导致桌宠退化为日志直播（Intervention Gate on Agent Events）
+- **现象**：接入 PI-Desktop 后，桌宠在编码会话中持续弹出气泡（约每次工具调用一条），密集时气泡几乎常驻不消失，
+  状态动画也出现反复抽回首帧的抖动。
+- **根因**：
+  1. `/api/event` 与 Petdex `/state` 路径把每条带 `message` 的事件**无条件**交给 `controller.say`，
+     完全绕过 `Body Control Contract` 规定的「气泡须经 Growth Core 审批」；
+  2. `InterventionPolicy.evaluate_intervention()` 在生产代码中**没有调用方**（仅测试引用），
+     桥接侧文案（`🤔 思考中` / `⚙️ 正在执行: <工具>` / `🎉 回合完成`）为硬编码，`SanctuaryGuard`
+     也只覆盖切片投喂与桌宠点击两条路径；
+  3. `SpeechBubble.show_message` 每条新消息重置 TTL，短于 TTL 的连续事件使气泡无法淡出；
+  4. `PetWindow.apply_state` 在状态未变时同样调用 `player.play()`，把帧索引重置为 0。
+- **修复方案**：
+  1. 新增 `InterventionPolicy.allow_agent_bubble(event_type)`，作为 Agent 事件进入气泡的**唯一闸门**：
+     常规遥测（`user_prompt` / `pre_tool_use` / `post_tool_use` / `task_complete` / `session_end`）
+     一律只驱动状态动画、**绝不发声**；仅 `NOTABLE_AGENT_EVENTS`（当前为 `tool_failure`）可发声，
+     并受 Sanctuary → 每日主动配额 → 冷却窗口（默认 60s）三道门约束；
+     `_handle_event_on_main_thread` 与 `run_companion` 完成接线，状态动画保持直通；
+  2. `apply_state(state, *, force=False)` 对同状态变为 no-op，仅在首次绘制、`load_pet`、`set_scale`
+     重切图集时显式 `force=True`；
+  3. Petdex `/state` 的 `idle` 改为映射 `session_end`（安静休息，不再庆祝），`needs_input` 映射到
+     新增的 `AgentEventType.NEEDS_INPUT`；未知状态默认降级为 `pre_tool_use`（`agent_context`），
+     避免 Agent 遥测冒充 `user_action`；
+  4. `/state` 与 `/bubble` 共用 `_agent_may_speak()`，与 `/api/event` 采用同一套 enable / instance /
+     allow_bubble 判定；`dispatch_json` 对未知 `event_type` 保守降级，杜绝 Qt 槽抛错。
+- **回归测试**：`tests/test_core.py` 覆盖三道门；`tests/test_http_server.py` 端到端断言
+  「完整回合状态照常流转、气泡零输出」，并锁定 `idle` 不庆祝与静音后 `/bubble` 被过滤。
+  另以临时 harness 做变异验证：关闭闸门时同一回合产出 3 条气泡，开启后为 0，状态序列一致。

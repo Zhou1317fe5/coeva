@@ -107,3 +107,62 @@ def test_intervention_policy_3_gates() -> None:
     guard.evaluate_text("别烦我，真恶心")
     assert guard.is_active
     assert engine.evaluate_intervention(is_task_in_flight=False) is None
+
+def test_agent_bubbles_are_gated_so_routine_telemetry_stays_silent() -> None:
+    """Routine agent telemetry must move the pet without ever speaking.
+
+    Regression guard: every tool call used to print a bubble, turning the
+    desktop into an agent log viewer and breaking the 80/15/5 ratio.
+    """
+    engine = InterventionPolicy(
+        sanctuary=SanctuaryGuard(),
+        cold_start=ColdStartPolicy(day_count=30),
+        watcher=StateWatcher(),
+    )
+
+    for routine in ("user_prompt", "pre_tool_use", "post_tool_use", "task_complete", "session_end"):
+        assert engine.allow_agent_bubble(routine) is False
+
+    # A tool failure is notable, so it may speak once...
+    assert engine.allow_agent_bubble("tool_failure") is True
+    # ...but not again inside the cooldown window.
+    assert engine.allow_agent_bubble("tool_failure") is False
+
+
+def test_agent_bubble_cooldown_expires_and_an_unknown_type_never_speaks() -> None:
+    """The cooldown is wall-clock based, and unknown types are not notable."""
+    engine = InterventionPolicy(
+        sanctuary=SanctuaryGuard(),
+        cold_start=ColdStartPolicy(day_count=30),
+        watcher=StateWatcher(),
+        agent_bubble_cooldown_seconds=60.0,
+    )
+    base = datetime(2026, 10, 16, 12, 0, 0)
+
+    assert engine.allow_agent_bubble("tool_failure", now=base) is True
+    assert engine.allow_agent_bubble("tool_failure", now=base + timedelta(seconds=59)) is False
+    assert engine.allow_agent_bubble("tool_failure", now=base + timedelta(seconds=61)) is True
+
+    assert engine.allow_agent_bubble("some_future_event") is False
+
+
+def test_sanctuary_and_quota_silence_agent_bubbles() -> None:
+    """Agent bubbles obey Sanctuary first, then the daily proactive quota."""
+    guard = SanctuaryGuard()
+    engine = InterventionPolicy(
+        sanctuary=guard,
+        cold_start=ColdStartPolicy(day_count=30),
+        watcher=StateWatcher(),
+        agent_bubble_cooldown_seconds=0.0,
+    )
+
+    # User is in distress: no agent bubble may interrupt, ever.
+    guard.evaluate_text("烦死了，全搞砸了")
+    assert engine.allow_agent_bubble("tool_failure") is False
+
+    # Clear Sanctuary: the agent may speak again, but only within the quota.
+    guard.reset()
+    assert engine.allow_agent_bubble("tool_failure") is True
+    assert engine.allow_agent_bubble("tool_failure") is True
+    assert engine.allow_agent_bubble("tool_failure") is True
+    assert engine.allow_agent_bubble("tool_failure") is False  # mature quota is 3/day
