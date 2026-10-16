@@ -6,13 +6,15 @@ import os
 from pathlib import Path
 
 import pytest
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import QApplication
 
 from src.body.animation import AnimationPlayer, SpriteSheet, SpriteSheetError
 from src.body.contracts import PetState
 from src.body.controller import BodyController
+from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
+from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY
 
 # Ensure QApplication is initialized for offscreen tests
 _app = QApplication.instance()
@@ -203,4 +205,88 @@ def test_pet_window_scale_adjustment(tmp_path: Path) -> None:
     assert idle_sheet_150.frame_width == 288
     assert idle_sheet_150.frame_height == 312
 
+    window.close()
+
+
+class _StubHookManager:
+    """Hook manager stand-in so settings tests never touch the real filesystem."""
+
+    @staticmethod
+    def get_wsl_distros() -> list[str]:
+        return []
+
+    @staticmethod
+    def check_hook_status(agent_id: str, instance_id: str) -> dict[str, object]:
+        return {"installed": False, "status": "not_installed", "target_dir": None}
+
+
+def _settings_window(tmp_path: Path) -> SettingsWindow:
+    """Build a settings window backed by a throwaway settings file."""
+    from src.connectors.settings import AgentSettingsStore
+
+    store = AgentSettingsStore(tmp_path / "agent_settings.json")
+    return SettingsWindow(store, _StubHookManager())  # type: ignore[arg-type]
+
+
+def test_settings_shows_stored_feeder_hotkey(tmp_path: Path) -> None:
+    """The feeder card displays the persisted combination on open."""
+    window = _settings_window(tmp_path)
+    assert window.hotkey_edit.text() == "Alt + Space"
+    window.close()
+
+
+def test_settings_records_hotkey_and_persists_it(tmp_path: Path) -> None:
+    """Recording a chord updates the field, emits, and writes the canonical spec."""
+    from PySide6.QtCore import Qt
+
+    window = _settings_window(tmp_path)
+    captured: list[str] = []
+    window.hotkey_changed.connect(captured.append)
+
+    window.hotkey_edit._start_recording()
+    window.hotkey_edit.keyPressEvent(
+        QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_F,
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier,
+        )
+    )
+
+    assert captured == ["<ctrl>+<alt>+f"]
+    assert window.hotkey_edit.text() == "Ctrl + Alt + F"
+    assert window.store.feeder_hotkey == "<ctrl>+<alt>+f"
+    window.close()
+
+
+def test_settings_rejects_modifierless_recording(tmp_path: Path) -> None:
+    """A chord without a modifier is refused, leaving the stored value intact."""
+    from PySide6.QtCore import Qt
+
+    window = _settings_window(tmp_path)
+    captured: list[str] = []
+    window.hotkey_changed.connect(captured.append)
+
+    window.hotkey_edit._start_recording()
+    window.hotkey_edit.keyPressEvent(
+        QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_F, Qt.KeyboardModifier.NoModifier)
+    )
+
+    assert captured == []
+    assert window.store.feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+    assert "无效" in window.hotkey_hint.text()
+    window.close()
+
+
+def test_settings_reset_restores_default_hotkey(tmp_path: Path) -> None:
+    """The reset button returns the shipped default and re-emits it."""
+    window = _settings_window(tmp_path)
+    window._on_hotkey_captured("<ctrl>+<alt>+f")
+
+    captured: list[str] = []
+    window.hotkey_changed.connect(captured.append)
+    window._on_hotkey_reset()
+
+    assert captured == [DEFAULT_FEEDER_HOTKEY]
+    assert window.store.feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+    assert window.hotkey_edit.text() == "Alt + Space"
     window.close()

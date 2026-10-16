@@ -5,13 +5,14 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFocusEvent, QFont, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -23,15 +24,83 @@ from PySide6.QtWidgets import (
 )
 
 from src.connectors.hook_manager import AgentHookManager
+from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, hotkey_display, hotkey_from_qt
 
 if TYPE_CHECKING:
     from src.connectors.settings import AgentSettingsStore
+
+
+class _HotkeyRecorderEdit(QLineEdit):
+    """Read-only field that records a key chord the moment it has focus.
+
+    Click it and press the chord: the canonical spec is emitted for the owner to
+    persist. Esc abandons the recording and restores the displayed combination.
+    """
+
+    hotkey_captured = Signal(str)
+    capture_rejected = Signal(str)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self._recording = False
+        self._current_spec = ""
+        self.setPlaceholderText("点击此处，然后按下组合键")
+        self.setToolTip("点击后直接按下想要的组合键；按 Esc 放弃录制")
+
+    def set_current(self, spec: str) -> None:
+        """Show the active combination without entering recording mode."""
+        self._current_spec = spec
+        if not self._recording:
+            self.setText(hotkey_display(spec))
+
+    def focusInEvent(self, event: QFocusEvent) -> None:  # noqa: N802
+        super().focusInEvent(event)
+        self._start_recording()
+
+    def focusOutEvent(self, event: QFocusEvent) -> None:  # noqa: N802
+        self._stop_recording()
+        self.setText(hotkey_display(self._current_spec))
+        super().focusOutEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        super().mousePressEvent(event)
+        self._start_recording()
+
+    def _start_recording(self) -> None:
+        self._recording = True
+        self.clear()
+        self.setPlaceholderText("请按下组合键… (Esc 放弃)")
+
+    def _stop_recording(self) -> None:
+        self._recording = False
+        self.setPlaceholderText("点击此处，然后按下组合键")
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if not self._recording:
+            super().keyPressEvent(event)
+            return
+        if event.key() == Qt.Key.Key_Escape:
+            self.capture_rejected.emit("已放弃录制，快捷键未改动")
+            self.clearFocus()
+            return
+        spec = hotkey_from_qt(event.modifiers(), Qt.Key(event.key()))
+        if spec is None:
+            self.capture_rejected.emit("组合键无效：需包含 Ctrl / Alt / Shift / Win 修饰键")
+            return
+        # Show the result immediately; focus may never change (e.g. tests, or a
+        # window that keeps focus), so the text must not depend on focus-out.
+        self._stop_recording()
+        self.set_current(spec.spec)
+        self.hotkey_captured.emit(spec.spec)
+        self.clearFocus()
 
 
 class SettingsWindow(QWidget):
     """Full-featured preferences and multi-agent management dialog."""
     pet_changed = Signal(str)
     scale_changed = Signal(float)
+    hotkey_changed = Signal(str)
 
 
     def __init__(
@@ -557,17 +626,61 @@ class SettingsWindow(QWidget):
         feed_title = QLabel("🌱 随手投喂切片 (Slice Feeder)")
         feed_title.setStyleSheet("font-weight: 600; font-size: 14px;")
         feed_desc = QLabel(
-            "默认快捷键：Alt + Space。在任何软件或网页下即可随时唤起半透明磨砂输入弹窗，"
-            "输入回车瞬时存盘，失焦秒隐。"
+            "在任何软件或网页下即可随时唤起半透明磨砂输入弹窗，输入回车瞬时存盘，失焦秒隐。"
         )
         feed_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
         feed_desc.setWordWrap(True)
         feed_layout.addWidget(feed_title)
         feed_layout.addWidget(feed_desc)
+
+        hotkey_row = QHBoxLayout()
+        hotkey_row.setSpacing(8)
+        self.hotkey_edit = _HotkeyRecorderEdit(feed_card)
+        self.hotkey_edit.set_current(self.store.feeder_hotkey)
+        self.hotkey_edit.setMinimumWidth(200)
+        self.hotkey_edit.hotkey_captured.connect(self._on_hotkey_captured)
+        self.hotkey_edit.capture_rejected.connect(self._on_hotkey_rejected)
+        hotkey_row.addWidget(self.hotkey_edit, 1)
+
+        reset_hotkey_btn = QPushButton("↺ 恢复默认")
+        reset_hotkey_btn.setFixedHeight(30)
+        reset_hotkey_btn.clicked.connect(self._on_hotkey_reset)
+        hotkey_row.addWidget(reset_hotkey_btn)
+        feed_layout.addLayout(hotkey_row)
+
+        self.hotkey_hint = QLabel("")
+        self.hotkey_hint.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        self.hotkey_hint.setWordWrap(True)
+        feed_layout.addWidget(self.hotkey_hint)
         layout.addWidget(feed_card)
 
         layout.addStretch()
         return container
+
+    # ── Feeder Hotkey Handlers ──
+    def _on_hotkey_captured(self, spec: str) -> None:
+        """Persist a freshly recorded hotkey and tell the app to re-register it.
+
+        ``spec`` is already a validated canonical combination, so the store
+        cannot reject it; the emitted signal is what makes it live without a
+        restart.
+        """
+        self.store.set_feeder_hotkey(spec)
+        self.hotkey_edit.set_current(spec)
+        self.hotkey_hint.setText(f"✅ 已更新为 {hotkey_display(spec)}，立即生效，无需重启。")
+        self.hotkey_changed.emit(spec)
+
+    def _on_hotkey_rejected(self, message: str) -> None:
+        """Surface why a recording attempt was refused, leaving the value intact."""
+        self.hotkey_edit.set_current(self.store.feeder_hotkey)
+        self.hotkey_hint.setText(f"⚠️ {message}")
+
+    def _on_hotkey_reset(self) -> None:
+        """Restore the shipped default combination."""
+        self._on_hotkey_captured(DEFAULT_FEEDER_HOTKEY)
+        self.hotkey_hint.setText(
+            f"↺ 已恢复默认 {hotkey_display(DEFAULT_FEEDER_HOTKEY)}，立即生效。"
+        )
 
     # ── Page 3: Growth Core & Sanctuary ──
     def _build_core_page(self) -> QWidget:

@@ -25,7 +25,7 @@ from src.core.intervention import InterventionPolicy
 from src.core.sanctuary import SanctuaryGuard
 from src.core.state_watcher import StateWatcher
 from src.feeder.contracts import RawSlice
-from src.feeder.hotkey import GlobalHotkeyListener
+from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, GlobalHotkeyListener, hotkey_display
 from src.feeder.overlay import SliceFeederOverlay
 from src.feeder.storage import SliceStore
 from src.memory.store import ChronicleStore, SliceRecord
@@ -51,6 +51,7 @@ class CompanionApp:
         self.settings_window = SettingsWindow(self.agent_settings, self.hook_manager)
         self.settings_window.pet_changed.connect(self._on_pet_changed)
         self.settings_window.scale_changed.connect(self._on_scale_changed)
+        self.settings_window.hotkey_changed.connect(self._on_hotkey_changed)
 
         # 1. Desktop Body (Defaults to Tiko, or saved pet preference)
         selected_pet = self.agent_settings.selected_pet
@@ -106,12 +107,27 @@ class CompanionApp:
         self._setup_decay()
 
     def _setup_hotkey(self) -> None:
-        """Register global hotkey <alt>+<space> to summon the slice feeder."""
+        """Register the configured global hotkey that summons the slice feeder.
+
+        The combination is user-owned (settings window), so an unusable stored
+        value falls back to the default rather than leaving the feeder
+        unreachable.
+        """
+        spec = self.agent_settings.feeder_hotkey
         try:
-            self.hotkey = GlobalHotkeyListener("<alt>+<space>", self.overlay.toggle_or_show)
+            self.hotkey = GlobalHotkeyListener(spec, self.overlay.toggle_or_show)
             self.hotkey.start()
-        except Exception:
-            pass
+        except ValueError:
+            self.hotkey = GlobalHotkeyListener(DEFAULT_FEEDER_HOTKEY, self.overlay.toggle_or_show)
+            self.hotkey.start()
+
+    def _on_hotkey_changed(self, spec: str) -> None:
+        """Re-register the feeder hotkey in place, so a change needs no restart."""
+        self.hotkey.stop()
+        self.hotkey = GlobalHotkeyListener(spec, self.overlay.toggle_or_show)
+        self.hotkey.start()
+        self.feed_action.setText(f"🌱 随手投喂切片 ({hotkey_display(spec)})")
+        self.controller.say(f"⌨️ 投喂快捷键已更新为 {hotkey_display(spec)}", ttl_ms=2500)
 
     def _setup_decay(self) -> None:
         """Prune expired transient evidence once at startup and then daily.
@@ -153,9 +169,11 @@ class CompanionApp:
         menu.addAction(settings_action)
 
         # 1. Feeder trigger
-        feed_action = QAction("🌱 随手投喂切片 (Alt+Space)", self.window)
-        feed_action.triggered.connect(self.overlay.toggle_or_show)
-        menu.addAction(feed_action)
+        self.feed_action = QAction(
+            f"🌱 随手投喂切片 ({hotkey_display(self.agent_settings.feeder_hotkey)})", self.window
+        )
+        self.feed_action.triggered.connect(self.overlay.toggle_or_show)
+        menu.addAction(self.feed_action)
 
         # 1.5 Switch Pet Submenu
         switch_menu = menu.addMenu("🔄 切换伴生体 (Switch Pet)")
@@ -269,7 +287,8 @@ class CompanionApp:
         if self.guard.is_active:
             self.controller.say("（安静地陪着你）", ttl_ms=2500)
         else:
-            self.controller.say("我在呢。按 Alt+Space 可以随手喂我想法~", ttl_ms=3000)
+            display = hotkey_display(self.agent_settings.feeder_hotkey)
+            self.controller.say(f"我在呢。按 {display} 可以随手喂我想法~", ttl_ms=3000)
 
     def _on_slice_submitted(self, text: str) -> None:
         """Handle incoming slice from overlay."""

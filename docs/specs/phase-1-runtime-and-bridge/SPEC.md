@@ -42,7 +42,7 @@ tags:
    - **Hermes 桥接**：利用 Hermes 生命周期 Hook（`pre_tool_call`, `post_tool_call`, `on_session_start`, `on_session_end`），向 Growth Core 汇报客观事件；
    - **Pi 桥接**：利用 Pi 的全局 extension 机制，向 Growth Core 汇报任务起止。
 3. **随手投喂切片输入（Slice Feeding MVP）**：
-   - 建立 Python 全局快捷键监听（如双击 `Alt` 或 `Win+Shift+P`）；
+   - 建立 Python 全局快捷键监听，默认 `Alt + Space`，**用户可在设置「桌面身体偏好 → 随手投喂切片」中自定义**（录制式录入，必须含 Ctrl/Alt/Shift/Win 修饰键；保存后立即重挂监听，无需重启）；
    - 呼出可自由拖动与记忆位置的极简半透明输入框，输入文字后敲击回车追加写入 `data/raw_slices.jsonl`；
    - 自动驱动桌宠做动作确认与温和气泡反馈。
 4. **轻量心智与守卫（Growth Core v0.1）**：
@@ -73,6 +73,21 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 }
 ```
 
+### 3.3 投喂快捷键配置契约（`data/agent_settings.json`）
+```json
+{
+  "version": 2,
+  "selected_pet": "tiko",
+  "feeder_hotkey": "<alt>+<space>",
+  "agents": {}
+}
+```
+- **磁盘形式**：pynput canonical 组合串（修饰键顺序固定为 `ctrl → alt → shift → cmd`，保证同一组合只有唯一写法）；默认 `"<alt>+<space>"`。
+- **展示形式**：`"Alt + Space"`、`"Ctrl + Alt + F"`，由 `hotkey_display()` 派生，磁盘值不参与展示。
+- **校验不变量**：必须包含至少一个修饰键（Ctrl / Alt / Shift / Win）且恰有一个主键；非法输入**永不落盘**（`set_feeder_hotkey()` 抛 `ValueError`），磁盘值非法或缺失时载入回退默认。
+- **生效方式**：变更后立即重建监听器（无需重启），托盘菜单项与桌宠点击气泡文案同步更新。
+- **模块归属**：`src/feeder/hotkey.py` 独占热键域（`HotkeySpec` / `parse_hotkey` / `hotkey_from_qt` / `hotkey_display` / `GlobalHotkeyListener`）；Qt→pynput 键名表由两库自身枚举派生，不手写。
+
 ---
 
 ## 4. 验收标准（Acceptance Criteria）
@@ -81,12 +96,13 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 - [x] **AC-2 (Hermes / Pi 联动)**：启动 Hermes 或 Pi 跑任务，Growth Core 接收到事件并在 1 秒内驱动桌宠展示对应动作。
 - [x] **AC-3 (随手投喂体验)**：按全局快捷键，200ms 内唤起半透明输入框，输入文字回车后窗口秒隐，`data/raw_slices.jsonl` 成功增加一条有效记录，桌宠点头确认。
 - [x] **AC-4 (避风港熔断)**：在投喂中输入带有“烦死了”、“全搞砸了”等负面情绪切片，系统静默存盘，严禁触发任何说教气泡，提供温和接纳反馈。
+- [x] **AC-5 (快捷键可自定义)**：设置「桌面身体偏好 → 随手投喂切片」以录制式录入新组合键；保存后 `data/agent_settings.json` 的 `feeder_hotkey` 写入 canonical 串并**立即生效无需重启**；无修饰键的组合被拒绝且磁盘值不变；「↺ 恢复默认」回到 `Alt + Space`；托盘菜单与气泡文案跟随当前值；磁盘值非法或缺失时启动回退默认且不崩溃。
 
 ---
 
 ## 5. 缺陷排查与工程修复复盘（Bug Post-mortems）
 
-为便于团队开发、后续交接与架构审查，记录在实际桌面联调中排查的五个关键缺陷及根治方案：
+为便于团队开发、后续交接与架构审查，记录在实际桌面联调中排查的关键缺陷及根治方案：
 
 ### 5.1 缺陷 1：全局热键与 GUI 线程死锁（Thread-safe Hotkey Bridge）
 - **现象**：按 `Alt + Space` 弹出输入框后，窗口卡死、未响应，无法输入文字。
@@ -130,3 +146,8 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 - **现象**：在 PowerShell 中执行包含转义双引号 `\"` 的 `curl -d "{\"key\":\"value\"}"` 时报错 `Invalid JSON`、`Port number not between 0 and 65535` 及 `Could not resolve host`。
 - **根因**：PowerShell 的命令行解析引擎会预处理并剥离双引号中的反斜杠双引号，导致传给底层程序的不是合法 JSON，且包含空格的 message 文本被误切分为独立的主机名/端口参数。
 - **修复方案**：规范在 Windows PowerShell 下的交互调用，推荐使用 PowerShell 原生 `Invoke-RestMethod`，或在 `curl` 中使用单引号包裹 JSON（在 PowerShell 中单引号是逐字字符串，内部无需反斜杠转义）。
+
+### 5.9 缺陷 9：热键重挂时旧监听线程残留导致双重绑定（Listener Handoff Race）
+- **现象**：在设置中自定义投喂快捷键并保存后，理论上旧组合应失效；但若热键在监听线程尚未完成启动时被替换，旧组合仍可能保持注册状态，出现新旧两个热键同时可用。
+- **根因**：`GlobalHotkeyListener` 的监听器对象由工作线程在 `_run()` 内赋值。当 `stop()` 早于该赋值执行时，`stop()` 看到 `_listener is None` 便直接返回，而工作线程随后仍会创建并进入 `listener.join()`，使这个「已被替换」的监听器长期存活。
+- **修复方案**：在 `_run()` 内创建监听器后检查 `self._running`——若已被停止，立即退出 `with` 块（触发 `GlobalHotKeys` 上下文清理），确保被替换的热键绝不残留；`stop()` 改为等待工作线程收尾（`join(timeout=2.0)`）并统一清空 `_listener` / `_thread` 引用，使「停止即完全释放」成为确定行为。回归测试 `test_listener_stop_releases_a_worker_that_has_not_started_yet` 锁定该顺序；已验证旧逻辑下该断言失败（监听器确实泄漏），新逻辑通过。

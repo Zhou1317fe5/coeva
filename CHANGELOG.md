@@ -23,10 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **只读 Chronicle HTTP 端点**：`/api/chronicle/{stats,slices,evidence,episodes}` 与 `POST /api/chronicle/slices/search`；
   按 `client_address` 做回环判定，**非回环来源一律 403**（WSL 跨网 Agent 路径不受影响）。
 - **规范图谱**：`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`（2A MVP 范围）与对应 task-spec。
+- **随手投喂快捷键可自定义（Slice Feeder Hotkey, `src/feeder/hotkey.py`）**：
+  - 设置「桌面身体偏好 → 随手投喂切片」新增**录制式**录入框（点击后直接按下组合键即捕获，Esc 放弃）与「↺ 恢复默认」按钮；
+  - 持久化于 `data/agent_settings.json` 的 `feeder_hotkey`，存 pynput canonical 串（如 `"<ctrl>+<alt>+f"`），默认 `"<alt>+<space>"`；
+  - 校验不变量：必须含 Ctrl/Alt/Shift/Win 修饰键且恰有一个主键，**非法值永不落盘**（抛 `ValueError`），磁盘值非法或缺失时启动回退默认；
+  - 保存后**立即重挂监听器，无需重启**；托盘菜单项与桌宠点击气泡文案跟随当前值；
+  - Qt→pynput 键名映射表由两库自身枚举派生，不手写硬编码表。
+  - 顺带修复热键重挂的旧监听线程竞态（旧组合可能残留为双重绑定），详见 phase-1 规范 §5.9。
 
-### 🧪 Tests（新增测试，45 项全绿）
+### 🧪 Tests（新增测试，当前全库 69 项全绿）
 - `tests/test_memory.py`：AC-1~AC-6、AC-9 及事件幂等键、Episode 分组；
-- `tests/test_chronicle_http.py`：AC-7 回环限定与端到端只读接口。
+- `tests/test_chronicle_http.py`：AC-7 回环限定与端到端只读接口；
+- `tests/test_feeder.py`：快捷键归一化/幂等、拒绝裸键与未知键、Qt 组合键映射、监听器非法组合拒绝、旧监听线程释放回归；
+- `tests/test_connectors.py`：`feeder_hotkey` 默认值、写入-重载往返、非法值拒绝、磁盘非法值回退；
+- `tests/test_body.py`：设置窗口显示已存快捷键、录制落盘与信号、无修饰键拒绝、恢复默认。
 
 ### 📌 Known Limitations（如实记录）
 - **检索未用 FTS5**：实测（SQLite 3.53.1）`unicode61` 与 `trigram` 分词器对 **2 字中文词均 0 命中**，

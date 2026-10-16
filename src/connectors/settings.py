@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, parse_hotkey
+
 DEFAULT_AGENTS: dict[str, dict[str, Any]] = {
     "pi-desktop": {
         "name": "PI-Desktop",
@@ -150,6 +152,10 @@ class AgentSettingsStore:
                 raw_data = {}
 
         self._selected_pet = str(raw_data.get("selected_pet", "tiko"))
+        stored_hotkey = parse_hotkey(str(raw_data.get("feeder_hotkey", "")))
+        self._feeder_hotkey = (
+            stored_hotkey.spec if stored_hotkey is not None else DEFAULT_FEEDER_HOTKEY
+        )
         agents_data = raw_data.get("agents", {})
         self._configs = {}
 
@@ -198,6 +204,7 @@ class AgentSettingsStore:
         payload = {
             "version": 2,
             "selected_pet": self._selected_pet,
+            "feeder_hotkey": self._feeder_hotkey,
             "agents": {aid: cfg.to_dict() for aid, cfg in self._configs.items()},
         }
         with open(self.file_path, "w", encoding="utf-8") as f:
@@ -218,6 +225,23 @@ class AgentSettingsStore:
     def set_selected_pet(self, pet_id: str) -> None:
         """Update and persist the selected desktop pet."""
         self._selected_pet = pet_id.strip() or "tiko"
+        self.save()
+
+    @property
+    def feeder_hotkey(self) -> str:
+        """Return the canonical global hotkey that summons the slice feeder."""
+        return self._feeder_hotkey
+
+    def set_feeder_hotkey(self, spec: str) -> None:
+        """Persist a new feeder hotkey, rejecting anything unusable.
+
+        An illegal combination raises rather than being written, so the value on
+        disk is always one the listener can actually register.
+        """
+        parsed = parse_hotkey(spec)
+        if parsed is None:
+            raise ValueError(f"非法快捷键组合: {spec!r}")
+        self._feeder_hotkey = parsed.spec
         self.save()
 
 

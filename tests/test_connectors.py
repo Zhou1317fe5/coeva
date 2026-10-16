@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
+
+import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -99,3 +102,48 @@ def test_agent_settings_pet_preference(tmp_path: Path) -> None:
 
     reloaded.set_selected_pet("wangcai")
     assert reloaded.selected_pet == "wangcai"
+
+
+def _persisted_hotkey(settings_file: Path) -> object:
+    """Read the hotkey straight off disk, bypassing the in-memory store."""
+    return json.loads(settings_file.read_text(encoding="utf-8"))["feeder_hotkey"]
+
+
+def test_feeder_hotkey_defaults_persists_and_rejects_illegal(tmp_path: Path) -> None:
+    """The feeder hotkey round-trips canonically and never persists a bad value."""
+    from src.connectors.settings import AgentSettingsStore
+    from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY
+
+    settings_file = tmp_path / "agent_settings.json"
+    store = AgentSettingsStore(settings_file)
+    assert store.feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+
+    # A friendly spelling is normalised on the way to disk.
+    store.set_feeder_hotkey("Ctrl+Alt+F")
+    assert store.feeder_hotkey == "<ctrl>+<alt>+f"
+    assert _persisted_hotkey(settings_file) == "<ctrl>+<alt>+f"
+    assert AgentSettingsStore(settings_file).feeder_hotkey == "<ctrl>+<alt>+f"
+
+    # Illegal input raises and leaves both memory and disk untouched.
+    with pytest.raises(ValueError):
+        store.set_feeder_hotkey("f")
+    assert store.feeder_hotkey == "<ctrl>+<alt>+f"
+    assert _persisted_hotkey(settings_file) == "<ctrl>+<alt>+f"
+
+
+def test_feeder_hotkey_falls_back_when_stored_value_is_invalid(tmp_path: Path) -> None:
+    """A hand-edited or missing value degrades to the default instead of crashing."""
+    from src.connectors.settings import AgentSettingsStore
+    from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY
+
+    settings_file = tmp_path / "agent_settings.json"
+    settings_file.write_text(
+        json.dumps({"version": 2, "selected_pet": "tiko", "feeder_hotkey": "f", "agents": {}}),
+        encoding="utf-8",
+    )
+    assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+
+    settings_file.write_text(
+        json.dumps({"version": 2, "selected_pet": "tiko", "agents": {}}), encoding="utf-8"
+    )
+    assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
