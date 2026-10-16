@@ -86,16 +86,19 @@ class InterventionPolicy:
         if event_type not in NOTABLE_AGENT_EVENTS:
             return False
 
-        if not self.cold_start.can_speak():
+        current = now or datetime.now()
+        # The quota is daily: roll it over before checking it, otherwise a
+        # companion that spent its budget stays silent until it is restarted.
+        self.cold_start.roll_over_if_new_day(current)
+        if not self.cold_start.can_speak(now=current):
             return False
 
-        current = now or datetime.now()
         if self._last_agent_bubble_at is not None:
             elapsed = (current - self._last_agent_bubble_at).total_seconds()
             if elapsed < self.agent_bubble_cooldown_seconds:
                 return False
 
-        if not self.cold_start.record_speech():
+        if not self.cold_start.record_speech(now=current):
             return False
 
         self._last_agent_bubble_at = current

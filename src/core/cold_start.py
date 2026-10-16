@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
 
@@ -61,6 +61,7 @@ class ColdStartPolicy:
     def __init__(self, day_count: int = 1) -> None:
         self.day_count = max(1, day_count)
         self.speeches_today = 0
+        self._speech_day: date | None = None
 
     @classmethod
     def from_persisted_first_seen(
@@ -100,18 +101,45 @@ class ColdStartPolicy:
         """Deep psychological interpretation is strictly forbidden in stages 1 and 2."""
         return self.stage in (ColdStartStage.STAGE_3_CALIBRATION, ColdStartStage.STAGE_MATURE)
 
-    def can_speak(self) -> bool:
-        """Check if daily speech budget remains."""
+    def can_speak(self, *, now: datetime | None = None) -> bool:
+        """Check if the daily speech budget still has room.
+
+        Rolls the counter over when the calendar day changes, so the quota really
+        is *daily*. Without this the counter was only ever reset by reset_day(),
+        which no production code called: once the companion spent its quota it
+        stayed silent until the process was restarted.
+        """
+        self.roll_over_if_new_day(now)
         return self.speeches_today < self.daily_speech_quota
 
-    def record_speech(self) -> bool:
+    def roll_over_if_new_day(self, now: datetime | None = None) -> bool:
+        """Reset the daily counter when the calendar day has advanced.
+
+        Returns True when a rollover happened. The day is taken in local time,
+        which is what "3 bubbles a day" means to the person at the desk.
+        """
+        current_day = (now or datetime.now()).date()
+        if self._speech_day is None:
+            self._speech_day = current_day
+            return False
+        if current_day == self._speech_day:
+            return False
+        self._speech_day = current_day
+        self.speeches_today = 0
+        return True
+
+    def record_speech(self, *, now: datetime | None = None) -> bool:
         """Consume one quota if allowed."""
-        if not self.can_speak():
+        if not self.can_speak(now=now):
             return False
         self.speeches_today += 1
         return True
 
     def reset_day(self) -> None:
-        """Reset daily speech counter when day advances."""
+        """Reset the daily speech counter when the day advances.
+
+        Kept for explicit callers and tests; normal rollover happens lazily in
+        `roll_over_if_new_day`.
+        """
         self.speeches_today = 0
         self.day_count += 1
