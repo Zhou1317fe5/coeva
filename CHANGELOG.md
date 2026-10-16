@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 1: 生产契约与标准形象锁定
+
+### 📝 Docs（规范与决策）
+- 新增 `docs/specs/vasu/SPEC.md`：明确三张参考图的优先级、Vasu 身份约束、资产目录、Codex 九行核心动画与 Coeva 专有扩展动画边界；本阶段未制作动画素材。
+
 ## [Unreleased] - Architecture: 彻底切断 Agent 执行与桌宠身体姿态的直连（物理隔离）
 
 ### 🚀 Architecture & Philosophy（架构哲学回归）
@@ -59,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   每次切换到该页刷新（`refresh_core_status()`）；未接入实例时明确显示"未接入"而非假装可用。
 
 ### ✨ Added（新增功能）
+- **多 Agent 历史会话收割器（Multi-Agent History Harvester）**：
+  - **架构实现**：在 `src/connectors/history/` 落地三大日志转译器（`PiDesktopParser`、`CodexCliParser`、`HermesDbParser`），自动扫描发现 Windows 和 WSL 下沉淀的 500+ 个历史会话日志；
+  - **严格零文本隐私与时间序因果（AC-1 ~ AC-3）**：100% 物理隔离用户的 Prompt 输入正文、思维链（CoT）与工具输出细节，仅提取行为时间脉冲，支持 SHA-1 幂等导入；
+  - **物理陪伴冷启动锁（AC-6）**：确立“信息与信任的不对称性”哲学硬约束，历史数据仅作为底层静默证据池，前台桌宠的破冰节奏与每日发言配额 100% 物理锁死在用户真实的相处天数上，坚决不因数据充裕而快进关系。
+  - **配套 CLI 工具**：支持 `--dry-run` 安全预览、`--sources` 来源选择与 `--limit` 灵活配置。
 - **闲置 60 秒自动入睡（P2）**：DESIGN §2.1 早有要求，但全仓无任何闲置定时器，入睡只能由
   `session_end` 或托盘菜单触发，等于桌宠作息被 Agent 生命周期绑架。现实现
   `IDLE_SLEEP_AFTER_MS = 60_000` 单次定时器：任何状态变化重置计时；入睡后仅"真活动"
