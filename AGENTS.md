@@ -17,6 +17,8 @@
 | `src/feeder/` | **随手投喂切片输入器（Slice Feeder）**：全局热键（如双击 `Alt` 或 `Win+Shift+P`）监听、半透明磨砂即用即走输入框及存盘管道。 |
 | `src/memory/` | **本地记忆与生命档案（Chronicle Store）**：管理 `data/raw_slices.jsonl`（切片流）、本地 SQLite（结构化事件）及 Markdown 格式的长期成长章节（Growth Chapters）。 |
 | `docs/specs/` | **ThinkRail 规范图谱（Durable Spec Graph）**：项目真实性事实源（Source of Truth）。包含总体目标、系统架构及各阶段模块规范。 |
+| `docs/concepts/` | **产品哲学与心智设计理论**：立项愿景、ACT 心理灵活性框架、介入三道门、归因与记忆衰减理论总纲。 |
+| `docs/research/` | **开源生态与选型调研**：Clawd 等桌宠底座调研、主从反转架构定调报告及历史演进归档。 |
 | `DESIGN.md` | **伴生体空间圣域与交互哲学规范**：定义 Stage 空间保护、点击穿透、输入框瞬态退出与质朴气泡风格。 |
 | `tests/` | **自动化测试套件**：涵盖单元测试、状态机流转测试与归因过滤测试。 |
 

@@ -122,12 +122,22 @@ Vasu 不记录机械的流水账，也不做 Life Logging 监控。
 
 ## 文档索引
 
-深入了解 Coeva 的设计细节与技术契约，请参阅本仓库内的详细规范：
+深入了解 Coeva 的设计细节与技术契约，请参阅 [`docs/README.md`](./docs/README.md) 获取完整文档中心导航：
 
-- [`co_evolving_ai_companion_concept_v0.1.md`](./co_evolving_ai_companion_concept_v0.1.md) — 概念设计与产品愿景总纲
-- [`personality_mind_development_framework_v0.1.md`](./personality_mind_development_framework_v0.1.md) — 六大心智发展域与心理灵活性框架
-- [`hermes_user_behavior_attribution_design_v0.1.md`](./hermes_user_behavior_attribution_design_v0.1.md) — Hermes 行为归因与防误判设计
-- [`companion_intervention_policy_v0.1.md`](./companion_intervention_policy_v0.1.md) — 介入策略、沉默原则与决策三道门
-- [`companion_data_model_requirements_v0.1.md`](./companion_data_model_requirements_v0.1.md) — 数据最小化与衰减生命周期
-- [`pet_relationship_growth_chapters_product_boundaries_v0.1.md`](./pet_relationship_growth_chapters_product_boundaries_v0.1.md) — 关系演化、人生章节与十项 Non-goals
-- [`hermes_first_slice_input_and_cold_start_v0.1.md`](./hermes_first_slice_input_and_cold_start_v0.1.md) — 单工具聚焦、随手投喂切片与前 14 天破冰策略
+### 现行执行规范图谱 (ThinkRail Specs)
+- [`docs/specs/SPEC.md`](./docs/specs/SPEC.md) — 总体系统架构设计规范
+- [`docs/specs/phase-1-runtime-and-bridge/SPEC.md`](./docs/specs/phase-1-runtime-and-bridge/SPEC.md) — Phase 1 运行时与桥接规范
+- [`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md) — Phase 2 人生章节与生命档案库规范
+
+### 核心心智理论与设计规范
+- [`01_concept_and_vision_v0.1.md`](./docs/concepts/01_concept_and_vision_v0.1.md) — 概念设计与产品愿景总纲
+- [`02_mind_development_framework_v0.1.md`](./docs/concepts/02_mind_development_framework_v0.1.md) — 六大心智发展域与心理灵活性框架
+- [`03_intervention_policy_v0.1.md`](./docs/concepts/03_intervention_policy_v0.1.md) — 介入策略、沉默原则与决策三道门
+- [`04_attribution_design_v0.1.md`](./docs/concepts/04_attribution_design_v0.1.md) — Hermes 行为归因与防误判设计
+- [`05_data_model_requirements_v0.1.md`](./docs/concepts/05_data_model_requirements_v0.1.md) — 数据最小化与衰减生命周期
+- [`06_relationship_and_growth_chapters_v0.1.md`](./docs/concepts/06_relationship_and_growth_chapters_v0.1.md) — 关系演化、人生章节与十项 Non-goals
+- [`07_cold_start_and_slice_feeder_v0.1.md`](./docs/concepts/07_cold_start_and_slice_feeder_v0.1.md) — 单工具聚焦、随手投喂切片与前 14 天破冰策略
+
+### 生态与技术选型调研
+- [`ecosystem_research_v2.0.md`](./docs/research/ecosystem_research_v2.0.md) — 开源生态与独立常驻底座调研报告 (v2.0)
+- [`docs/research/README.md`](./docs/research/README.md) — 技术调研演进脉络与历史归档索引
