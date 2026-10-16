@@ -20,6 +20,9 @@ _EVENT_TO_STATE: dict[AgentEventType, PetState] = {
     AgentEventType.TASK_COMPLETE: PetState.HAPPY,
     AgentEventType.NEEDS_INPUT: PetState.WAITING,
     AgentEventType.SESSION_END: PetState.SLEEPING,
+    # A finished turn returns the pet to rest, not to celebration: the task is
+    # still in progress, the agent merely paused between exchanges.
+    AgentEventType.TURN_END: PetState.IDLE,
 }
 
 

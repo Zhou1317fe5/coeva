@@ -1,4 +1,16 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
+
+const COMPANION_PORT = 17321;
+
+// One id per PI-Desktop session, so the companion can group telemetry into
+// episodes. A hardcoded id collapsed every session the user ever ran into a
+// single episode, which made any cross-session pattern impossible.
+let sessionId = newSessionId();
+
+function newSessionId() {
+  return `pi-${randomUUID()}`;
+}
 
 function postEvent(payload) {
   try {
@@ -6,7 +18,7 @@ function postEvent(payload) {
     const req = http.request(
       {
         hostname: "127.0.0.1",
-        port: 17321,
+        port: COMPANION_PORT,
         path: "/api/event",
         method: "POST",
         headers: {
@@ -32,12 +44,13 @@ function postEvent(payload) {
 export default function companionBridge(pi) {
   if (!pi || typeof pi.on !== "function") return;
 
-  // 1. Session start
+  // 1. Session start -> new episode boundary
   pi.on("session_start", () => {
+    sessionId = newSessionId();
     postEvent({
       agent_id: "pi-desktop",
       event_type: "session_start",
-      session_id: "pi_session",
+      session_id: sessionId,
     });
   });
 
@@ -46,7 +59,7 @@ export default function companionBridge(pi) {
     postEvent({
       agent_id: "pi-desktop",
       event_type: "user_prompt",
-      session_id: "pi_session",
+      session_id: sessionId,
       message: "🤔 PI-Desktop 思考中...",
     });
   });
@@ -57,33 +70,42 @@ export default function companionBridge(pi) {
     postEvent({
       agent_id: "pi-desktop",
       event_type: "pre_tool_use",
-      session_id: "pi_session",
+      session_id: sessionId,
       tool_name: toolName,
       message: `⚙️ 正在执行: ${toolName}`,
     });
   });
 
-  // 4. Tool result -> Failure alert
+  // 4. Tool result -> completion or failure. A successful result used to emit
+  //    nothing at all, so the companion only ever learned about failures.
   pi.on("tool_result", (event) => {
+    const toolName = (event && event.toolName) || "tool";
     if (event && event.isError) {
-      const toolName = event.toolName || "tool";
       postEvent({
         agent_id: "pi-desktop",
         event_type: "tool_failure",
-        session_id: "pi_session",
+        session_id: sessionId,
         tool_name: toolName,
         message: `⚠️ 工具报错: ${toolName}`,
+      });
+    } else {
+      postEvent({
+        agent_id: "pi-desktop",
+        event_type: "post_tool_use",
+        session_id: sessionId,
+        tool_name: toolName,
       });
     }
   });
 
-  // 5. Turn end -> Complete / Celebration
+  // 5. Turn end -> the agent finished one exchange, which is not the same as the
+  //    user's task being complete. Reporting it as `task_complete` produced ~450
+  //    "completed task" events per working day.
   pi.on("turn_end", () => {
     postEvent({
       agent_id: "pi-desktop",
-      event_type: "task_complete",
-      session_id: "pi_session",
-      message: "🎉 回合完成！",
+      event_type: "turn_end",
+      session_id: sessionId,
     });
   });
 
@@ -92,7 +114,7 @@ export default function companionBridge(pi) {
     postEvent({
       agent_id: "pi-desktop",
       event_type: "session_end",
-      session_id: "pi_session",
+      session_id: sessionId,
     });
   });
 }

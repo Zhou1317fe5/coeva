@@ -218,6 +218,28 @@ shortcut: LIKE 全表扫描，切片 > 10k 时换 FTS5 + 中文分词器（见 �
 **硬约束**：`agent_context` 永远不得升级为高权重发展证据。
 这是 §2.2 在代码中的唯一落点，也是 2A 唯一可在单测中断言的归因规则（见 AC-2）。
 
+### 5.1 事件类型与 Episode 边界
+
+`AgentEventType` 共 9 种。**`session_id` 必须由 connector 为每次会话生成**，
+否则所有会话塌缩成同一个 Episode，跨会话的 Pattern 永远无法成立。
+
+| 事件 | 语义 | 备注 |
+| :--- | :--- | :--- |
+| `session_start` | 会话开始 | **必须携带新的 session_id** |
+| `user_prompt` | 用户发起一轮 | 唯一 `user_action` |
+| `pre_tool_use` | 即将调用工具 | |
+| `post_tool_use` | 工具**成功**返回 | 缺失时只有失败可见 |
+| `tool_failure` | 工具失败 | |
+| `turn_end` | 一轮对话结束 | **不是** `task_complete` |
+| `task_complete` | 任务真正完成 | 低频 |
+| `needs_input` | 等待用户输入 | |
+| `session_end` | 会话结束 | |
+
+> **为何区分 `turn_end` 与 `task_complete`**：实测一个工作日产生约 450 条 `turn_end`。
+> 若都记为 `task_complete`，未来的 Episode/Pattern 统计会得出"用户完成了数百个任务"的失真结论。
+> 已知 connector 实测（pi-desktop）：`turn_end` 报为 `task_complete` 时的分布为
+> `task_complete 449 / pre_tool_use 412 / tool_failure 25 / user_prompt 16`。
+
 > v0.1 的 `tool_loop_abort` / `late_night_push` 归因**已移除**：
 > 前者需要"用户中止"事件类型（`AgentEventType` 中不存在），
 > 后者把 Agent 自主行为等同于用户作息，违反 §2.2。二者均需 connector 侧先提供用户侧信号（§8）。

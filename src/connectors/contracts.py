@@ -18,6 +18,10 @@ class AgentEventType(StrEnum):
     TASK_COMPLETE = "task_complete"
     SESSION_END = "session_end"
     NEEDS_INPUT = "needs_input"
+    # One exchange finished. Distinct from TASK_COMPLETE: a working day produces
+    # hundreds of these, and treating each as a completed task drowned the real
+    # user signals in agent noise.
+    TURN_END = "turn_end"
 
 
 @dataclass(frozen=True)
