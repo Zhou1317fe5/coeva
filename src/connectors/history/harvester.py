@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ class MultiAgentHistoryHarvester:
         sources: list[str] | None = None,
         *,
         limit_per_source: int | None = None,
+        on_progress: Callable[[str, int, int], None] | None = None,
     ) -> dict[str, list[HarvestedSession]]:
         """Harvest sessions from selected or all registered agent sources."""
         active_sources = sources or list(self.parsers.keys())
@@ -46,7 +48,8 @@ class MultiAgentHistoryHarvester:
 
             results[src] = []
             if isinstance(parser, HermesDbParser):
-                # HermesDbParser handles all sessions via SQLite query directly
+                if on_progress:
+                    on_progress(src, 1, 1)
                 all_sessions = parser.parse_all_sessions()
                 if limit_per_source is not None:
                     all_sessions = all_sessions[:limit_per_source]
@@ -55,11 +58,13 @@ class MultiAgentHistoryHarvester:
                 targets = parser.discover_targets()
                 if limit_per_source is not None:
                     targets = targets[:limit_per_source]
-                for t in targets:
+                total_t = len(targets)
+                for i, t in enumerate(targets):
+                    if on_progress:
+                        on_progress(src, i + 1, total_t)
                     sess = parser.parse_session(t)
                     if sess:
                         results[src].append(sess)
-
         return results
 
     def dry_run(
@@ -67,9 +72,12 @@ class MultiAgentHistoryHarvester:
         sources: list[str] | None = None,
         *,
         limit_per_source: int | None = None,
+        on_progress: Callable[[str, int, int], None] | None = None,
     ) -> dict[str, Any]:
         """Perform a read-only analysis of discoverable historical sessions."""
-        harvested = self.harvest_sessions(sources=sources, limit_per_source=limit_per_source)
+        harvested = self.harvest_sessions(
+            sources=sources, limit_per_source=limit_per_source, on_progress=on_progress
+        )
         summary: dict[str, Any] = {
             "sources": {},
             "total_sessions": 0,
@@ -108,20 +116,20 @@ class MultiAgentHistoryHarvester:
         sources: list[str] | None = None,
         *,
         limit_per_source: int | None = None,
+        on_progress: Callable[[str, int, int], None] | None = None,
     ) -> dict[str, int]:
         """Parse sessions and idempotently record events into ChronicleStore."""
-        harvested = self.harvest_sessions(sources=sources, limit_per_source=limit_per_source)
+        harvested = self.harvest_sessions(
+            sources=sources, limit_per_source=limit_per_source, on_progress=on_progress
+        )
         ingested_counts: dict[str, int] = {}
         total_ingested = 0
 
         for src, sessions in harvested.items():
-            count = 0
-            for sess in sessions:
-                for ev in sess.events:
-                    store.record_event(ev)
-                    count += 1
-            ingested_counts[src] = count
-            total_ingested += count
+            src_events = [ev for sess in sessions for ev in sess.events]
+            store.record_events_batch(src_events)
+            ingested_counts[src] = len(src_events)
+            total_ingested += len(src_events)
 
         ingested_counts["total"] = total_ingested
         return ingested_counts

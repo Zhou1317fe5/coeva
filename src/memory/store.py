@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -181,6 +182,33 @@ class ChronicleStore:
         )
         self._conn.commit()
         return cursor.rowcount > 0
+
+    def record_events_batch(self, events: Iterable[AgentEvent]) -> int:
+        """Batch insert events in a single transaction. Returns count of newly inserted rows."""
+        rows = []
+        for event in events:
+            provenance, retention_class = classify(event.event_type)
+            rows.append((
+                event_id(event),
+                event.timestamp,
+                event.agent_id,
+                event.session_id,
+                str(event.event_type),
+                event.tool_name,
+                event.error_message,
+                provenance,
+                retention_class,
+            ))
+        if not rows:
+            return 0
+        cursor = self._conn.executemany(
+            "INSERT OR IGNORE INTO events "
+            "(id, timestamp, agent_id, session_id, event_type, tool_name, error_message, "
+            " provenance, retention_class) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        self._conn.commit()
+        return cursor.rowcount
 
     def import_slices_jsonl(self, path: Path | None = None) -> int:
         """Idempotently import the legacy raw slice stream. Returns newly added rows."""

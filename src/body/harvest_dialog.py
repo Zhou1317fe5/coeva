@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSpinBox,
     QTextEdit,
@@ -25,8 +26,59 @@ if TYPE_CHECKING:
     from src.memory.store import ChronicleStore
 
 
+class HarvestWorkerThread(QThread):
+    """Background worker thread performing session scanning and batch database ingestion."""
+
+    progress_msg = Signal(str)
+    preview_finished = Signal(dict)
+    import_finished = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        harvester: MultiAgentHistoryHarvester,
+        mode: str,  # "preview" or "import"
+        sources: list[str],
+        limit: int,
+        store: ChronicleStore | None = None,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.harvester = harvester
+        self.mode = mode
+        self.sources = sources
+        self.limit = limit
+        self.store = store
+
+    def run(self) -> None:
+        try:
+            def _on_prog(src: str, cur: int, total: int) -> None:
+                self.progress_msg.emit(f"[{src}] 正在提取会话: {cur}/{total}...")
+
+            if self.mode == "preview":
+                summary = self.harvester.dry_run(
+                    sources=self.sources,
+                    limit_per_source=self.limit,
+                    on_progress=_on_prog,
+                )
+                self.preview_finished.emit(summary)
+            elif self.mode == "import":
+                if self.store is None:
+                    self.failed.emit("ChronicleStore is not initialized.")
+                    return
+                counts = self.harvester.ingest_into_store(
+                    self.store,
+                    sources=self.sources,
+                    limit_per_source=self.limit,
+                    on_progress=_on_prog,
+                )
+                self.import_finished.emit(counts)
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
 class HarvestHistoryDialog(QDialog):
-    """Modern dark-themed dialog for multi-agent historical session harvesting."""
+    """Non-blocking, modern dark-themed dialog for multi-agent historical session harvesting."""
 
     harvest_completed = Signal(int)  # Emits total events ingested
 
@@ -34,10 +86,11 @@ class HarvestHistoryDialog(QDialog):
         super().__init__(parent)
         self.store = store
         self.harvester = MultiAgentHistoryHarvester()
+        self.worker: HarvestWorkerThread | None = None
 
         self.setWindowTitle("📦 历史多 Agent 会话收割 (Historical Session Harvesting)")
-        self.resize(620, 480)
-        self.setMinimumSize(540, 400)
+        self.resize(650, 520)
+        self.setMinimumSize(560, 420)
 
         self._setup_ui()
         self._apply_styling()
@@ -45,7 +98,7 @@ class HarvestHistoryDialog(QDialog):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         # 1. Title & Purpose Description
         title_label = QLabel("多 Agent 历史会话归因收割")
@@ -102,7 +155,26 @@ class HarvestHistoryDialog(QDialog):
         self.log_display.setPlaceholderText("点击下方「🔍 扫描预览」查看可收割资产...")
         layout.addWidget(self.log_display)
 
-        # 4. Action Buttons
+        # 4. Progress bar (indeterminate / pulse during worker execution)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setFixedHeight(6)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                background-color: #27272a;
+                border-radius: 3px;
+            }
+            QProgressBar::chunk {
+                background-color: #10b981;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress_bar)
+
+        # 5. Action Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
@@ -124,10 +196,10 @@ class HarvestHistoryDialog(QDialog):
 
         btn_row.addStretch()
 
-        btn_close = QPushButton("关闭")
-        btn_close.setFixedHeight(32)
-        btn_close.clicked.connect(self.close)
-        btn_row.addWidget(btn_close)
+        self.btn_close = QPushButton("关闭")
+        self.btn_close.setFixedHeight(32)
+        self.btn_close.clicked.connect(self.close)
+        btn_row.addWidget(self.btn_close)
 
         layout.addLayout(btn_row)
 
@@ -141,6 +213,16 @@ class HarvestHistoryDialog(QDialog):
             sources.append("hermes")
         return sources
 
+    def _set_working_state(self, is_working: bool) -> None:
+        """Enable or disable controls during background operations to prevent re-entrancy."""
+        self.btn_preview.setEnabled(not is_working)
+        self.btn_import.setEnabled(not is_working)
+        self.cb_pi.setEnabled(not is_working)
+        self.cb_codex.setEnabled(not is_working)
+        self.cb_hermes.setEnabled(not is_working)
+        self.spin_limit.setEnabled(not is_working)
+        self.progress_bar.setVisible(is_working)
+
     def _on_preview_clicked(self) -> None:
         sources = self._selected_sources()
         if not sources:
@@ -148,8 +230,20 @@ class HarvestHistoryDialog(QDialog):
             return
 
         limit = self.spin_limit.value()
-        self.log_display.append(f"🔍 正在扫描系统 Agent 会话日志 (上限 {limit} 个/源)...")
-        summary = self.harvester.dry_run(sources=sources, limit_per_source=limit)
+        self.log_display.append(f"🔍 启动后台扫描 (上限 {limit} 个会话/源，界面保持流畅)...")
+        self._set_working_state(True)
+
+        self.worker = HarvestWorkerThread(
+            self.harvester, mode="preview", sources=sources, limit=limit, parent=self
+        )
+        self.worker.progress_msg.connect(self.log_display.append)
+        self.worker.preview_finished.connect(self._on_preview_finished)
+        self.worker.failed.connect(self._on_worker_failed)
+        self.worker.start()
+
+    def _on_preview_finished(self, summary: dict[str, Any]) -> None:
+        self._set_working_state(False)
+        sources = self._selected_sources()
 
         text = [
             "================= 扫描预览结果 =================",
@@ -177,15 +271,28 @@ class HarvestHistoryDialog(QDialog):
             return
 
         limit = self.spin_limit.value()
-        self.log_display.append(f"📥 正在导入客观事件至 ChronicleStore (各源上限 {limit})...")
+        self.log_display.append(f"📥 启动后台极速批量入库 (各源上限 {limit} 会话)...")
+        self._set_working_state(True)
 
-        counts = self.harvester.ingest_into_store(
-            self.store, sources=sources, limit_per_source=limit
+        self.worker = HarvestWorkerThread(
+            self.harvester,
+            mode="import",
+            sources=sources,
+            limit=limit,
+            store=self.store,
+            parent=self,
         )
+        self.worker.progress_msg.connect(self.log_display.append)
+        self.worker.import_finished.connect(self._on_import_finished)
+        self.worker.failed.connect(self._on_worker_failed)
+        self.worker.start()
+
+    def _on_import_finished(self, counts: dict[str, int]) -> None:
+        self._set_working_state(False)
         total = counts.get("total", 0)
 
         log_lines = [
-            "✨ 导入完成！",
+            "✨ 批量入库完成！",
             "各源入库事件计数:",
         ]
         for src, c in counts.items():
@@ -203,6 +310,18 @@ class HarvestHistoryDialog(QDialog):
             f"当前底层已累计 {self.store.stats()['events']} 条事件。\n\n"
             f"（注：前台桌宠陪伴天数仍按真实相处自然递增，绝不打扰日常工作。）",
         )
+
+    def _on_worker_failed(self, err_msg: str) -> None:
+        self._set_working_state(False)
+        self.log_display.append(f"❌ 操作失败: {err_msg}")
+        QMessageBox.critical(self, "错误", f"后台任务发生异常:\n{err_msg}")
+
+    def closeEvent(self, event: Any) -> None:  # noqa: N802
+        """Ensure background worker is cleanly terminated when dialog is closed."""
+        if self.worker and self.worker.isRunning():
+            self.worker.terminate()
+            self.worker.wait(1000)
+        super().closeEvent(event)
 
     def _apply_styling(self) -> None:
         self.setStyleSheet("""
@@ -253,5 +372,10 @@ class HarvestHistoryDialog(QDialog):
             }
             QPushButton:hover {
                 background-color: #3f3f46;
+            }
+            QPushButton:disabled {
+                background-color: #1f1f23;
+                color: #52525b;
+                border-color: #27272a;
             }
         """)

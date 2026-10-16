@@ -65,6 +65,8 @@ class PiDesktopParser(BaseSessionParser):
                     line_str = line.strip()
                     if not line_str:
                         continue
+                    if '"session"' not in line_str and '"message"' not in line_str:
+                        continue
                     try:
                         record: dict[str, Any] = json.loads(line_str)
                     except json.JSONDecodeError:

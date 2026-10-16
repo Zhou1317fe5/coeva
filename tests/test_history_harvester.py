@@ -410,7 +410,11 @@ def test_harvest_history_dialog_preview_and_controls(tmp_path: Path) -> None:
     dialog.spin_limit.setValue(2)
 
     # Test preview trigger
+    # Test preview trigger via worker thread
     dialog._on_preview_clicked()
+    if dialog.worker:
+        dialog.worker.wait(10000)
+    app.processEvents()
     log_text = dialog.log_display.toPlainText()
     assert "扫描预览结果" in log_text
     assert "合计发现会话" in log_text
