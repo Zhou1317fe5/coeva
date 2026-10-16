@@ -365,17 +365,18 @@ class CompanionHttpServer:
     def _handle_event_on_main_thread(self, data: dict[str, Any]) -> None:
         """Executed safely on the Qt GUI main loop.
 
-        State animation stays a direct projection of agent telemetry, but a
-        bubble is a control-plane act: it must pass the Growth Core gates. A
-        routine tool call therefore moves the pet silently instead of printing
-        an agent log line over the user's work (DESIGN.md section 2.3).
+        Data Plane & Control Plane separation (AGENTS.md section 4):
+        Agent telemetry (tool calls, prompt turns, session changes) is purely
+        read-only background evidence. It is dispatched to the event bus and
+        persisted into Chronicle for growth chapters, but it STRICTLY NEVER
+        drives or overrides the pet's physical body posture directly.
+        This prevents rapid state thrashing (running -> idle -> running in 50ms)
+        and multi-agent posture collisions. The pet's body posture is owned
+        purely by human interaction and natural desk rhythm.
         """
-        suggested_state = self.bus.dispatch_json(data)
+        self.bus.dispatch_json(data)
         if self.controller is None:
             return
-
-        if data.get("_allow_action", True):
-            self.controller.set_state(suggested_state)
 
         msg = data.get("message")
         if not msg or not data.get("_allow_bubble", True):

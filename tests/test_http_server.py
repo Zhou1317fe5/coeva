@@ -417,11 +417,13 @@ class _RecordingController:
         pass
 
 
-def test_agent_events_move_the_pet_but_do_not_print_bubbles(tmp_path: Path) -> None:
-    """The desktop must stay a companion, not an agent log viewer.
+def test_agent_events_do_not_override_pet_posture_nor_print_bubbles(tmp_path: Path) -> None:
+    """The desktop must stay a companion, not an agent log viewer or ticker.
 
-    End-to-end regression guard for the P0 fix: a full simulated turn (prompt ->
-    tool calls -> turn end) animates the pet and speaks nothing.
+    Data Plane & Control Plane separation (AGENTS.md section 4):
+    Agent telemetry (prompt -> tool calls -> turn end) is background evidence.
+    It is recorded to the bus/chronicle, but strictly NEVER overrides the pet's
+    body posture directly, nor prints agent progress bubbles.
     """
     from src.connectors.settings import AgentSettingsStore
     from src.core.cold_start import ColdStartPolicy
@@ -473,10 +475,12 @@ def test_agent_events_move_the_pet_but_do_not_print_bubbles(tmp_path: Path) -> N
         time.sleep(0.05)
         QCoreApplication.processEvents()
 
-        # The pet still animates through the turn...
-        assert controller.states == [PetState.THINKING, PetState.WORKING, PetState.HAPPY]
-        # ...but none of that routine telemetry was spoken.
+        # Physical posture remains peaceful & untouched by background agent telemetry!
+        assert controller.states == []
+        # Routine agent telemetry is also silent.
         assert controller.said == []
+        # Data Plane: all 3 events are recorded cleanly in bus history.
+        assert len(bus.history) == 3
     finally:
         server.stop()
 
@@ -509,11 +513,11 @@ def test_petdex_idle_does_not_celebrate_and_bubble_is_mutable(tmp_path: Path) ->
     time.sleep(0.1)
 
     try:
-        # Petdex "idle" is not a completed turn: it must not celebrate.
+        # Petdex "idle" does not hijack pet posture nor celebrate.
         _post_json(17395, "/state", {"state": "idle", "agent": "hermes"})
         time.sleep(0.05)
         QCoreApplication.processEvents()
-        assert controller.states == [PetState.SLEEPING]
+        assert controller.states == []
 
         # Muting the agent's bubbles must silence /bubble too.
         store.update_agent("hermes", allow_bubble=False)

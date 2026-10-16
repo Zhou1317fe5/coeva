@@ -6,7 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - Fix: 贴边消失 / 闲置入睡 / 面板按钮 / 设置页状态
+## [Unreleased] - Architecture: 彻底切断 Agent 执行与桌宠身体姿态的直连（物理隔离）
+
+### 🚀 Architecture & Philosophy（架构哲学回归）
+- **控制面与数据面物理分离（AGENTS.md §4 硬约束落地）**：
+  - **根因复盘**：此前系统残留了将每个微观工具调用（`Read` / `Bash` 耗时 30ms）直连桌宠动画的玩具式逻辑。实测一段 2 分钟对话中，事件 1129 条导致了 **734 次状态毫秒级震荡**（`running 30ms` -> `idle 50ms` -> `running 60ms`）。这不仅造成小猫像抽搐般频繁狂奔，而且在多 Agent（Pi + Hermes + Codex）并发时，会导致毫秒级覆盖踩踏；
+  - **彻底解绑**：移除 `run_companion.py` 中 `LocalEventBus` 对 `controller.set_state` 的回调直连，移除 `http_server.py` 中 Agent 事件对桌宠姿态的强行篡改；
+  - **各归其位**：
+    - **数据面（Data Plane）**：所有 Agent 发来的高频微观工具事件，**100% 只作为只读证据静默存入 Chronicle 档案库与 StateWatcher 心智节律中，对桌面表现层零干扰**；
+    - **桌面表现层（Desktop Body）**：桌宠姿态主权彻底回归**人类与自然节律**（正常工作时静默微呼吸 Idle、投喂切片时轻快确认 Jump、离开 60 秒自然打瞌睡 Sleep、鼠标触碰或点击自然唤醒），不再沦为任何 Agent CLI 的低级进度条外壳。
+
+---
 ### 🔧 Changed（行为调整）
 - **默认尺寸改为 50%**：`DEFAULT_SCALE` 由 `1.0` 改为 `0.5`，并移除 `run_companion.py` /
   `src/body/main.py` 中显式传入的 `scale=1`（它覆盖了默认值，导致改常量无效）。

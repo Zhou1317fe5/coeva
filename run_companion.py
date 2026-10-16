@@ -88,9 +88,11 @@ class CompanionApp:
         )
 
         # 4. Connectors & Event Bus
+        # Data Plane: Agent events record rhythm (watcher) and persist evidence (chronicle).
+        # Control Plane is decoupled: agent events NEVER directly drive pet body state,
+        # preventing state thrashing and multi-agent posture collisions (AGENTS.md section 4).
         self.bus = LocalEventBus(
             on_event_received=lambda e: self.watcher.record_activity(),
-            on_state_suggested=lambda s: self.controller.set_state(s),
             store=self.chronicle,
         )
         self.hermes = HermesConnector(self.bus)
