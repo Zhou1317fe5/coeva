@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   已保存过尺寸的用户不受影响——`data/body_position.json` 中的偏好会覆盖该默认值。
 
 ### 🐛 Fixed（缺陷修复）
+- **摩擦归因时间序因果缺陷（P1 · 认知偏差）**：原 `PatternBuilder._detect_friction_response` 仅判断
+  会话内是否存在 `tool_failure` 和 `user_prompt`，未检查二者发生的前后时间顺序。由于大多数会话
+  均以用户 Prompt 启动（`timestamp` 早于报错），当 Agent 遭遇报错并自主修复时，用户的起始指令被错误
+  识别为“报错后的纠偏介入”，导致模式挖掘将 Agent 自主修复错误归因为 `pat_friction_recovery`（用户主动干预）。
+  现引入严格时间序因果约束：仅当 `user_prompt` 的时间戳严格晚于 `tool_failure` 时才归为用户干预；
+  若 Agent 自主修复未被打断，则如实归因为 `pat_agent_autonomous_recovery`（充分自主修复空间 / 信任委派），
+  并映射至“接纳不确定性”与“调节灵活性”心智透镜。同时优化 `_detect_delegation_ratio`，支持双向对流判定。
 - **拖拽贴边后不再自动收纳（P0 · 用户报告）**：`_has_moved` 仅在鼠标按下时重置，拖动结束
   (`mouseReleaseEvent`) 后从未复位；而 `leaveEvent` 与 150ms 游标轮询两条自动收纳路径都要求
   `not self._has_moved`。因此**只要用拖拽把宠物贴到边缘，收纳逻辑就被永久关闭** ——

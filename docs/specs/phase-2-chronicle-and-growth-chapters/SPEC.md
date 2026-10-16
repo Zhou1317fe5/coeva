@@ -333,3 +333,27 @@ Phase 1 暴露的只是 Agent 开关；2A 的端点会暴露**用户原始切片
    §8 的 2B 启动门不是保守，而是防止把阈值写成猜测。
 3. **WSL 跨网访问与回环限定的张力** —— §7.2 以按路由判定解决；
    若将来拆分为独立端口，需重新评估。
+
+---
+
+## 11. 缺陷排查与工程修复复盘（Bug Post-mortems）
+
+为便于团队开发、后续交接与架构审查，记录在 Phase 2 记忆归因与行为模式挖掘中排查的关键缺陷及根治方案：
+
+### 11.1 缺陷 1：摩擦归因缺乏时间序因果导致 Agent 自主修复被误判为用户干预（Temporal Causality Attribution Bug）
+- **现象**：在 Agent 执行长链路复杂任务中，工具执行产生报错（`tool_failure`）后，Agent 自主分析上下文并尝试修复，用户并未进行任何干预；但在行为模式挖掘时，该 Episode 却被错误归因为 `pat_friction_recovery`（用户主动下发纠偏指令），导致认知画像与用户真实行为完全相反。
+- **根因**：原 `_detect_friction_response` 仅使用集合包含判定（`fails > 0 and user_prompts > 0`）。然而，几乎所有会话的最开始都包含一条用户发起的初始任务 Prompt（`user_prompt` at t=0）。由于缺乏时间序前后因果判定，前置的初始 Prompt 被误作为“报错后的干预证据”。
+- **修复方案**：
+  1. **严格时间序因果约束（Strict Temporal Causality Rule）**：重构 `PatternBuilder._detect_friction_response`，按 `timestamp ASC` 严格遍历事件流。只有当 `user_prompt` 的时间戳严格发生在 `tool_failure` 之后，才记为用户介入；
+  2. **双向模式与认知透镜健全**：若 Agent 遭遇报错但用户未在报错后打断，如实归因为 `pat_agent_autonomous_recovery`（给予自主修复空间），并在心智层映射到“接纳不确定性（Openness to Uncertainty）”与“调节灵活性（Regulatory Flexibility）”透镜；
+  3. **任务委派比率因果化**：重构 `_detect_delegation_ratio`，计算用户 Prompt 占总事件比率，支持 `pat_hands_off_delegation`（深度信任委派）与 `pat_interactive_steering`（紧密阶段引导）双向判定。
+
+### 11.2 缺陷 2：冷启动天数计算与每日发言配额跨天未自然滚动（Cold Start Day Progression & Speech Quota Rollover）
+- **现象**：伴生体连续运行数天后，系统内部仍被锁定在 Day 1 且每日气泡配额耗尽后无法在次日自然重置。
+- **根因**：`ColdStartPolicy` 原实现仅在内存中维护会话内天数；且 `InterventionPolicy.can_speak()` 的配额重置只基于静态字典，缺乏跨日期的本地持久化锚点。
+- **修复方案**：引入 `data/first_seen.json` 作为首次唤醒持久化记录，通过 `ColdStartPolicy.from_persisted_first_seen()` 根据本地日历天数自然递增计算伴生天数；在 `can_speak()` 中增加基于当前日期的 `roll_over_if_new_day()` 检查，次日自动刷新 3 次发言配额。
+
+### 11.3 缺陷 3：数据面 Agent 执行与控制面桌宠姿态强耦合导致毫秒级震荡（Planes Separation & Telemetry Decoupling）
+- **现象**：当外部 Agent 高频调用 CLI/工具时，桌宠在 2 分钟内震荡切换 700+ 次动画状态，甚至导致多 Agent 并发时的状态踩踏。
+- **根因**：控制面（桌面表现层）与数据面（只读事件流）未物理解耦，HTTP 接收器与 EventBus 直接回调了 `BodyController.set_state`。
+- **修复方案**：彻底切断 EventBus 对身体姿态的直连。所有 Agent 遥测数据 100% 作为只读证据流进入 Chronicle 与 StateWatcher，身体姿态主权回归人类与自然节律（静默 Idle、投喂 Jump、离开打瞌睡 Sleep）。

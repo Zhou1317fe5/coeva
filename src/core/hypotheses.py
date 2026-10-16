@@ -97,6 +97,28 @@ class HypothesisEngine:
                     )
                 )
 
+            elif pat.pattern_id == "pat_agent_autonomous_recovery":
+                # Maps to Openness to Uncertainty: high tolerance for agent self-healing
+                conf = self._calculate_confidence(pat)
+                hypotheses.append(
+                    DevelopmentHypothesis(
+                        hypothesis_id=f"hyp_{pat.pattern_id}",
+                        statement=(
+                            "面对工具链报错摩擦时，倾向于给予 Agent 充分自主修复空间，"
+                            "展现出对机器探索过程的高度包容。"
+                        ),
+                        lenses=(
+                            DevelopmentLens.OPENNESS_TO_UNCERTAINTY,
+                            DevelopmentLens.REGULATORY_FLEXIBILITY,
+                        ),
+                        supporting_patterns=(pat.pattern_id,),
+                        supporting_episodes=pat.supporting_episodes,
+                        counter_episodes=pat.counter_episodes,
+                        confidence=conf,
+                        status=HypothesisStatus.CANDIDATE,
+                    )
+                )
+
             elif pat.pattern_id == "pat_circadian_pacing":
                 # Maps to Temporal Integration
                 conf = self._calculate_confidence(pat)
@@ -105,6 +127,28 @@ class HypothesisEngine:
                         hypothesis_id=f"hyp_{pat.pattern_id}",
                         statement="在日常开发节律中，能够在常规作息时间前主动收尾会话，保持当下精力与长远健康的平衡。",
                         lenses=(DevelopmentLens.TEMPORAL_INTEGRATION,),
+                        supporting_patterns=(pat.pattern_id,),
+                        supporting_episodes=pat.supporting_episodes,
+                        counter_episodes=pat.counter_episodes,
+                        confidence=conf,
+                        status=HypothesisStatus.CANDIDATE,
+                    )
+                )
+
+            elif pat.pattern_id == "pat_hands_off_delegation":
+                # Maps to Autonomous Action & Regulatory Flexibility
+                conf = self._calculate_confidence(pat)
+                hypotheses.append(
+                    DevelopmentHypothesis(
+                        hypothesis_id=f"hyp_{pat.pattern_id}",
+                        statement=(
+                            "在长链路复杂任务中，倾向于充分授权 Agent 自主执行，"
+                            "宏观把控目标而不进行微观打断。"
+                        ),
+                        lenses=(
+                            DevelopmentLens.AUTONOMOUS_ACTION,
+                            DevelopmentLens.REGULATORY_FLEXIBILITY,
+                        ),
                         supporting_patterns=(pat.pattern_id,),
                         supporting_episodes=pat.supporting_episodes,
                         counter_episodes=pat.counter_episodes,

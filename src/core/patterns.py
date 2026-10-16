@@ -69,43 +69,67 @@ class PatternBuilder:
         return patterns
 
     def _detect_friction_response(self, episodes: list[Episode]) -> BehavioralPattern | None:
-        """Detect whether user actively intervenes or pauses after tool failures."""
-        supporting: list[str] = []
-        counter: list[str] = []
+        """Detect whether user intervenes after errors, or lets the agent heal autonomously.
+
+        Strict Temporal Causality Rule:
+        A user intervention is ONLY counted when `user_prompt` occurs AFTER a `tool_failure`.
+        An initial prompt starting the session does NOT count as error recovery.
+        """
+        intervened_episodes: list[str] = []
+        autonomous_healing_episodes: list[str] = []
 
         for ep in episodes:
-            # Query tool failures in this session
-            fails = self.store._conn.execute(
-                "SELECT COUNT(*) AS c FROM events "
-                "WHERE session_id = ? AND event_type = 'tool_failure'",
+            rows = self.store._conn.execute(
+                "SELECT event_type, timestamp FROM events "
+                "WHERE session_id = ? "
+                "ORDER BY timestamp ASC",
                 (ep.session_id,),
-            ).fetchone()["c"]
+            ).fetchall()
 
-            if fails > 0:
-                # Did user provide active prompt or pause?
-                user_prompts = self.store._conn.execute(
-                    "SELECT COUNT(*) AS c FROM events "
-                    "WHERE session_id = ? AND event_type = 'user_prompt'",
-                    (ep.session_id,),
-                ).fetchone()["c"]
+            has_failure = False
+            user_intervened_after_fail = False
 
-                if user_prompts > 0:
-                    supporting.append(ep.session_id)
+            for r in rows:
+                etype = r["event_type"]
+                if etype == "tool_failure":
+                    has_failure = True
+                elif has_failure and etype == "user_prompt":
+                    user_intervened_after_fail = True
+                    break
+
+            if has_failure:
+                if user_intervened_after_fail:
+                    intervened_episodes.append(ep.session_id)
                 else:
-                    counter.append(ep.session_id)
+                    autonomous_healing_episodes.append(ep.session_id)
 
-        if not supporting and not counter:
+        if not intervened_episodes and not autonomous_healing_episodes:
             return None
 
-        return BehavioralPattern(
-            pattern_id="pat_friction_recovery",
-            category="friction_response",
-            description="当 Agent 执行遇到报错摩擦时，用户倾向于主动下发纠偏指令并调整边界。",
-            supporting_episodes=tuple(supporting),
-            counter_episodes=tuple(counter),
-            contexts=("coding", "tool_execution"),
-            metadata={"failure_handling": "prompt_intervention"},
-        )
+        # Determine dominant pattern truthfully based on evidence ratio
+        if len(intervened_episodes) >= len(autonomous_healing_episodes):
+            return BehavioralPattern(
+                pattern_id="pat_friction_recovery",
+                category="friction_response",
+                description="面对工具执行报错摩擦时，用户倾向于主动下发纠偏指令并调整边界。",
+                supporting_episodes=tuple(intervened_episodes),
+                counter_episodes=tuple(autonomous_healing_episodes),
+                contexts=("coding", "tool_execution"),
+                metadata={"failure_handling": "prompt_intervention"},
+            )
+        else:
+            return BehavioralPattern(
+                pattern_id="pat_agent_autonomous_recovery",
+                category="friction_response",
+                description=(
+                    "面对工具执行报错摩擦时，倾向于给予 Agent 充分自主修复空间，"
+                    "不频繁介入打断。"
+                ),
+                supporting_episodes=tuple(autonomous_healing_episodes),
+                counter_episodes=tuple(intervened_episodes),
+                contexts=("coding", "autonomous_healing"),
+                metadata={"failure_handling": "hands_off_delegation"},
+            )
 
     def _detect_pacing_boundaries(self, episodes: list[Episode]) -> BehavioralPattern | None:
         """Detect whether user concludes sessions within healthy boundaries."""
@@ -142,25 +166,48 @@ class PatternBuilder:
         )
 
     def _detect_delegation_ratio(self, episodes: list[Episode]) -> BehavioralPattern | None:
-        """Detect collaboration style: autonomous guidance vs dense tool usage."""
-        supporting: list[str] = []
-        counter: list[str] = []
+        """Detect collaboration style: autonomous delegation vs active interactive steering.
+
+        Causality metric:
+        Computes user_prompt ratio against total events in the session.
+        Low ratio (<= 15%) indicates hands-off delegation;
+        higher ratio indicates interactive steering.
+        """
+        hands_off_episodes: list[str] = []
+        interactive_episodes: list[str] = []
 
         for ep in episodes:
-            if ep.event_count > 5:
-                if ep.has_user_action:
-                    supporting.append(ep.session_id)
-                else:
-                    counter.append(ep.session_id)
+            if ep.event_count >= 5:
+                user_prompts = self.store._conn.execute(
+                    "SELECT COUNT(*) AS c FROM events "
+                    "WHERE session_id = ? AND event_type = 'user_prompt'",
+                    (ep.session_id,),
+                ).fetchone()["c"]
 
-        if not supporting and not counter:
+                ratio = user_prompts / max(1, ep.event_count)
+                if ratio <= 0.15:
+                    hands_off_episodes.append(ep.session_id)
+                else:
+                    interactive_episodes.append(ep.session_id)
+
+        if not hands_off_episodes and not interactive_episodes:
             return None
 
-        return BehavioralPattern(
-            pattern_id="pat_interactive_steering",
-            category="tool_delegation",
-            description="在较长链路的任务执行中，用户保持了主动的提示词引导与监控节奏。",
-            supporting_episodes=tuple(supporting),
-            counter_episodes=tuple(counter),
-            contexts=("agent_delegation",),
-        )
+        if len(hands_off_episodes) >= len(interactive_episodes):
+            return BehavioralPattern(
+                pattern_id="pat_hands_off_delegation",
+                category="tool_delegation",
+                description="在长链路复杂任务执行中，倾向于充分委派 Agent 自主探索，不频繁打断。",
+                supporting_episodes=tuple(hands_off_episodes),
+                counter_episodes=tuple(interactive_episodes),
+                contexts=("agent_delegation", "autonomous_execution"),
+            )
+        else:
+            return BehavioralPattern(
+                pattern_id="pat_interactive_steering",
+                category="tool_delegation",
+                description="在长链路复杂任务执行中，保持紧密的阶段性提示词引导与交互节奏。",
+                supporting_episodes=tuple(interactive_episodes),
+                counter_episodes=tuple(hands_off_episodes),
+                contexts=("interactive_collaboration",),
+            )

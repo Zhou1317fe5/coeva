@@ -24,12 +24,15 @@ def _feed_session(
     session_id: str,
     *,
     has_failure: bool = False,
-    has_user_prompt: bool = False,
+    prompt_after_failure: bool = False,
     event_count: int = 6,
     hour: int = 14,
 ) -> None:
-    # ISO: 2026-10-16T{hour:02d}:00:00
+    # ISO timestamps with distinct, ordered minutes
     ts_start = f"2026-10-16T{hour:02d}:00:00+00:00"
+    ts_prompt_init = f"2026-10-16T{hour:02d}:01:00+00:00"
+    ts_fail = f"2026-10-16T{hour:02d}:05:00+00:00"
+    ts_prompt_after = f"2026-10-16T{hour:02d}:08:00+00:00"
     ts_end = f"2026-10-16T{hour:02d}:20:00+00:00"
 
     store.record_event(
@@ -40,33 +43,44 @@ def _feed_session(
             timestamp=ts_start,
         )
     )
-    if has_user_prompt:
-        store.record_event(
-            AgentEvent(
-                agent_id="pi-desktop",
-                event_type=AgentEventType.USER_PROMPT,
-                session_id=session_id,
-                timestamp=ts_start,
-            )
+    # The session starts with an initial user prompt
+    store.record_event(
+        AgentEvent(
+            agent_id="pi-desktop",
+            event_type=AgentEventType.USER_PROMPT,
+            session_id=session_id,
+            timestamp=ts_prompt_init,
         )
+    )
     if has_failure:
         store.record_event(
             AgentEvent(
                 agent_id="pi-desktop",
                 event_type=AgentEventType.TOOL_FAILURE,
                 session_id=session_id,
-                timestamp=ts_start,
+                timestamp=ts_fail,
                 tool_name="Bash",
                 error_message="Exit 1",
             )
         )
-    for i in range(event_count - 3):
+    if prompt_after_failure:
+        # User actively stepped in AFTER the tool failed
+        store.record_event(
+            AgentEvent(
+                agent_id="pi-desktop",
+                event_type=AgentEventType.USER_PROMPT,
+                session_id=session_id,
+                timestamp=ts_prompt_after,
+            )
+        )
+    for i in range(max(1, event_count - 4)):
+        ts_tool = f"2026-10-16T{hour:02d}:{10 + i:02d}:00+00:00"
         store.record_event(
             AgentEvent(
                 agent_id="pi-desktop",
                 event_type=AgentEventType.PRE_TOOL_USE,
                 session_id=session_id,
-                timestamp=ts_start,
+                timestamp=ts_tool,
                 tool_name=f"tool_{i}",
             )
         )
@@ -98,12 +112,12 @@ def test_friction_recovery_pattern_and_counter_evidence() -> None:
     store = _store()
     builder = PatternBuilder(store)
 
-    # Episode 1 & 2: Error occurred, and user intervened with prompt -> Supporting
-    _feed_session(store, "ep_supp_1", has_failure=True, has_user_prompt=True)
-    _feed_session(store, "ep_supp_2", has_failure=True, has_user_prompt=True)
+    # Episode 1 & 2: Error occurred, and user intervened with prompt afterwards -> Supporting
+    _feed_session(store, "ep_supp_1", has_failure=True, prompt_after_failure=True)
+    _feed_session(store, "ep_supp_2", has_failure=True, prompt_after_failure=True)
 
-    # Episode 3: Error occurred, but no user prompt intervention -> Counter example
-    _feed_session(store, "ep_counter_1", has_failure=True, has_user_prompt=False)
+    # Episode 3: Error occurred, but user never prompted after failure -> Counter example
+    _feed_session(store, "ep_counter_1", has_failure=True, prompt_after_failure=False)
 
     patterns = builder.build_patterns(min_episodes=2)
     friction_pats = [p for p in patterns if p.pattern_id == "pat_friction_recovery"]
@@ -126,6 +140,29 @@ def test_friction_recovery_pattern_and_counter_evidence() -> None:
     assert hyp.confidence == ConfidenceLevel.MODERATE
     assert DevelopmentLens.REGULATORY_FLEXIBILITY in hyp.lenses
     assert DevelopmentLens.OPENNESS_TO_UNCERTAINTY in hyp.lenses
+    store.close()
+
+
+def test_agent_autonomous_recovery_when_user_does_not_intervene() -> None:
+    """When user lets the agent fail and heal on its own, attribute hands-off delegation."""
+    store = _store()
+    builder = PatternBuilder(store)
+
+    # User started the session, tool failed, but user NEVER stepped in -> Agent self-healing
+    _feed_session(store, "ep_auto_1", has_failure=True, prompt_after_failure=False)
+    _feed_session(store, "ep_auto_2", has_failure=True, prompt_after_failure=False)
+
+    patterns = builder.build_patterns(min_episodes=2)
+    auto_pats = [p for p in patterns if p.pattern_id == "pat_agent_autonomous_recovery"]
+    assert len(auto_pats) == 1
+    pat = auto_pats[0]
+    assert "充分自主修复空间" in pat.description
+    assert set(pat.supporting_episodes) == {"ep_auto_1", "ep_auto_2"}
+
+    hypotheses = HypothesisEngine().synthesize(patterns)
+    auto_hyps = [h for h in hypotheses if h.hypothesis_id == "hyp_pat_agent_autonomous_recovery"]
+    assert len(auto_hyps) == 1
+    assert DevelopmentLens.OPENNESS_TO_UNCERTAINTY in auto_hyps[0].lenses
     store.close()
 
 
