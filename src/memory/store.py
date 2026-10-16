@@ -16,6 +16,18 @@ from typing import Any
 
 from src.connectors.contracts import AgentEvent
 from src.core.attribution import classify
+from src.core.hypotheses import (
+    ConfidenceLevel,
+    DevelopmentHypothesis,
+    DevelopmentLens,
+    HypothesisStatus,
+)
+from src.core.self_model import (
+    ConfirmedInsight,
+    GrowthTheme,
+    InsightStatus,
+    ThemeStatus,
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS slices (
@@ -53,6 +65,35 @@ CREATE VIEW IF NOT EXISTS evidence AS
            provenance, retention_class,
            CASE WHEN tool_name <> '' THEN event_type || ':' || tool_name ELSE event_type END
       FROM events;
+CREATE TABLE IF NOT EXISTS hypotheses (
+    id                  TEXT PRIMARY KEY,
+    statement           TEXT NOT NULL,
+    lenses              TEXT NOT NULL,
+    supporting_patterns TEXT NOT NULL,
+    supporting_episodes TEXT NOT NULL,
+    counter_episodes    TEXT NOT NULL,
+    confidence          TEXT NOT NULL,
+    status              TEXT NOT NULL,
+    created_at          TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS insights (
+    id                  TEXT PRIMARY KEY,
+    statement           TEXT NOT NULL,
+    lenses              TEXT NOT NULL,
+    supporting_patterns TEXT NOT NULL,
+    user_confirmation   TEXT NOT NULL,
+    valid_from          TEXT NOT NULL,
+    last_revalidated    TEXT NOT NULL,
+    status              TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS growth_themes (
+    id                  TEXT PRIMARY KEY,
+    title               TEXT NOT NULL,
+    lens                TEXT NOT NULL,
+    statement           TEXT NOT NULL,
+    status              TEXT NOT NULL,
+    created_at          TEXT NOT NULL
+);
 """
 
 DEFAULT_DB_PATH = Path("data") / "companion_chronicle.db"
@@ -286,6 +327,152 @@ class ChronicleStore:
     def _count_episodes(self) -> int:
         row = self._conn.execute("SELECT COUNT(DISTINCT session_id) AS n FROM events").fetchone()
         return int(row["n"])
+
+    # ── Phase 2C: Self Model, Hypotheses, Insights & Growth Themes ───
+
+    def save_hypothesis(self, hyp: DevelopmentHypothesis) -> None:
+        """Insert or update a development hypothesis."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO hypotheses "
+            "(id, statement, lenses, supporting_patterns, supporting_episodes, "
+            " counter_episodes, confidence, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                hyp.hypothesis_id,
+                hyp.statement,
+                ",".join(lens.value for lens in hyp.lenses),
+                ",".join(hyp.supporting_patterns),
+                ",".join(hyp.supporting_episodes),
+                ",".join(hyp.counter_episodes),
+                hyp.confidence.value,
+                hyp.status.value,
+                hyp.created_at,
+            ),
+        )
+        self._conn.commit()
+
+    def list_hypotheses(
+        self, *, status: HypothesisStatus | None = None
+    ) -> list[DevelopmentHypothesis]:
+        """Query development hypotheses, optionally filtered by status."""
+        sql = "SELECT * FROM hypotheses"
+        params: list[Any] = []
+        if status:
+            sql += " WHERE status = ?"
+            params.append(status.value)
+        sql += " ORDER BY created_at DESC"
+
+        out: list[DevelopmentHypothesis] = []
+        for r in self._conn.execute(sql, params):
+            lenses = tuple(
+                DevelopmentLens(x) for x in r["lenses"].split(",") if x
+            )
+            out.append(
+                DevelopmentHypothesis(
+                    hypothesis_id=r["id"],
+                    statement=r["statement"],
+                    lenses=lenses,
+                    supporting_patterns=tuple(x for x in r["supporting_patterns"].split(",") if x),
+                    supporting_episodes=tuple(x for x in r["supporting_episodes"].split(",") if x),
+                    counter_episodes=tuple(x for x in r["counter_episodes"].split(",") if x),
+                    confidence=ConfidenceLevel(r["confidence"]),
+                    status=HypothesisStatus(r["status"]),
+                    created_at=r["created_at"],
+                )
+            )
+        return out
+
+    def save_insight(self, insight: ConfirmedInsight) -> None:
+        """Persist a confirmed mutual insight."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO insights "
+            "(id, statement, lenses, supporting_patterns, user_confirmation, "
+            " valid_from, last_revalidated, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                insight.insight_id,
+                insight.statement,
+                ",".join(lens.value for lens in insight.lenses),
+                ",".join(insight.supporting_patterns),
+                insight.user_confirmation_text,
+                insight.valid_from,
+                insight.last_revalidated,
+                insight.status.value,
+            ),
+        )
+        self._conn.commit()
+
+    def list_insights(
+        self, *, status: InsightStatus | None = None
+    ) -> list[ConfirmedInsight]:
+        """Query confirmed insights, optionally filtered by status."""
+        sql = "SELECT * FROM insights"
+        params: list[Any] = []
+        if status:
+            sql += " WHERE status = ?"
+            params.append(status.value)
+        sql += " ORDER BY valid_from DESC"
+
+        out: list[ConfirmedInsight] = []
+        for r in self._conn.execute(sql, params):
+            lenses = tuple(
+                DevelopmentLens(x) for x in r["lenses"].split(",") if x
+            )
+            out.append(
+                ConfirmedInsight(
+                    insight_id=r["id"],
+                    statement=r["statement"],
+                    lenses=lenses,
+                    supporting_patterns=tuple(x for x in r["supporting_patterns"].split(",") if x),
+                    user_confirmation_text=r["user_confirmation"],
+                    valid_from=r["valid_from"],
+                    last_revalidated=r["last_revalidated"],
+                    status=InsightStatus(r["status"]),
+                )
+            )
+        return out
+
+    def save_theme(self, theme: GrowthTheme) -> None:
+        """Persist a growth theme."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO growth_themes "
+            "(id, title, lens, statement, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                theme.theme_id,
+                theme.title,
+                theme.lens.value,
+                theme.statement,
+                theme.status.value,
+                theme.created_at,
+            ),
+        )
+        self._conn.commit()
+
+    def list_themes(
+        self, *, status: ThemeStatus | None = None
+    ) -> list[GrowthTheme]:
+        """Query active or historical growth themes."""
+        sql = "SELECT * FROM growth_themes"
+        params: list[Any] = []
+        if status:
+            sql += " WHERE status = ?"
+            params.append(status.value)
+        sql += " ORDER BY created_at DESC"
+
+        out: list[GrowthTheme] = []
+        for r in self._conn.execute(sql, params):
+            out.append(
+                GrowthTheme(
+                    theme_id=r["id"],
+                    title=r["title"],
+                    lens=DevelopmentLens(r["lens"]),
+                    statement=r["statement"],
+                    status=ThemeStatus(r["status"]),
+                    created_at=r["created_at"],
+                )
+            )
+        return out
 
 
 def event_id(event: AgentEvent) -> str:

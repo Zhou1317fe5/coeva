@@ -117,3 +117,56 @@ def test_chronicle_window_search_flow() -> None:
     finally:
         win.close()
         store.close()
+
+
+def test_chronicle_window_self_model_and_calibration() -> None:
+    """Test switching to Self Model tab, viewing hypotheses, and triggering calibration."""
+    from src.core.hypotheses import (
+        ConfidenceLevel,
+        DevelopmentHypothesis,
+        DevelopmentLens,
+        HypothesisStatus,
+    )
+    from src.core.self_model import CalibrationResponse
+
+    store = _populated_store()
+    # Pre-populate a candidate hypothesis
+    hyp = DevelopmentHypothesis(
+        hypothesis_id="hyp_ui_test",
+        statement="在遇到挫折时能够保持理性节奏",
+        lenses=(DevelopmentLens.REGULATORY_FLEXIBILITY,),
+        supporting_patterns=("pat_01",),
+        supporting_episodes=("session_alpha",),
+        counter_episodes=(),
+        confidence=ConfidenceLevel.HIGH,
+        status=HypothesisStatus.CANDIDATE,
+    )
+    store.save_hypothesis(hyp)
+
+    win = ChronicleViewerWindow(store)
+    try:
+        # Switch to tab 3 (Self Model)
+        win.nav_list.setCurrentRow(3)
+        assert win.stack.currentIndex() == 3
+
+        # 1. Hypotheses list shows our candidate
+        assert win.hyp_list.count() == 1
+        item = win.hyp_list.item(0)
+        assert "保持理性节奏" in item.text()
+
+        # 2. Select item and calibrate YES
+        win.hyp_list.setCurrentItem(item)
+        updated_hyp, insight, _ = win.model_mgr.apply_calibration(hyp, CalibrationResponse.YES)
+        store.save_hypothesis(updated_hyp)
+        if insight:
+            store.save_insight(insight)
+
+        # Verify persistence and reload
+        updated = store.list_hypotheses()[0]
+        assert updated.status == HypothesisStatus.CONFIRMED
+
+        # Simulate button trigger
+        win._refresh_self_model()
+    finally:
+        win.close()
+        store.close()

@@ -13,16 +13,30 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
+)
+
+from src.core.hypotheses import (
+    DevelopmentHypothesis,
+    HypothesisEngine,
+    HypothesisStatus,
+)
+from src.core.patterns import PatternBuilder
+from src.core.self_model import (
+    CalibrationResponse,
+    InsightStatus,
+    SelfModelManager,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +49,7 @@ class ChronicleViewerWindow(QWidget):
     def __init__(self, store: ChronicleStore, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.store = store
+        self.model_mgr = SelfModelManager()
         self.setWindowTitle("📖 记忆与切片档案 (Chronicle Archive)")
         self.resize(760, 560)
         self.setMinimumSize(600, 420)
@@ -90,6 +105,7 @@ class ChronicleViewerWindow(QWidget):
         self.nav_list.addItem("🌱 投喂切片 (Slices)")
         self.nav_list.addItem("🧭 经历会话 (Episodes)")
         self.nav_list.addItem("🔍 记忆检索 (Search)")
+        self.nav_list.addItem("🌿 共同认知 (Self Model)")
         self.nav_list.currentRowChanged.connect(self._on_tab_changed)
         splitter.addWidget(self.nav_list)
 
@@ -98,6 +114,7 @@ class ChronicleViewerWindow(QWidget):
         self.stack.addWidget(self._build_slices_page())
         self.stack.addWidget(self._build_episodes_page())
         self.stack.addWidget(self._build_search_page())
+        self.stack.addWidget(self._build_self_model_page())
         splitter.addWidget(self.stack)
 
         splitter.setStretchFactor(0, 0)
@@ -179,6 +196,63 @@ class ChronicleViewerWindow(QWidget):
 
         return container
 
+    def _build_self_model_page(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 0, 0, 0)
+        layout.setSpacing(10)
+
+        tip = QLabel("伴生体基于真实经历谨慎提取的候选心智理解（需用户校准，绝不自封真理）：")
+        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        layout.addWidget(tip)
+
+        # Hypotheses Section
+        hyp_title = QLabel("🌿 待校准心智假说 (Candidate Hypotheses)")
+        hyp_title.setStyleSheet("font-weight: 600; color: #60a5fa; font-size: 13px;")
+        layout.addWidget(hyp_title)
+
+        self.hyp_list = QListWidget()
+        self.hyp_list.setObjectName("dataList")
+        layout.addWidget(self.hyp_list, 1)
+
+        # Hyp Action Bar
+        hyp_btn_row = QHBoxLayout()
+        hyp_btn_row.setSpacing(8)
+
+        self.btn_hyp_yes = QPushButton("✨ 认同该理解 (Yes)")
+        self.btn_hyp_yes.clicked.connect(
+            lambda: self._trigger_calibration(CalibrationResponse.YES)
+        )
+        hyp_btn_row.addWidget(self.btn_hyp_yes)
+
+        self.btn_hyp_partly = QPushButton("✏️ 补充校准 (Partly)")
+        self.btn_hyp_partly.clicked.connect(
+            lambda: self._trigger_calibration(CalibrationResponse.PARTLY)
+        )
+        hyp_btn_row.addWidget(self.btn_hyp_partly)
+
+        self.btn_hyp_no = QPushButton("❌ 否定此判断 (No)")
+        self.btn_hyp_no.clicked.connect(
+            lambda: self._trigger_calibration(CalibrationResponse.NO)
+        )
+        hyp_btn_row.addWidget(self.btn_hyp_no)
+
+        layout.addLayout(hyp_btn_row)
+
+        # Confirmed Insights Section
+        ins_title = QLabel("🤝 双方已确认共识 (Confirmed Insights)")
+        ins_title.setStyleSheet(
+            "font-weight: 600; color: #34d399; font-size: 13px; margin-top: 6px;"
+        )
+        layout.addWidget(ins_title)
+
+        self.ins_list = QListWidget()
+        self.ins_list.setObjectName("dataList")
+        self.ins_list.setFixedHeight(120)
+        layout.addWidget(self.ins_list)
+
+        return container
+
     def _apply_styling(self) -> None:
         self.setStyleSheet("""
             QWidget {
@@ -254,6 +328,8 @@ class ChronicleViewerWindow(QWidget):
             self._refresh_slices()
         elif index == 1:
             self._refresh_episodes()
+        elif index == 3:
+            self._refresh_self_model()
 
     def refresh_all(self) -> None:
         """Reload all statistics and active list data from the database."""
@@ -350,3 +426,100 @@ class ChronicleViewerWindow(QWidget):
             self.search_detail.setText(
                 f"时间: {time_str} | ID: {record.id}\n\n{record.content}"
             )
+
+    # ── Phase 2C Self Model Operations ──
+
+    def _refresh_self_model(self) -> None:
+        """Load candidate hypotheses, synthesize if empty, and show confirmed insights."""
+        self.hyp_list.clear()
+        self.ins_list.clear()
+
+        # 1. Hypotheses
+        hyps = self.store.list_hypotheses(status=HypothesisStatus.CANDIDATE)
+        if not hyps:
+            # Trigger real pattern mining from episodes and synthesize
+            pats = PatternBuilder(self.store).build_patterns(min_episodes=2)
+            fresh_hyps = HypothesisEngine().synthesize(pats)
+            for h in fresh_hyps:
+                self.store.save_hypothesis(h)
+            hyps = self.store.list_hypotheses(status=HypothesisStatus.CANDIDATE)
+
+        for h in hyps:
+            lenses_str = " · ".join(f"[{lens.value}]" for lens in h.lenses)
+            counter_tag = (
+                f"⚠️ 反例: {len(h.counter_episodes)}处"
+                if h.has_counter_evidence
+                else "无反例"
+            )
+            item_text = (
+                f"🌱 {h.statement}\n"
+                f"   透镜: {lenses_str} | 置信度: {h.confidence.value} | "
+                f"正例: {len(h.supporting_episodes)}处 | {counter_tag}"
+            )
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, h)
+            self.hyp_list.addItem(item)
+
+        if not hyps:
+            item = QListWidgetItem("暂无新的候选心智假说（当前经历样本不足，系统保持审慎沉默）")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.hyp_list.addItem(item)
+
+        # 2. Confirmed Insights
+        insights = self.store.list_insights(status=InsightStatus.ACTIVE)
+        for ins in insights:
+            item_text = (
+                f"🤝 {ins.statement} (确认于 {ins.valid_from})\n"
+                f"   批注: {ins.user_confirmation_text}"
+            )
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, ins)
+            self.ins_list.addItem(item)
+
+        if not insights:
+            item = QListWidgetItem("暂无双方确认的长期共识（需通过上方假说进行共同校准）")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.ins_list.addItem(item)
+
+    def _on_hyp_selected(self, item: QListWidgetItem) -> None:
+        pass
+
+    def _trigger_calibration(self, response: CalibrationResponse) -> None:
+        current_item = self.hyp_list.currentItem()
+        if not current_item:
+            QMessageBox.information(self, "提示", "请先在上方列表中点击选中一条要校准的候选假说。")
+            return
+
+        hyp: DevelopmentHypothesis | None = current_item.data(Qt.ItemDataRole.UserRole)
+        if not hyp or not isinstance(hyp, DevelopmentHypothesis):
+            return
+
+        user_comment = ""
+        if response in (CalibrationResponse.PARTLY, CalibrationResponse.EXPLAIN):
+            text, ok = QInputDialog.getText(
+                self,
+                "补充校准 (Calibration)",
+                "这处理解有哪些需要补充或修正的细微之处？\n（例如：仅在特定场景成立）",
+            )
+            if not ok:
+                return
+            user_comment = text.strip()
+
+        # Apply state machine
+        updated_hyp, new_insight, revised_hyp = self.model_mgr.apply_calibration(
+            hyp, response, user_comment=user_comment
+        )
+
+        self.store.save_hypothesis(updated_hyp)
+        if new_insight:
+            self.store.save_insight(new_insight)
+        if revised_hyp:
+            self.store.save_hypothesis(revised_hyp)
+
+        action_names = {
+            CalibrationResponse.YES: "已确认为长期共识！",
+            CalibrationResponse.PARTLY: "已生成修正后的新假说！",
+            CalibrationResponse.NO: "已永久否定并封存此判断，未来绝不再提。",
+        }
+        QMessageBox.information(self, "校准完成", action_names.get(response, "校准已记录"))
+        self._refresh_self_model()

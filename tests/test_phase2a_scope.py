@@ -78,11 +78,19 @@ def test_ac8_no_chapters_table_or_narrative_artifacts() -> None:
     finally:
         store.close()
 
-    # The 2A schema is exactly these two tables plus the evidence view.
-    assert names == {"slices", "events", "evidence"}, names
+    # Phase 2C schema: 2A foundation + candidate hypotheses, insights & growth themes.
+    # Chapter narrative tables remain strictly forbidden until 2D (Narrative Firewall).
+    assert names == {
+        "slices",
+        "events",
+        "evidence",
+        "hypotheses",
+        "insights",
+        "growth_themes",
+    }, names
 
-    narrative = {n for n in names if "chapter" in n or "insight" in n or "hypothesis" in n}
-    assert narrative == set(), f"AC-8 violated: narrative storage present: {narrative}"
+    narrative = {n for n in names if "chapter" in n}
+    assert narrative == set(), f"Narrative generation storage appeared prematurely: {narrative}"
 
 
 def test_ac8_no_llm_client_module_exists() -> None:
