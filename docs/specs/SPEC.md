@@ -65,6 +65,13 @@ tags:
 ### 决议 4：控制面与数据面物理分离，兼顾伴生体 Stage 空间保护
 - **原因**：将高频感知数据与低频控制决策物理隔离开，同时在交互上严格保护角色的圣域空间，杜绝桌面杂乱。
 
+### 决议 5：汲取 `crafter-station/petdex` 的协议与资产生态，坚守 Python 心智基座
+- **源码审计结论**：深度审计 `petdex-desktop-native` 的 2.3 万行 Zig 源码，确认其虽具备 6MB 原生二进制优势，但 Zig 与底层 Native-SDK 的二次开发与调试门槛极高，与基于 Python 构建的 Growth Core（ACT 心理灵活性评估、避风港熔断、人生章节）存在严重的技术栈撕裂。
+- **生态吸纳策略**：
+  1. **资产兼容**：原生兼容 Petdex 社区广泛流通的 9 状态 SpriteSheet 标准（`idle`, `running`, `jumping`, `failed`, `waiting`, `review` 等），零成本吸纳其高质量宠物图库；
+  2. **协议兼容**：在伴生体 HTTP 服务中原生兼容 Petdex 的 `/state` 与 `/bubble` 端点，无缝接纳社区开源 Agent 桥接脚本；
+  3. **心智守卫**：拒绝其“工具调用直接等于宠物奔跑”的无脑机械映射，所有事件必须先流经 Growth Core 归因与三道门仲裁。
+
 ---
 
 ## 3. 伴生体核心架构与交互规范（Core System Disciplines）

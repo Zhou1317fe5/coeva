@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtGui import QAction, QIcon
@@ -20,22 +21,32 @@ def main() -> int:
         app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    assets_root = Path("assets") / "pets" / "claw"
-    if not assets_root.is_dir():
-        # Fallback to local default if claw is not found
-        assets_root = Path("assets") / "pets" / "dachshund"
+    # Default pet is Tiko, with fallback to debug-duck, wangcai, or claw
+    preferred_pets = ["tiko", "debug-duck", "wangcai", "claw", "dachshund"]
+    assets_root: Path | None = None
+    for pet_name in preferred_pets:
+        cand = Path("assets") / "pets" / pet_name
+        if cand.is_dir():
+            assets_root = cand
+            break
 
-    window = PetWindow(assets_root, scale=2)
+    if assets_root is None:
+        assets_root = Path("assets") / "pets" / "tiko"
+
+    window = PetWindow(assets_root, scale=1)
     controller = BodyController(window)
 
     # System Tray
     tray = QSystemTrayIcon(window)
-    icon_path = assets_root / "sprites" / "idle.png"
-    if icon_path.is_file():
-        tray.setIcon(QIcon(str(icon_path)))
+    idle_sheet = window._loaded_sheets.get("idle")
+    if idle_sheet and idle_sheet.frames:
+        tray.setIcon(QIcon(idle_sheet.frames[0]))
     else:
-        tray.setIcon(QIcon())
-
+        icon_path = assets_root / "sprites" / "idle.png"
+        if icon_path.is_file():
+            tray.setIcon(QIcon(str(icon_path)))
+        else:
+            tray.setIcon(QIcon())
     tray_menu = QMenu()
 
     # Quick state changes
@@ -59,6 +70,31 @@ def main() -> int:
     tray_menu.addAction(say_action)
 
     tray_menu.addSeparator()
+
+    # Switch pet submenu
+    switch_menu = tray_menu.addMenu("🔄 切换伴生体 (Switch Pet)")
+    available_pets = [
+        ("🤖 Tiko (默认 · 小机器人)", Path("assets") / "pets" / "tiko"),
+        ("🐥 Debug Duck (调试小黄鸭)", Path("assets") / "pets" / "debug-duck"),
+        ("🐱 Wangcai (布偶猫)", Path("assets") / "pets" / "wangcai"),
+    ]
+
+    def _make_switcher(target_dir: Path, label: str) -> Callable[[], None]:
+        def _switch() -> None:
+            if target_dir.is_dir():
+                window.load_pet(target_dir)
+                cur_idle = window._loaded_sheets.get("idle")
+                if cur_idle and cur_idle.frames:
+                    tray.setIcon(QIcon(cur_idle.frames[0]))
+                clean_name = label.split()[1] if len(label.split()) > 1 else label
+                controller.say(f"已切换为 {clean_name}")
+        return _switch
+
+    for label, pet_path in available_pets:
+        if pet_path.is_dir():
+            pet_action = QAction(label, window)
+            pet_action.triggered.connect(_make_switcher(pet_path, label))
+            switch_menu.addAction(pet_action)
 
     quit_action = QAction("退出伴生体 (Quit)", window)
     quit_action.triggered.connect(app.quit)

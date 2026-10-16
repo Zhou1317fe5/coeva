@@ -115,3 +115,18 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 - **现象**：输入心烦吐槽内容后，桌宠没有任何界面动作，用户无法确认系统是否响应。
 - **根因**：过早采取了 100% 绝对静默，缺少最起码的“情绪被接纳”确认。
 - **修复方案**：避风港状态下严禁任何说教或行动建议，但弹出非干预性温和气泡（`🍃 收到。先放一放，我陪着你...`），既守住底线，又消除了未响应的疑惑。
+
+### 5.6 缺陷 6：HTTP 单线程阻塞与连接挂起（ThreadingHTTPServer & Connection Close）
+- **现象**：外部调用一次格式错误或未正常关闭的 HTTP 请求后，后续所有请求（包括 `/api/status`）均发生超时挂起。
+- **根因**：原 `CompanionHttpServer` 使用了标准库单线程阻塞式的 `HTTPServer`，当一个连接半开或被客户端中断时，单线程主循环被阻塞在当前 socket 读写中。
+- **修复方案**：全面升级为并发 `ThreadingHTTPServer`，每个连接由独立工作线程处理；响应中显式增加 `Connection: close` 标头并置 `close_connection = True`，同时设置 `timeout = 5.0s`，彻底杜绝单次异常请求卡死整个服务。
+
+### 5.7 缺陷 7：PI-Desktop 扩展未在注册表登记导致不可见（Registry Registration）
+- **现象**：虽然将插件代码拷贝到了扩展目录，但在 PI-Desktop「设置 -> 插件」面板中完全找不到扩展。
+- **根因**：PI-Desktop 插件管理严格依赖 `~/.pi-desktop/plugins/registry.json`，未在注册表中配置的插件不会被宿主加载和展示在 UI 中。
+- **修复方案**：将插件规范化为标准已安装插件 `pi.companion-bridge`（桌面伴生体心跳桥接），通过 `PluginCheck` 格式校验，并在 `registry.json` 中完整写入其元数据、权限（`agent.extension`）与配置信息，实现在 PI-Desktop 界面中立即可见且生效。
+
+### 5.8 缺陷 8：Windows PowerShell 双引号剥离与参数截断（PowerShell Invoke-RestMethod）
+- **现象**：在 PowerShell 中执行包含转义双引号 `\"` 的 `curl -d "{\"key\":\"value\"}"` 时报错 `Invalid JSON`、`Port number not between 0 and 65535` 及 `Could not resolve host`。
+- **根因**：PowerShell 的命令行解析引擎会预处理并剥离双引号中的反斜杠双引号，导致传给底层程序的不是合法 JSON，且包含空格的 message 文本被误切分为独立的主机名/端口参数。
+- **修复方案**：规范在 Windows PowerShell 下的交互调用，推荐使用 PowerShell 原生 `Invoke-RestMethod`，或在 `curl` 中使用单引号包裹 JSON（在 PowerShell 中单引号是逐字字符串，内部无需反斜杠转义）。

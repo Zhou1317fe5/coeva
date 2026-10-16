@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "pi.companion-bridge",
+  "name": "桌面伴生体心跳桥接",
+  "version": "0.1.0",
+  "description": "实时同步 PI-Desktop 的思考、工具调用与完成状态至桌面伴生体（Co-evolving AI Companion）。",
+  "author": "Co-evolving Companion",
+  "main": "main.js",
+  "ui": {
+    "panel": "renderer/index.html",
+    "width": 460,
+    "height": 560,
+    "title": {
+      "en": "Companion Bridge",
+      "zh-CN": "桌面伴生体控制台"
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "companion.openPanel",
+        "title": "桌面伴生体: 打开控制台",
+        "keywords": [
+          "companion",
+          "pet",
+          "伴生体",
+          "桌宠"
+        ],
+        "category": "Companion"
+      }
+    ],
+    "agentExtensions": [
+      "extensions/bridge.mjs"
+    ]
+  },
+  "permissions": [
+    "ui.panel",
+    "agent.extension"
+  ],
+  "engines": {
+    "piDesktop": ">=0.1.0"
+  },
+  "activationEvents": [
+    "onCommand:companion.openPanel",
+    "onStartup"
+  ]
+}

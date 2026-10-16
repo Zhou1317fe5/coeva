@@ -1,9 +1,10 @@
 {
-  "id": "imported.pi-companion-bridge",
-  "name": "pi-companion-bridge",
-  "version": "0.1.0",
   "schemaVersion": 1,
-  "description": "Bridges PI-Desktop events to Co-evolving AI Companion desktop pet",
+  "id": "pi.companion-bridge",
+  "name": "桌面伴生体心跳桥接",
+  "version": "0.1.0",
+  "description": "实时同步 PI-Desktop 的思考、工具调用与完成状态至桌面伴生体（Co-evolving AI Companion）。",
+  "author": "Co-evolving Companion",
   "main": "main.cjs",
   "permissions": [
     "agent.extension"

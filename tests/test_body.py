@@ -92,3 +92,105 @@ def test_pet_window_clamping_and_reset() -> None:
     window.reset_to_default_position()
     assert window.x() < 5000  # brought back inside screen
     window.close()
+
+def test_petdex_atlas_loader(tmp_path: Path) -> None:
+    """Test loading and slicing a standard 9-row Petdex atlas image."""
+    from src.body.animation import PetdexAtlasLoader
+
+    # Create an 8-col x 9-row image (total 160x180, each frame 20x20)
+    image = QImage(160, 180, QImage.Format.Format_ARGB32)
+    image.fill(0xFF10B981)
+    atlas_path = tmp_path / "petdex_sheet.png"
+    image.save(str(atlas_path))
+
+    sheets = PetdexAtlasLoader.load_atlas(atlas_path, cols=8, rows=9)
+    assert len(sheets) == 9
+    assert "idle" in sheets
+    assert "running" in sheets
+    assert "jumping" in sheets
+    assert "failed" in sheets
+    assert "review" in sheets
+
+    idle_sheet = sheets["idle"]
+    assert idle_sheet.frame_count == 8
+    assert idle_sheet.frame_width == 20
+    assert idle_sheet.frame_height == 20
+
+def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
+    """Test that PetdexAtlasLoader trims trailing completely transparent frames."""
+    from src.body.animation import PetdexAtlasLoader
+
+    # 8 cols x 9 rows (total 160x180, frame 20x20)
+    image = QImage(160, 180, QImage.Format.Format_ARGB32)
+    image.fill(0x00000000)  # transparent
+    # fill only the first 3 frames in row 0
+    for c in range(3):
+        for y in range(0, 20):
+            for x in range(c * 20, (c + 1) * 20):
+                image.setPixelColor(x, y, 0xFFFFFFFF)
+
+    atlas_path = tmp_path / "trimmed_sheet.png"
+    image.save(str(atlas_path))
+
+    sheets = PetdexAtlasLoader.load_atlas(atlas_path, cols=8, rows=9, trim_empty_frames=True)
+    idle_sheet = sheets["idle"]
+    assert idle_sheet.frame_count == 3
+    assert idle_sheet.frame_width == 20
+    assert idle_sheet.frame_height == 20
+
+
+def test_builtin_pets_loading() -> None:
+    """Test that all three built-in pets (tiko, debug-duck, wangcai) load properly in PetWindow."""
+    tiko_dir = Path("assets") / "pets" / "tiko"
+    duck_dir = Path("assets") / "pets" / "debug-duck"
+    wangcai_dir = Path("assets") / "pets" / "wangcai"
+
+    assert tiko_dir.is_dir()
+    assert duck_dir.is_dir()
+    assert wangcai_dir.is_dir()
+
+    # Default pet: Tiko
+    window = PetWindow(tiko_dir, scale=1)
+    assert "idle" in window._loaded_sheets
+    assert "review" in window._loaded_sheets
+    assert "running" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 6
+
+    # Test state transitions
+    for target_state in (PetState.WORKING, PetState.THINKING, PetState.HAPPY, PetState.ERROR):
+        window.apply_state(target_state)
+        assert window.current_state == target_state
+
+    # Test dynamic switching to Debug Duck
+    window.load_pet(duck_dir)
+    assert "idle" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 6
+
+    # Test dynamic switching to Wangcai
+    window.load_pet(wangcai_dir)
+    assert "idle" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 6
+
+    window.close()
+
+def test_pet_window_scale_adjustment() -> None:
+    """Test dynamic scaling adjustment and persistence for pet body."""
+    tiko_dir = Path("assets") / "pets" / "tiko"
+    window = PetWindow(tiko_dir, scale=1.0)
+    assert abs(window.scale_factor - 1.0) < 0.01
+
+    # Scale down to 50%
+    window.set_scale(0.5)
+    assert abs(window.scale_factor - 0.5) < 0.01
+    idle_sheet = window._loaded_sheets["idle"]
+    assert idle_sheet.frame_width == 96
+    assert idle_sheet.frame_height == 104
+
+    # Scale up to 150%
+    window.set_scale(1.5)
+    assert abs(window.scale_factor - 1.5) < 0.01
+    idle_sheet_150 = window._loaded_sheets["idle"]
+    assert idle_sheet_150.frame_width == 288
+    assert idle_sheet_150.frame_height == 312
+
+    window.close()

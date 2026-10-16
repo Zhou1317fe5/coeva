@@ -1,0 +1,11 @@
+{
+  "id": "wangcai",
+  "displayName": "Wangcai",
+  "description": "A calm fluffy ragdoll cat with blue eyes, dark ears, and a gentle face.",
+  "species": "ragdoll_cat",
+  "author": "boxu-openai",
+  "source": "https://petdex.dev/pets/wangcai",
+  "spritesheetPath": "spritesheet.webp",
+  "cols": 8,
+  "rows": 9
+}

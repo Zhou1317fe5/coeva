@@ -6,17 +6,17 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QCloseEvent, QCursor, QEnterEvent, QMouseEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QCursor, QEnterEvent, QMouseEvent, QPixmap, QWheelEvent
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
-from src.body.animation import AnimationPlayer, SpriteSheet, SpriteSheetError
+from src.body.animation import AnimationPlayer, PetdexAtlasLoader, SpriteSheet, SpriteSheetError
 from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
 
 CLICK_DRAG_THRESHOLD_PX = 4
 EDGE_SNAP_DISTANCE_PX = 30  # Snapping threshold set to 30px
 PEEK_REVEAL_WIDTH_PX = 24  # Width of half-body staying visible when docked
-DEFAULT_SCALE = 2
+DEFAULT_SCALE = 1.0
 
 
 class PetWindow(QWidget):
@@ -26,12 +26,14 @@ class PetWindow(QWidget):
 
     clicked = Signal()
     position_changed = Signal(int, int)
+    scale_changed = Signal(float)
+
 
     def __init__(
         self,
         pet_dir: Path,
         *,
-        scale: int = DEFAULT_SCALE,
+        scale: float = DEFAULT_SCALE,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -89,9 +91,72 @@ class PetWindow(QWidget):
     @property
     def current_state(self) -> PetState:
         return self._current_state
+    @property
+    def scale_factor(self) -> float:
+        """Return the current scaling factor."""
+        return self._scale
+
+    def set_scale(self, scale: float) -> None:
+        """Dynamically adjust pet scaling factor and refresh spritesheets."""
+        clamped = max(0.4, min(3.0, round(scale, 2)))
+        if abs(self._scale - clamped) < 0.01:
+            return
+        self._scale = clamped
+        self._load_spritesheets()
+        self.apply_state(self._current_state)
+        self._save_position()
+        self.scale_changed.emit(self._scale)
+
+
+    def load_pet(self, pet_dir: Path) -> None:
+        """Switch to another pet directory dynamically and refresh animation."""
+        self.pet_dir = pet_dir
+        self._loaded_sheets.clear()
+        self._load_spritesheets()
+        self.apply_state(self._current_state)
 
     def _load_spritesheets(self) -> None:
-        """Preload sprite sheets available in the pet sprites directory."""
+        """Preload sprite sheets from Petdex atlas or legacy sprites directory."""
+        # 1. Try Petdex / Codex unified atlas sheet
+        pet_json = self.pet_dir / "pet.json"
+        atlas_candidate: Path | None = None
+        cols = 8
+        rows = 9
+
+        if pet_json.is_file():
+            try:
+                meta = json.loads(pet_json.read_text(encoding="utf-8"))
+                if "spritesheetPath" in meta:
+                    candidate = self.pet_dir / str(meta["spritesheetPath"])
+                    if candidate.is_file():
+                        atlas_candidate = candidate
+                cols = int(meta.get("cols", 8))
+                rows = int(meta.get("rows", 9))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if atlas_candidate is None:
+            for name in ("spritesheet.webp", "sprite.webp", "spritesheet.png", "sprite.png"):
+                candidate = self.pet_dir / name
+                if candidate.is_file():
+                    atlas_candidate = candidate
+                    break
+
+        if atlas_candidate is not None:
+            try:
+                sheets = PetdexAtlasLoader.load_atlas(
+                    atlas_candidate,
+                    cols=cols,
+                    rows=rows,
+                    scale=self._scale,
+                    trim_empty_frames=True,
+                )
+                self._loaded_sheets.update(sheets)
+                return
+            except SpriteSheetError:
+                pass
+
+        # 2. Fallback to legacy single sprite files
         sprites_dir = self.pet_dir / "sprites"
         if not sprites_dir.is_dir():
             return
@@ -106,7 +171,8 @@ class PetWindow(QWidget):
         for state_key, (path, frames, _fps) in known_files.items():
             if path.is_file():
                 try:
-                    sheet = SpriteSheet.load(path, frames=frames).scaled(self._scale)
+                    # Legacy 32px sprites scale with a 2x base multiplier
+                    sheet = SpriteSheet.load(path, frames=frames).scaled(2.0 * self._scale)
                     self._loaded_sheets[state_key] = sheet
                 except SpriteSheetError:
                     pass
@@ -115,21 +181,29 @@ class PetWindow(QWidget):
         """Switch the pet's animated state."""
         self._current_state = state
 
-        sheet_key = "idle"
-        fps = 6
-        loop = True
+        state_candidates: dict[PetState, tuple[list[str], int, bool]] = {
+            PetState.IDLE: (["idle"], 6, True),
+            PetState.SLEEPING: (["sleep", "idle"], 3, True),
+            PetState.THINKING: (["review", "waiting", "idle"], 6, True),
+            PetState.WORKING: (["running", "running-right", "walk", "idle"], 8, True),
+            PetState.HAPPY: (["waving", "jumping", "idle"], 6, True),
+            PetState.ERROR: (["failed", "idle"], 6, True),
+            PetState.WAITING: (["waiting", "idle"], 6, True),
+        }
 
-        if state == PetState.SLEEPING:
-            sheet_key = "sleep" if "sleep" in self._loaded_sheets else "idle"
-            fps = 3
-        else:
-            sheet_key = "idle"
-            fps = 6
+        candidates, fps, loop = state_candidates.get(state, (["idle"], 6, True))
 
-        sheet = self._loaded_sheets.get(sheet_key) or self._loaded_sheets.get("idle")
+        sheet: SpriteSheet | None = None
+        for key in candidates:
+            if key in self._loaded_sheets:
+                sheet = self._loaded_sheets[key]
+                break
+
+        if sheet is None:
+            sheet = self._loaded_sheets.get("idle")
+
         if sheet is not None:
             self._player.play(sheet, fps=fps, loop=loop)
-
     def say(self, text: str, *, ttl_ms: int = 4000) -> None:
         """Display a speech bubble above the pet."""
         if self._docked_edge is not None and not self._is_peek_expanded:
@@ -177,6 +251,11 @@ class PetWindow(QWidget):
                     saved_x = int(data.get("x", fallback_x))
                     saved_y = int(data.get("y", fallback_y))
                     self._docked_edge = data.get("docked_edge", None)
+                    if "scale" in data:
+                        saved_scale = float(data["scale"])
+                        if 0.3 <= saved_scale <= 3.0 and abs(self._scale - saved_scale) >= 0.01:
+                            self._scale = saved_scale
+                            self._load_spritesheets()
 
                     min_clamped_x = geom.left() - self.width() + PEEK_REVEAL_WIDTH_PX
                     max_clamped_x = geom.right() - PEEK_REVEAL_WIDTH_PX
@@ -194,7 +273,12 @@ class PetWindow(QWidget):
         try:
             cfg.parent.mkdir(parents=True, exist_ok=True)
             cfg.write_text(
-                json.dumps({"x": self.x(), "y": self.y(), "docked_edge": self._docked_edge}),
+                json.dumps({
+                    "x": self.x(),
+                    "y": self.y(),
+                    "docked_edge": self._docked_edge,
+                    "scale": round(self._scale, 2),
+                }),
                 "utf-8",
             )
         except OSError:
@@ -243,6 +327,21 @@ class PetWindow(QWidget):
         self._hover_poll_timer.start()
         if self._bubble.isVisible():
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
+        """Ctrl + Wheel: smoothly zoom in/out pet scale with instant bubble feedback."""
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = event.angleDelta().y()
+            step = 0.1 if delta > 0 else -0.1
+            new_scale = round(self._scale + step, 1)
+            new_scale = max(0.5, min(2.5, new_scale))
+            if abs(new_scale - self._scale) >= 0.04:
+                self.set_scale(new_scale)
+                percent = int(round(self._scale * 100))
+                self.say(f"🔍 伴生体大小: {percent}%", ttl_ms=1500)
+            event.accept()
+            return
+        super().wheelEvent(event)
 
     def _retract_to_dock(self) -> None:
         """Slide half-body into screen edge, leaving only the head peeking out."""

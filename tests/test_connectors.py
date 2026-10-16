@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
 from src.body.contracts import PetState
 from src.connectors.contracts import AgentEvent, AgentEventType
 from src.connectors.event_bus import LocalEventBus
@@ -75,3 +81,21 @@ def test_hermes_connector_lifecycle() -> None:
     assert connector.on_session_end("s1") == PetState.SLEEPING
 
     assert len(bus.history) == 6
+
+def test_agent_settings_pet_preference(tmp_path: Path) -> None:
+    """Test that selected desktop pet preference defaults to tiko and persists correctly."""
+    from src.connectors.settings import AgentSettingsStore
+
+    settings_file = tmp_path / "agent_settings.json"
+    store = AgentSettingsStore(settings_file)
+    assert store.selected_pet == "tiko"
+
+    store.set_selected_pet("debug-duck")
+    assert store.selected_pet == "debug-duck"
+
+    # Reload from disk
+    reloaded = AgentSettingsStore(settings_file)
+    assert reloaded.selected_pet == "debug-duck"
+
+    reloaded.set_selected_pet("wangcai")
+    assert reloaded.selected_pet == "wangcai"

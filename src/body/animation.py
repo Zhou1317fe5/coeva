@@ -56,25 +56,98 @@ class SpriteSheet:
 
         return cls(sliced, frame_width=frame_width, frame_height=frame_height)
 
-    def scaled(self, factor: int) -> SpriteSheet:
-        """Return a new SpriteSheet scaled using nearest-neighbor for crisp pixel art."""
-        if factor <= 1:
+    def scaled(self, factor: float) -> SpriteSheet:
+        """Return a new SpriteSheet scaled to given factor."""
+        if abs(factor - 1.0) < 0.01:
             return self
+        new_w = max(16, int(round(self.frame_width * factor)))
+        new_h = max(16, int(round(self.frame_height * factor)))
+        mode = (
+            Qt.TransformationMode.SmoothTransformation
+            if factor < 1.0
+            else Qt.TransformationMode.FastTransformation
+        )
         scaled_frames = [
             f.scaled(
-                self.frame_width * factor,
-                self.frame_height * factor,
+                new_w,
+                new_h,
                 aspectMode=Qt.AspectRatioMode.KeepAspectRatio,
-                mode=Qt.TransformationMode.FastTransformation,
+                mode=mode,
             )
             for f in self.frames
         ]
         return SpriteSheet(
             scaled_frames,
-            frame_width=self.frame_width * factor,
-            frame_height=self.frame_height * factor,
+            frame_width=new_w,
+            frame_height=new_h,
         )
 
+
+class PetdexAtlasLoader:
+    """Loader for standard Petdex 9-row atlas sprite sheets."""
+
+    PETDEX_ROW_MAP: dict[int, str] = {
+        0: "idle",
+        1: "running-right",
+        2: "running-left",
+        3: "waving",
+        4: "jumping",
+        5: "failed",
+        6: "waiting",
+        7: "running",
+        8: "review",
+    }
+
+    @classmethod
+    def load_atlas(
+        cls,
+        image_path: Path,
+        *,
+        cols: int = 8,
+        rows: int = 9,
+        scale: float = 1.0,
+        trim_empty_frames: bool = True,
+    ) -> dict[str, SpriteSheet]:
+        """Slice a unified Petdex sprite sheet into action-specific SpriteSheets."""
+        if not image_path.is_file():
+            raise SpriteSheetError(f"Atlas image not found: {image_path}")
+
+        image = QImage(str(image_path))
+        if image.isNull():
+            raise SpriteSheetError(f"Cannot decode atlas image: {image_path}")
+
+        total_w = image.width()
+        total_h = image.height()
+
+        frame_w = total_w // max(1, cols)
+        frame_h = total_h // max(1, rows)
+
+        sheets: dict[str, SpriteSheet] = {}
+        for r_idx, action_name in cls.PETDEX_ROW_MAP.items():
+            if r_idx >= rows:
+                break
+            raw_frames: list[tuple[QImage, bool]] = []
+            for c_idx in range(cols):
+                frame_img = image.copy(c_idx * frame_w, r_idx * frame_h, frame_w, frame_h)
+                if trim_empty_frames:
+                    alpha_img = frame_img.convertToFormat(QImage.Format.Format_Alpha8)
+                    has_pixels = any(bytes(alpha_img.constBits()))
+                else:
+                    has_pixels = True
+                raw_frames.append((frame_img, has_pixels))
+
+            if trim_empty_frames:
+                # Trim trailing empty frames, keeping at least 1 frame
+                while len(raw_frames) > 1 and not raw_frames[-1][1]:
+                    raw_frames.pop()
+
+            pixmaps = [QPixmap.fromImage(item[0]) for item in raw_frames]
+            sheet = SpriteSheet(pixmaps, frame_width=frame_w, frame_height=frame_h)
+            if abs(scale - 1.0) >= 0.01:
+                sheet = sheet.scaled(scale)
+            sheets[action_name] = sheet
+
+        return sheets
 
 class AnimationPlayer(QObject):
     """Timer-driven player for a SpriteSheet."""

@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pi-plugin-chrome" content="v2" />
+    <title>桌面伴生体控制台</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #222224;
+        --surface-hover: color-mix(in oklab, #ffffff 8%, transparent);
+        --fg: #f3f4f6;
+        --muted: #9ca3af;
+        --border: color-mix(in oklab, #ffffff 12%, transparent);
+        --accent: #10b981;
+        --accent-hover: #059669;
+        --danger: #ef4444;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --surface-hover: color-mix(in oklab, #0f172a 4%, transparent);
+        --fg: #0f172a;
+        --muted: #64748b;
+        --border: #e2e8f0;
+        --accent: #10b981;
+        --accent-hover: #059669;
+        --danger: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 3px 8px;
+        border-radius: 9999px;
+      }
+      .status-online {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+      }
+      .status-offline {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .form-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      input[type="text"] {
+        flex: 1;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: var(--fg);
+        font: inherit;
+        outline: none;
+      }
+      input[type="text"]:focus {
+        border-color: var(--accent);
+      }
+      button {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: var(--fg);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 120ms ease;
+      }
+      button:hover {
+        background: var(--surface-hover);
+      }
+      button.primary {
+        background: var(--accent);
+        color: #ffffff;
+        border-color: transparent;
+      }
+      button.primary:hover {
+        background: var(--accent-hover);
+      }
+      .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .agent-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: var(--bg);
+        margin-top: 8px;
+        border: 1px solid var(--border);
+      }
+      .agent-info {
+        display: flex;
+        flex-direction: column;
+      }
+      .agent-name {
+        font-weight: 500;
+        font-size: 13px;
+      }
+      .agent-desc {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .guide-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .guide-item:last-child {
+        margin-bottom: 0;
+      }
+      .kbd {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 11px;
+        color: var(--fg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="title">🐾 桌面伴生体控制台</div>
+      <div id="statusBadge" class="status-badge status-offline">
+        <span class="dot"></span>
+        <span id="statusText">检测中...</span>
+      </div>
+    </div>
+
+    <!-- 1. 伴生状态卡片 -->
+    <div class="card">
+      <div style="font-weight: 500; margin-bottom: 4px;">📡 遥测直连状态</div>
+      <div style="color: var(--muted); font-size: 12px;">
+        独立守护进程运行在本地端口 <code style="color: var(--accent);">127.0.0.1:17321</code>。
+      </div>
+      <div style="margin-top: 10px;">
+        <button id="refreshBtn">🔄 刷新连接状态</button>
+      </div>
+    </div>
+
+    <!-- 2. 多 Agent 遥测介入设置 (Like Clawd on Desk) -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 500;">🤖 多 Agent 遥测接入开关</div>
+        <span style="font-size: 11px; color: var(--muted);">实时过滤</span>
+      </div>
+      <div style="color: var(--muted); font-size: 12px; margin-top: 2px;">
+        指定允许向伴生体推送客观事件的 AI 工具。取消勾选将物理拦截该 Agent：
+      </div>
+      <div id="agentsList">
+        <div style="color: var(--muted); font-size: 12px; padding: 12px 0;">正在拉取 Agent 列表...</div>
+      </div>
+    </div>
+
+    <!-- 3. 交互测试区 -->
+    <div class="card">
+      <div style="font-weight: 500;">💬 发送说话气泡</div>
+      <div class="form-row">
+        <input type="text" id="sayInput" placeholder="给伴生体发一句问候..." value="✨ 嗨，我在 PI-Desktop 敲代码呢！" />
+        <button id="sayBtn" class="primary">发送</button>
+      </div>
+
+      <div style="font-weight: 500; margin-top: 14px;">🎭 触发动作测试</div>
+      <div class="btn-group">
+        <button class="action-btn" data-action="jump">🐾 跳跃开心 (Jump)</button>
+        <button class="action-btn" data-action="thinking">🤔 思考动效 (Thinking)</button>
+        <button class="action-btn" data-action="working">⚙️ 干活中 (Working)</button>
+        <button class="action-btn" data-action="celebrating">🎉 庆祝完成 (Celebrating)</button>
+      </div>
+    </div>
+
+    <!-- 4. 伴生快捷指南 -->
+    <div class="card">
+      <div style="font-weight: 500; margin-bottom: 8px;">🌱 伴生体使用指南</div>
+      <div class="guide-item">
+        <span>💡</span>
+        <span>随手投喂：在任何窗口下按 <span class="kbd">Alt</span> + <span class="kbd">Space</span> 瞬时唤起投喂输入框，回车自动存盘。</span>
+      </div>
+      <div class="guide-item">
+        <span>🧭</span>
+        <span>贴边探头：把小猫拖到屏幕最左或最右边缘，自动贴墙仅露半截，鼠标悬停探头，移开自动缩回。</span>
+      </div>
+      <div class="guide-item">
+        <span>🍃</span>
+        <span>情绪避风港：输入心烦、崩溃内容时，100% 熔断说教与分析，静默守护。</span>
+      </div>
+    </div>
+
+    <script>
+      const statusBadge = document.getElementById("statusBadge");
+      const statusText = document.getElementById("statusText");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const sayBtn = document.getElementById("sayBtn");
+      const sayInput = document.getElementById("sayInput");
+      const agentsList = document.getElementById("agentsList");
+
+      async function checkStatus() {
+        try {
+          const res = await fetch("http://127.0.0.1:17321/api/status", { method: "GET" });
+          if (res.ok) {
+            statusBadge.className = "status-badge status-online";
+            statusText.innerText = "伴生体在线 (17321)";
+          } else {
+            throw new Error();
+          }
+        } catch (_err) {
+          statusBadge.className = "status-badge status-offline";
+          statusText.innerText = "伴生体离线";
+        }
+      }
+
+      async function loadAgents() {
+        try {
+          const res = await fetch("http://127.0.0.1:17321/api/agents", { method: "GET" });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data.agents) return;
+
+          agentsList.innerHTML = "";
+          data.agents.forEach(agent => {
+            const card = document.createElement("div");
+            card.style.background = "var(--bg)";
+            card.style.border = "1px solid var(--border)";
+            card.style.borderRadius = "8px";
+            card.style.padding = "10px";
+            card.style.marginTop = "8px";
+
+            // Main row
+            const topRow = document.createElement("div");
+            topRow.style.display = "flex";
+            topRow.style.justifyContent = "space-between";
+            topRow.style.alignItems = "center";
+
+            const info = document.createElement("div");
+            info.innerHTML = `
+              <div style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;">
+                ${agent.name}
+                ${agent.last_seen ? '<span style="color:#10b981;font-size:10px;">🟢在线</span>' : '<span style="color:#6b7280;font-size:10px;">⚪未活动</span>'}
+              </div>
+              <div style="color:var(--muted);font-size:11px;margin-top:2px;">${agent.description || agent.agent_id}</div>
+            `;
+
+            const mainLabel = document.createElement("label");
+            mainLabel.style.display = "flex";
+            mainLabel.style.alignItems = "center";
+            mainLabel.style.gap = "4px";
+            mainLabel.style.cursor = "pointer";
+            mainLabel.style.fontSize = "12px";
+
+            const mainChk = document.createElement("input");
+            mainChk.type = "checkbox";
+            mainChk.checked = agent.enabled;
+            mainChk.addEventListener("change", async () => {
+              await fetch("http://127.0.0.1:17321/api/agents/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ agent_id: agent.agent_id, enabled: mainChk.checked })
+              });
+            });
+            mainLabel.appendChild(mainChk);
+            mainLabel.appendChild(document.createTextNode(" 总开关"));
+
+            topRow.appendChild(info);
+            topRow.appendChild(mainLabel);
+            card.appendChild(topRow);
+
+            // Instances list (Windows vs WSL)
+            if (agent.instances && Object.keys(agent.instances).length > 0) {
+              const instBox = document.createElement("div");
+              instBox.style.marginTop = "8px";
+              instBox.style.paddingTop = "6px";
+              instBox.style.borderTop = "1px solid color-mix(in oklab, var(--border) 60%, transparent)";
+
+              Object.values(agent.instances).forEach(inst => {
+                const iRow = document.createElement("div");
+                iRow.style.display = "flex";
+                iRow.style.justifyContent = "space-between";
+                iRow.style.alignItems = "center";
+                iRow.style.fontSize = "11px";
+                iRow.style.padding = "3px 0";
+
+                const isWsl = inst.instance_id.includes("wsl");
+                const icon = isWsl ? "🐧" : "🖥️";
+                const isWsl = inst.instance_id.includes("wsl");
+                const icon = isWsl ? "🐧" : "🖥️";
+                const isInstalled = inst.hook_status === "installed";
+
+                const iTitle = document.createElement("div");
+                iTitle.style.display = "flex";
+                iTitle.style.alignItems = "center";
+                iTitle.style.gap = "6px";
+                iTitle.innerHTML = `
+                  <span>${icon} ${inst.label}</span>
+                  ${isInstalled ? '<span style="background:#064e3b;color:#34d399;padding:1px 4px;border-radius:3px;font-size:9px;">HOOK就绪</span>' : '<span style="background:#451a03;color:#f59e0b;padding:1px 4px;border-radius:3px;font-size:9px;">HOOK待部署</span>'}
+                  ${inst.last_seen ? '<span style="color:#10b981;font-size:9px;">🟢活跃</span>' : ''}
+                `;
+
+                const rightBox = document.createElement("div");
+                rightBox.style.display = "flex";
+                rightBox.style.alignItems = "center";
+                rightBox.style.gap = "8px";
+
+                if (isInstalled) {
+                  const unBtn = document.createElement("button");
+                  unBtn.innerText = "卸载";
+                  unBtn.style.padding = "1px 6px";
+                  unBtn.style.fontSize = "10px";
+                  unBtn.style.background = "#27272a";
+                  unBtn.addEventListener("click", async () => {
+                    await fetch("http://127.0.0.1:17321/api/agents/hook/uninstall", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ agent_id: agent.agent_id, instance_id: inst.instance_id })
+                    });
+                    loadAgents();
+                  });
+                  rightBox.appendChild(unBtn);
+                } else {
+                  const inBtn = document.createElement("button");
+                  inBtn.innerText = "一键接入";
+                  inBtn.style.padding = "1px 6px";
+                  inBtn.style.fontSize = "10px";
+                  inBtn.style.background = "#059669";
+                  inBtn.style.color = "white";
+                  inBtn.addEventListener("click", async () => {
+                    await fetch("http://127.0.0.1:17321/api/agents/hook/install", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ agent_id: agent.agent_id, instance_id: inst.instance_id })
+                    });
+                    loadAgents();
+                  });
+                  rightBox.appendChild(inBtn);
+                }
+
+                const iLabel = document.createElement("label");
+                iLabel.style.display = "flex";
+                iLabel.style.alignItems = "center";
+                iLabel.style.gap = "3px";
+                iLabel.style.cursor = "pointer";
+
+                const iChk = document.createElement("input");
+                iChk.type = "checkbox";
+                iChk.checked = inst.enabled;
+                iChk.addEventListener("change", async () => {
+                  await fetch("http://127.0.0.1:17321/api/agents/instance/update", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ agent_id: agent.agent_id, instance_id: inst.instance_id, enabled: iChk.checked })
+                  });
+                });
+                iLabel.appendChild(iChk);
+                iLabel.appendChild(document.createTextNode(" 启用"));
+                rightBox.appendChild(iLabel);
+
+                iRow.appendChild(iTitle);
+                iRow.appendChild(rightBox);
+                instBox.appendChild(iRow);
+              });
+              card.appendChild(instBox);
+            }
+
+            agentsList.appendChild(card);
+          });
+        } catch (_err) {
+          agentsList.innerHTML = "<div style='color:#ef4444;font-size:12px;'>加载失败，伴生体可能未启动</div>";
+        }
+      }
+
+      refreshBtn.addEventListener("click", () => {
+        checkStatus();
+        loadAgents();
+      });
+
+      checkStatus();
+      loadAgents();
+      setInterval(checkStatus, 4000);
+
+      sayBtn.addEventListener("click", async () => {
+        const text = sayInput.value.trim();
+        if (!text) return;
+        try {
+          await fetch("http://127.0.0.1:17321/api/say", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, ttl_ms: 3500 })
+          });
+        } catch (e) {
+          alert("发送失败，伴生体可能未启动");
+        }
+      });
+
+      document.querySelectorAll(".action-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const action = btn.dataset.action;
+          try {
+            await fetch("http://127.0.0.1:17321/api/action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action })
+            });
+          } catch (e) {
+            alert("发送失败，伴生体可能未启动");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
