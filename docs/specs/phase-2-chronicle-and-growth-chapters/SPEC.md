@@ -250,7 +250,7 @@ Phase 1 暴露的只是 Agent 开关；2A 的端点会暴露**用户原始切片
 | User Calibration | 2C | 依赖 Hypothesis；须先定义"认领"的精确语义（点 Confirm 算不算？） |
 | Confirmed Insight 与退休 | 2C | 依赖 Calibration |
 | Growth Themes | 2C | 依赖 Insight；须先解决"1–3 个硬上限"与用户自主目标的冲突 |
-| Evidence-based Cold Start | 2C | **须先修缺陷**：`ColdStartPolicy.day_count` 仅由 `reset_day()` 递增，而它在生产代码中无调用方（`run_companion.py:56` 写死 `day_count=1`），故 `allows_psychological_analysis` 恒为 False，冷启动从未真正前进 |
+| Evidence-based Cold Start | 2C | **日计数缺陷已修**（`ColdStartPolicy.from_persisted_first_seen()` 按真实天数推进，`data/first_seen.json`）。**但本项仍待做**：改为证据驱动（而非纯时间驱动）尚未开始 |
 | Chapter Eligibility Gate | 2D | 依赖 Insight；须定义 Sustained / Structural / Diversity / Meaning 四项的可判定阈值 |
 | Chapter 生成 | 2D | 需 LLM 客户端（当前依赖树无任何 LLM SDK）、API key 存放约定、超时与离线降级 |
 | Narrative Firewall | 2D | 随 Chapter 生成一并实现（§2.5 目前无执行对象） |

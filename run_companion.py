@@ -72,7 +72,7 @@ class CompanionApp:
 
         # 3. Growth Core & Sanctuary
         self.guard = SanctuaryGuard()
-        self.cold_start = ColdStartPolicy(day_count=1)
+        self.cold_start = ColdStartPolicy.from_persisted_first_seen()
         self.watcher = StateWatcher(overwork_threshold_hours=3.0)
         self.intervention = InterventionPolicy(
             sanctuary=self.guard,

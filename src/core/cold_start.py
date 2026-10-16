@@ -2,7 +2,48 @@
 
 from __future__ import annotations
 
+import json
+from datetime import date
 from enum import StrEnum
+from pathlib import Path
+
+DEFAULT_FIRST_SEEN_PATH = Path("data") / "first_seen.json"
+
+
+def day_count_between(first_seen: date, today: date) -> int:
+    """1-based day index of `today` relative to `first_seen`.
+
+    The first day the companion is seen counts as day 1, so the 14-day cold start
+    spans first_seen .. first_seen + 13 days.
+    """
+    return max(1, (today - first_seen).days + 1)
+
+
+def read_or_create_first_seen(path: Path | None = None, *, today: date | None = None) -> date:
+    """Return the persisted first-run date, creating it on first launch.
+
+    Without this the day count never advanced: ColdStartPolicy was constructed with
+    a hardcoded day_count=1 and reset_day() had no production caller, so
+    allows_psychological_analysis was permanently False.
+    """
+    resolved_path = path or DEFAULT_FIRST_SEEN_PATH
+    current = today or date.today()
+
+    if resolved_path.is_file():
+        try:
+            data = json.loads(resolved_path.read_text(encoding="utf-8"))
+            return date.fromisoformat(str(data["first_seen"]))
+        except (json.JSONDecodeError, KeyError, ValueError, OSError):
+            pass  # unreadable or corrupt: fall through and rewrite it
+
+    try:
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        resolved_path.write_text(
+            json.dumps({"first_seen": current.isoformat()}), encoding="utf-8"
+        )
+    except OSError:
+        pass  # a read-only filesystem must not stop the companion from starting
+    return current
 
 
 class ColdStartStage(StrEnum):
@@ -20,6 +61,19 @@ class ColdStartPolicy:
     def __init__(self, day_count: int = 1) -> None:
         self.day_count = max(1, day_count)
         self.speeches_today = 0
+
+    @classmethod
+    def from_persisted_first_seen(
+        cls, path: Path | None = None, *, today: date | None = None
+    ) -> ColdStartPolicy:
+        """Build a policy whose day count reflects real elapsed days.
+
+        Replaces the previous hardcoded `day_count=1`, which pinned the companion
+        to stage 1 forever because nothing ever called reset_day().
+        """
+        first_seen = read_or_create_first_seen(path, today=today)
+        current = today or date.today()
+        return cls(day_count=day_count_between(first_seen, current))
 
     @property
     def stage(self) -> ColdStartStage:
