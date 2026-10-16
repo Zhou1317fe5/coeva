@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtGui import QAction, QIcon
@@ -10,10 +11,13 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from src.body.contracts import PetState
 from src.body.controller import BodyController
+from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
 from src.connectors.event_bus import LocalEventBus
 from src.connectors.hermes_connector import HermesConnector
+from src.connectors.hook_manager import AgentHookManager
 from src.connectors.http_server import CompanionHttpServer
+from src.connectors.settings import AgentSettingsStore
 from src.core.cold_start import ColdStartPolicy
 from src.core.intervention import InterventionPolicy
 from src.core.sanctuary import SanctuaryGuard
@@ -22,6 +26,7 @@ from src.feeder.contracts import RawSlice
 from src.feeder.hotkey import GlobalHotkeyListener
 from src.feeder.overlay import SliceFeederOverlay
 from src.feeder.storage import SliceStore
+from src.memory.store import ChronicleStore, SliceRecord
 
 
 class CompanionApp:
@@ -35,16 +40,28 @@ class CompanionApp:
             self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
 
-        # 1. Desktop Body
-        assets_dir = Path("assets") / "pets" / "claw"
-        if not assets_dir.is_dir():
-            assets_dir = Path("assets") / "pets" / "dachshund"
+        # 0. Multi-Agent & Companion Settings
+        self.agent_settings = AgentSettingsStore()
+        self.hook_manager = AgentHookManager()
+        self.settings_window = SettingsWindow(self.agent_settings, self.hook_manager)
+        self.settings_window.pet_changed.connect(self._on_pet_changed)
+        self.settings_window.scale_changed.connect(self._on_scale_changed)
 
-        self.window = PetWindow(assets_dir, scale=2)
+        # 1. Desktop Body (Defaults to Tiko, or saved pet preference)
+        selected_pet = self.agent_settings.selected_pet
+        assets_dir = Path("assets") / "pets" / selected_pet
+        if not assets_dir.is_dir():
+            assets_dir = Path("assets") / "pets" / "tiko"
+        if not assets_dir.is_dir():
+            assets_dir = Path("assets") / "pets" / "claw"
+
+        self.window = PetWindow(assets_dir, scale=1)
         self.controller = BodyController(self.window)
 
-        # 2. Slice Feeder & Store
+        # 2. Slice Feeder & Chronicle Store
         self.store = SliceStore(Path("data") / "raw_slices.jsonl")
+        self.chronicle = ChronicleStore()
+        self.chronicle.import_slices_jsonl()
         self.overlay = SliceFeederOverlay()
         self.overlay.slice_submitted.connect(self._on_slice_submitted)
 
@@ -62,13 +79,19 @@ class CompanionApp:
         self.bus = LocalEventBus(
             on_event_received=lambda e: self.watcher.record_activity(),
             on_state_suggested=lambda s: self.controller.set_state(s),
+            store=self.chronicle,
         )
         self.hermes = HermesConnector(self.bus)
 
-        # 5. Local HTTP Server for external Agents (PI-Desktop, Hermes, Codex)
-        self.http_server = CompanionHttpServer(self.bus, self.controller)
+        # 5. Local HTTP Server
+        self.http_server = CompanionHttpServer(
+            self.bus,
+            self.controller,
+            settings_store=self.agent_settings,
+            hook_manager=self.hook_manager,
+            store=self.chronicle,
+        )
         self.http_server.start()
-
         # Pet click interaction
         self.window.clicked.connect(self._on_pet_clicked)
 
@@ -87,21 +110,70 @@ class CompanionApp:
     def _setup_tray(self, assets_dir: Path) -> None:
         """Create a full-featured tray menu for manual inspection and testing."""
         self.tray = QSystemTrayIcon(self.window)
-        icon_path = assets_dir / "sprites" / "idle.png"
-        if icon_path.is_file():
-            self.tray.setIcon(QIcon(str(icon_path)))
+        idle_sheet = self.window._loaded_sheets.get("idle")
+        if idle_sheet and idle_sheet.frames:
+            self.tray.setIcon(QIcon(idle_sheet.frames[0]))
         else:
-            self.tray.setIcon(QIcon())
-
+            icon_path = assets_dir / "sprites" / "idle.png"
+            if icon_path.is_file():
+                self.tray.setIcon(QIcon(str(icon_path)))
+            else:
+                self.tray.setIcon(QIcon())
         menu = QMenu()
+
+        # 0. Settings Window trigger (Like Clawd on Desk)
+        settings_action = QAction("⚙️ 伴生体与多 Agent 设置...", self.window)
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
 
         # 1. Feeder trigger
         feed_action = QAction("🌱 随手投喂切片 (Alt+Space)", self.window)
         feed_action.triggered.connect(self.overlay.toggle_or_show)
         menu.addAction(feed_action)
 
+        # 1.5 Switch Pet Submenu
+        switch_menu = menu.addMenu("🔄 切换伴生体 (Switch Pet)")
+        available_pets = [
+            ("🤖 Tiko (默认 · 小机器人)", "tiko"),
+            ("🐥 Debug Duck (调试小黄鸭)", "debug-duck"),
+            ("🐱 Wangcai (布偶猫)", "wangcai"),
+            ("🐾 Claw (经典小猫)", "claw"),
+        ]
+
+        def _make_switcher(pid: str) -> Callable[[], None]:
+            def _switch() -> None:
+                self.agent_settings.set_selected_pet(pid)
+                self._on_pet_changed(pid)
+            return _switch
+
+        for label, pid in available_pets:
+            if (Path("assets") / "pets" / pid).is_dir():
+                pet_action = QAction(label, self.window)
+                pet_action.triggered.connect(_make_switcher(pid))
+                switch_menu.addAction(pet_action)
+
         menu.addSeparator()
 
+
+        # 1.6 Scale Submenu
+        scale_menu = menu.addMenu("🔍 伴生体大小 (Scale)")
+        scale_presets = [
+            ("50% 极小 (Mini · 96px)", 0.5),
+            ("75% 小巧 (Compact · 144px)", 0.75),
+            ("100% 标准 (Normal · 192px)", 1.0),
+            ("125% 适中 (Medium · 240px)", 1.25),
+            ("150% 醒目 (Large · 288px)", 1.5),
+        ]
+
+        def _make_scale_changer(val: float) -> Callable[[], None]:
+            def _change() -> None:
+                self._on_scale_changed(val)
+            return _change
+
+        for s_label, s_val in scale_presets:
+            s_action = QAction(s_label, self.window)
+            s_action.triggered.connect(_make_scale_changer(s_val))
+            scale_menu.addAction(s_action)
         # 2. Agent state simulation tests with clear visual bubble feedback
         sim_menu = menu.addMenu("⚡ 测试: 模拟 Hermes Agent 事件")
 
@@ -181,6 +253,14 @@ class CompanionApp:
         # 1. Save to disk
         slice_item = RawSlice.create(text, mood_flag=mood)
         self.store.save(slice_item)
+        self.chronicle.record_slice(
+            SliceRecord(
+                id=slice_item.id,
+                timestamp=slice_item.timestamp,
+                content=slice_item.content,
+                mood_flag=slice_item.mood_flag,
+            )
+        )
 
         # 2. Check Sanctuary mode
         if is_distressed:
@@ -191,6 +271,32 @@ class CompanionApp:
             # AC-3: Acknowledge normal slice with gentle confirmation
             self.controller.perform_action("jump")
             self.controller.say("✨ 记下了，存进档案库了", ttl_ms=2500)
+
+
+    def _open_settings(self) -> None:
+        """Open the modern multi-agent and companion settings window."""
+        self.settings_window.refresh_agents()
+        self.settings_window.show()
+        self.settings_window.raise_()
+        self.settings_window.activateWindow()
+
+    def _on_pet_changed(self, pet_id: str) -> None:
+        """Handle dynamic pet switching from Settings or Tray."""
+        pet_dir = Path("assets") / "pets" / pet_id
+        if pet_dir.is_dir():
+            self.window.load_pet(pet_dir)
+            cur_idle = self.window._loaded_sheets.get("idle")
+            if cur_idle and cur_idle.frames:
+                self.tray.setIcon(QIcon(cur_idle.frames[0]))
+            names = {
+                "tiko": "Tiko (小机器人)",
+                "debug-duck": "Debug Duck (小黄鸭)",
+                "wangcai": "Wangcai (布偶猫)",
+                "claw": "Claw",
+            }
+            display_name = names.get(pet_id, pet_id)
+            self.controller.say(f"伴生体已切换为 {display_name}")
+
 
     def _on_quit(self) -> None:
         try:
@@ -203,6 +309,12 @@ class CompanionApp:
             pass
         self.window.close()
         self.app.quit()
+
+    def _on_scale_changed(self, scale: float) -> None:
+        """Handle pet scale adjustments from Settings or Tray."""
+        self.window.set_scale(scale)
+        percent = int(round(scale * 100))
+        self.controller.say(f"🔍 伴生体大小已调整为 {percent}%", ttl_ms=1800)
 
     def run(self) -> int:
         self.window.show()
