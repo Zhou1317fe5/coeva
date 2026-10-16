@@ -262,7 +262,7 @@ Phase 1 暴露的只是 Agent 开关；2A 的端点会暴露**用户原始切片
 | token 鉴权 | 安全 | 仅当端口需要暴露到非回环 |
 | 精细衰减分层 | 存储 | 两档 TTL 不够用时 |
 | 端到端事件去重 | 存储 | hook 载荷携带稳定 id/时间戳之后（当前见 §4.3 限制） |
-| `prune()` 的定时触发 | 存储 | 目前仅提供方法，尚无调度器调用（由 `run_companion` 或后台任务接入） |
+| `prune()` 的定时触发 | 存储 | **已完成**：`CompanionApp._setup_decay()` 在启动时与每 24 小时调用 |
 | 切片写入 Chronicle 的接线 | 归因 | `run_companion._on_slice_submitted` 已写 `RawSlice` 并存档案库；`SliceStore`（jsonl）仍为 Phase 1 遗留双写，待确认是否保留为导出通道 |
 
 ---

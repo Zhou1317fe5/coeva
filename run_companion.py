@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import sqlite3
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -27,6 +29,9 @@ from src.feeder.hotkey import GlobalHotkeyListener
 from src.feeder.overlay import SliceFeederOverlay
 from src.feeder.storage import SliceStore
 from src.memory.store import ChronicleStore, SliceRecord
+
+# Evidence decay runs at startup and once a day thereafter.
+_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 
 class CompanionApp:
@@ -98,6 +103,7 @@ class CompanionApp:
         # Setup System Tray & Hotkey
         self._setup_tray(assets_dir)
         self._setup_hotkey()
+        self._setup_decay()
 
     def _setup_hotkey(self) -> None:
         """Register global hotkey <alt>+<space> to summon the slice feeder."""
@@ -105,6 +111,26 @@ class CompanionApp:
             self.hotkey = GlobalHotkeyListener("<alt>+<space>", self.overlay.toggle_or_show)
             self.hotkey.start()
         except Exception:
+            pass
+
+    def _setup_decay(self) -> None:
+        """Prune expired transient evidence once at startup and then daily.
+
+        Without this the events table grows without bound, and the retention
+        contract in the Phase 2 spec would be nominal only.
+        """
+        self._run_prune()
+        self.prune_timer = QTimer(self.window)
+        self.prune_timer.setInterval(_PRUNE_INTERVAL_MS)
+        self.prune_timer.timeout.connect(self._run_prune)
+        self.prune_timer.start()
+
+    def _run_prune(self) -> None:
+        """Drop transient events past the retention TTL. Never touches durable rows."""
+        try:
+            self.chronicle.prune()
+        except sqlite3.Error:
+            # A locked database must not take the companion down; retry next interval.
             pass
 
     def _setup_tray(self, assets_dir: Path) -> None:
