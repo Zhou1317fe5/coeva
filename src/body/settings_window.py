@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -469,22 +470,36 @@ class SettingsWindow(QWidget):
         return card
 
     def _install_hook_and_refresh(self, agent_id: str, instance_id: str) -> None:
-        self.hook_manager.install_hook(agent_id, instance_id)
-        self.store.update_instance(agent_id, instance_id, enabled=True)
+        res = self.hook_manager.install_hook(agent_id, instance_id)
+        if res.get("ok"):
+            self.store.update_instance(agent_id, instance_id, enabled=True)
+        else:
+            err = res.get("error", "未知错误")
+            QMessageBox.warning(
+                self,
+                "接入失败",
+                f"无法为 {agent_id} ({instance_id}) 一键接入：\n{err}",
+            )
         self.refresh_agents()
 
     def _uninstall_hook_and_refresh(self, agent_id: str, instance_id: str) -> None:
-        self.hook_manager.uninstall_hook(agent_id, instance_id)
+        res = self.hook_manager.uninstall_hook(agent_id, instance_id)
+        if not res.get("ok"):
+            err = res.get("error", "未知错误")
+            QMessageBox.warning(
+                self,
+                "卸载失败",
+                f"无法为 {agent_id} ({instance_id}) 卸载 Hook：\n{err}",
+            )
         self.refresh_agents()
 
     def _scan_and_deploy_all_wsl(self) -> None:
         distros = self.hook_manager.get_wsl_distros()
         for distro in distros:
             iid = f"wsl:{distro}"
-            self.hook_manager.install_hook("hermes", iid)
-            self.store.update_instance("hermes", iid, enabled=True)
-            self.hook_manager.install_hook("pi-cli", iid)
-            self.store.update_instance("pi-cli", iid, enabled=True)
+            for aid in ("hermes", "pi-cli", "codex", "claude-code"):
+                self.hook_manager.install_hook(aid, iid)
+                self.store.update_instance(aid, iid, enabled=True)
         self.refresh_agents()
 
     # ── Page 2: Desktop Body Preferences ──

@@ -57,7 +57,7 @@ def test_local_event_bus_dispatch_and_state_mapping() -> None:
         }
     )
     assert state_tool == PetState.WORKING
-    assert states_observed[-1] == PetState.WORKING
+    assert states_observed[-1] == PetState.WORKING  # type: ignore[comparison-overlap]
 
 
 def test_hermes_connector_lifecycle() -> None:
@@ -147,3 +147,73 @@ def test_feeder_hotkey_falls_back_when_stored_value_is_invalid(tmp_path: Path) -
         json.dumps({"version": 2, "selected_pet": "tiko", "agents": {}}), encoding="utf-8"
     )
     assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+
+def test_codex_hook_lifecycle(tmp_path: Path) -> None:
+    """Test one-click installation, status check and clean uninstall of Codex CLI hook."""
+    from src.connectors.hook_manager import AgentHookManager
+
+    mgr = AgentHookManager()
+    target_dir = tmp_path / ".codex" / "companion-bridge"
+    mgr._resolve_target_dir = lambda aid, iid: target_dir  # type: ignore[method-assign,assignment]
+
+    # 1. Initially not installed
+    status = mgr.check_hook_status("codex", "windows")
+    assert status["installed"] is False
+
+    # 2. Install
+    res = mgr.install_hook("codex", "windows")
+    assert res["ok"] is True
+    assert (target_dir / "codex_hook.py").is_file()
+    hooks_file = tmp_path / ".codex" / "hooks.json"
+    assert hooks_file.is_file()
+    assert "companion-bridge" in hooks_file.read_text(encoding="utf-8")
+
+    # 3. Status check -> installed
+    status_after = mgr.check_hook_status("codex", "windows")
+    assert status_after["installed"] is True
+
+    # 4. Uninstall
+    un_res = mgr.uninstall_hook("codex", "windows")
+    assert un_res["ok"] is True
+    assert not (target_dir / "codex_hook.py").exists()
+    assert "companion-bridge" not in hooks_file.read_text(encoding="utf-8")
+
+    # 5. Status check -> not installed
+    status_final = mgr.check_hook_status("codex", "windows")
+    assert status_final["installed"] is False
+
+
+def test_claude_code_hook_lifecycle(tmp_path: Path) -> None:
+    """Test one-click installation, status check and clean uninstall of Claude Code hook."""
+    from src.connectors.hook_manager import AgentHookManager
+
+    mgr = AgentHookManager()
+    target_dir = tmp_path / ".claude" / "companion-bridge"
+    mgr._resolve_target_dir = lambda aid, iid: target_dir  # type: ignore[method-assign,assignment]
+
+    # 1. Initially not installed
+    status = mgr.check_hook_status("claude-code", "windows")
+    assert status["installed"] is False
+
+    # 2. Install
+    res = mgr.install_hook("claude-code", "windows")
+    assert res["ok"] is True
+    assert (target_dir / "claude_hook.py").is_file()
+    settings_file = tmp_path / ".claude" / "settings.json"
+    assert settings_file.is_file()
+    assert "companion-bridge" in settings_file.read_text(encoding="utf-8")
+
+    # 3. Status check -> installed
+    status_after = mgr.check_hook_status("claude-code", "windows")
+    assert status_after["installed"] is True
+
+    # 4. Uninstall
+    un_res = mgr.uninstall_hook("claude-code", "windows")
+    assert un_res["ok"] is True
+    assert not (target_dir / "claude_hook.py").exists()
+    assert "companion-bridge" not in settings_file.read_text(encoding="utf-8")
+
+    # 5. Status check -> not installed
+    status_final = mgr.check_hook_status("claude-code", "windows")
+    assert status_final["installed"] is False
+
