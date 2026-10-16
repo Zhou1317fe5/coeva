@@ -297,6 +297,19 @@ class ChronicleStore:
             )
         ]
 
+    def search_events(self, keyword: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        """Search historical events by session_id, tool_name, error_message, or agent_id."""
+        pattern = f"%{keyword}%"
+        rows = self._conn.execute(
+            "SELECT id, timestamp, agent_id, session_id, event_type, tool_name, error_message "
+            "FROM events "
+            "WHERE session_id LIKE ? OR tool_name LIKE ? "
+            "   OR error_message LIKE ? OR agent_id LIKE ? "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (pattern, pattern, pattern, pattern, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def list_evidence(
         self, *, limit: int = 20, offset: int = 0, provenance: str | None = None
     ) -> list[dict[str, Any]]:

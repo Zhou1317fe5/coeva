@@ -8,7 +8,7 @@ honoring the Clean Stage and Non-Judgmental Mirror disciplines.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -42,9 +42,10 @@ from src.core.self_model import (
     InsightStatus,
     SelfModelManager,
 )
+from src.memory.store import SliceRecord
 
 if TYPE_CHECKING:
-    from src.memory.store import ChronicleStore, Episode, SliceRecord
+    from src.memory.store import ChronicleStore, Episode
 
 
 class ChronicleViewerWindow(QWidget):
@@ -175,7 +176,15 @@ class ChronicleViewerWindow(QWidget):
 
         self.episodes_list = QListWidget()
         self.episodes_list.setObjectName("dataList")
+        self.episodes_list.itemClicked.connect(self._on_episode_selected)
         layout.addWidget(self.episodes_list, 1)
+
+        # Episode Detail Box
+        self.episode_detail = QTextEdit()
+        self.episode_detail.setReadOnly(True)
+        self.episode_detail.setFixedHeight(110)
+        self.episode_detail.setPlaceholderText("点击上方会话可查看完整起止时间、参与端与详细统计...")
+        layout.addWidget(self.episode_detail)
 
         return container
 
@@ -189,8 +198,7 @@ class ChronicleViewerWindow(QWidget):
         search_bar.setSpacing(8)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("输入关键词实时检索历史切片（如：代码、疲惫、灵感）...")
-        self.search_input.setFixedHeight(32)
+        self.search_input.setPlaceholderText("输入关键词检索切片或历史会话/工具（如：代码、Bash、error、01a0）...")
         self.search_input.returnPressed.connect(self._do_search)
         search_bar.addWidget(self.search_input, 1)
 
@@ -222,10 +230,19 @@ class ChronicleViewerWindow(QWidget):
         tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
         layout.addWidget(tip)
 
-        # Hypotheses Section
+        # Hypotheses Section Header with Re-mine Button
+        hyp_header = QHBoxLayout()
         hyp_title = QLabel("🌿 待校准心智假说 (Candidate Hypotheses)")
         hyp_title.setStyleSheet("font-weight: 600; color: #60a5fa; font-size: 13px;")
-        layout.addWidget(hyp_title)
+        hyp_header.addWidget(hyp_title)
+        hyp_header.addStretch()
+
+        self.btn_remine_patterns = QPushButton("🔄 基于最新经历重新挖掘")
+        self.btn_remine_patterns.setFixedHeight(26)
+        self.btn_remine_patterns.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_remine_patterns.clicked.connect(self._re_mine_self_model)
+        hyp_header.addWidget(self.btn_remine_patterns)
+        layout.addLayout(hyp_header)
 
         self.hyp_list = QListWidget()
         self.hyp_list.setObjectName("dataList")
@@ -344,10 +361,13 @@ class ChronicleViewerWindow(QWidget):
             self._refresh_slices()
         elif index == 1:
             self._refresh_episodes()
+        elif index == 2:
+            self._do_search()
         elif index == 3:
             self._refresh_self_model()
         elif index == 4:
             self._refresh_chapters()
+
     def refresh_all(self) -> None:
         """Reload all statistics and active list data from the database."""
         stats = self.store.stats()
@@ -359,6 +379,7 @@ class ChronicleViewerWindow(QWidget):
         self._refresh_slices()
         self._refresh_episodes()
         self._refresh_chapters()
+        self._refresh_self_model()
     def _refresh_slices(self) -> None:
         self.slices_list.clear()
         slices: list[SliceRecord] = self.store.list_slices(limit=100)
@@ -384,7 +405,8 @@ class ChronicleViewerWindow(QWidget):
 
     def _refresh_episodes(self) -> None:
         self.episodes_list.clear()
-        episodes: list[Episode] = self.store.list_episodes(limit=50)
+        self.episode_detail.clear()
+        episodes: list[Episode] = self.store.list_episodes(limit=200)
 
         for ep in episodes:
             start_str = ep.started_at[:19].replace("T", " ")
@@ -401,7 +423,26 @@ class ChronicleViewerWindow(QWidget):
                 f"  共计 {ep.event_count} 次事件 · 参与端: [{agents_str}] · {action_badge}"
             )
             item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, ep)
             self.episodes_list.addItem(item)
+
+    def _on_episode_selected(self, item: QListWidgetItem) -> None:
+        ep: Episode | None = item.data(Qt.ItemDataRole.UserRole)
+        if ep is not None:
+            action_desc = (
+                "用户主动下发了指令/提示词"
+                if ep.has_user_action
+                else "全程由 Agent 自主执行与修复"
+            )
+            agents_str = ", ".join(ep.agent_ids) if ep.agent_ids else "未知"
+            self.episode_detail.setText(
+                f"会话 ID: {ep.session_id}\n"
+                f"参与终端: {agents_str}\n"
+                f"起始时间: {ep.started_at}\n"
+                f"结束时间: {ep.ended_at}\n"
+                f"累计事件: {ep.event_count} 条客观行为记录\n"
+                f"用户干预状态: {action_desc}"
+            )
 
     def _do_search(self) -> None:
         kw = self.search_input.text().strip()
@@ -410,21 +451,37 @@ class ChronicleViewerWindow(QWidget):
         if not kw:
             return
 
-        results: list[SliceRecord] = self.store.search_slices(kw, limit=50)
-        for item in results:
-            time_str = item.timestamp[:19].replace("T", " ")
-            preview = item.content.replace("\n", " ")
-            if len(preview) > 45:
-                preview = preview[:45] + "..."
-            list_item = QListWidgetItem(f"[{time_str}] {preview}")
-            list_item.setData(Qt.ItemDataRole.UserRole, item)
+        # 1. Search slices
+        slice_results: list[SliceRecord] = self.store.search_slices(kw, limit=30)
+        for s in slice_results:
+            time_str = s.timestamp[:19].replace("T", " ")
+            preview = s.content.replace("\n", " ")
+            if len(preview) > 40:
+                preview = preview[:40] + "..."
+            list_item = QListWidgetItem(f"🌱 [切片] [{time_str}] {preview}")
+            list_item.setData(Qt.ItemDataRole.UserRole, s)
             self.search_results.addItem(list_item)
 
-        if not results:
-            empty_item = QListWidgetItem(f"未找到与 “{kw}” 相关的切片记忆")
+        # 2. Search historical events
+        event_results = self.store.search_events(kw, limit=50)
+        for ev in event_results:
+            time_str = ev["timestamp"][:19].replace("T", " ")
+            agent = ev["agent_id"]
+            etype = ev["event_type"]
+            tname = ev.get("tool_name") or ""
+            err = ev.get("error_message") or ""
+            sid = ev["session_id"]
+            sid_short = sid[:8] + "..." if len(sid) > 12 else sid
+            extra = f"· 工具: {tname}" if tname else (f"· 报错: {err}" if err else "")
+            disp = f"⚡ [{agent}] [{time_str}] {etype} {extra} (会话: {sid_short})"
+            list_item = QListWidgetItem(disp)
+            list_item.setData(Qt.ItemDataRole.UserRole, ev)
+            self.search_results.addItem(list_item)
+
+        if not slice_results and not event_results:
+            empty_item = QListWidgetItem(f"未找到与 “{kw}” 相关的切片或事件")
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.search_results.addItem(empty_item)
-
     def _on_slice_selected(self, item: QListWidgetItem) -> None:
         record: SliceRecord | None = item.data(Qt.ItemDataRole.UserRole)
         if record is not None:
@@ -437,30 +494,48 @@ class ChronicleViewerWindow(QWidget):
             )
 
     def _on_search_selected(self, item: QListWidgetItem) -> None:
-        record: SliceRecord | None = item.data(Qt.ItemDataRole.UserRole)
-        if record is not None:
-            time_str = record.timestamp[:19].replace("T", " ")
+        data: Any = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, SliceRecord):
+            time_str = data.timestamp[:19].replace("T", " ")
             self.search_detail.setText(
-                f"时间: {time_str} | ID: {record.id}\n\n{record.content}"
+                f"🌱 随手投喂切片\n时间: {time_str}\n情绪标签: {data.mood_flag}\n"
+                f"来源: {data.source}\nID: {data.id}\n\n{data.content}"
             )
+        elif isinstance(data, dict):
+            time_str = data.get("timestamp", "")[:19].replace("T", " ")
+            self.search_detail.setText(
+                f"⚡ 遥测事件\n时间: {time_str}\nAgent: {data.get('agent_id')}\n"
+                f"事件类型: {data.get('event_type')}\n工具名称: {data.get('tool_name')}\n"
+                f"报错信息: {data.get('error_message')}\n会话 ID: {data.get('session_id')}"
+            )
+
+    def _re_mine_self_model(self) -> None:
+        """Force re-run pattern builder on all latest episodes and re-synthesize hypotheses."""
+        self._refresh_self_model(force_remine=True)
+        stats = self.store.stats()
+        ep_c = stats.get('episodes', 0)
+        pats = PatternBuilder(self.store).build_patterns(min_episodes=2)
+        QMessageBox.information(
+            self,
+            "挖掘完成",
+            f"已根据当前 {ep_c} 个经历会话，成功挖掘出 {len(pats)} 个行为模式并生成候选假说！",
+        )
 
     # ── Phase 2C Self Model Operations ──
 
-    def _refresh_self_model(self) -> None:
-        """Load candidate hypotheses, synthesize if empty, and show confirmed insights."""
+    def _refresh_self_model(self, force_remine: bool = False) -> None:
+        """Load candidate hypotheses, synthesize if empty or forced, and show confirmed insights."""
         self.hyp_list.clear()
         self.ins_list.clear()
 
         # 1. Hypotheses
         hyps = self.store.list_hypotheses(status=HypothesisStatus.CANDIDATE)
-        if not hyps:
-            # Trigger real pattern mining from episodes and synthesize
+        if not hyps or force_remine:
             pats = PatternBuilder(self.store).build_patterns(min_episodes=2)
             fresh_hyps = HypothesisEngine().synthesize(pats)
             for h in fresh_hyps:
                 self.store.save_hypothesis(h)
             hyps = self.store.list_hypotheses(status=HypothesisStatus.CANDIDATE)
-
         for h in hyps:
             lenses_str = " · ".join(f"[{lens.value}]" for lens in h.lenses)
             counter_tag = (

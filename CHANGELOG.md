@@ -6,7 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - Vasu Phase 2A: 动作语言与关键姿态评审
+## [Unreleased] - Philosophy: 独立生命个体与朋友式共存哲学入档
+
+### 📝 Docs & Philosophy（设计哲学与产品规范确立）
+- **根目录 `SPEC.md` §2.1**：确立“独立生命个体与朋友式共存（Autonomous Life & Non-Intrusive Companionship）”，明确桌宠生活在桌面上，有自己的工作、玩耍与休息闭环，与用户同处一个工坊，彼此独立而不割裂；
+- **`DESIGN.md` §1**：升华“生命感与日常自主节律（Living Presence & Ambient Fellowship）”，确立 90% 依赖体态微语言、文字气泡极低频且克制的交互分寸。生命引擎实现与新自制宠物彻底解耦，待新宠物制作完毕后再行落地讨论。
+
+---
 
 ### 📝 Art Production（美术制作）
 - 新增 `assets/vasu/production/` 的六姿态静态草图、朝右行走基准姿态、64px 对比图与评审记录。朝右轮廓可作为 Phase 2B 的试行动画依据；观察、做事、休息、玩耍和回应仍需按评审意见修订。未制作动画行或图集。
