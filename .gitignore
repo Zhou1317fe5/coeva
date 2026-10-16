@@ -50,3 +50,8 @@ Desktop.ini
 
 # ThinkRail Context (temporary task specs)
 .thinkrail/context/
+
+# Local user data: never commit. Contains raw slice content (the user's own words),
+# the Chronicle database, machine-local window/agent settings and the SQLite WAL files.
+# The app recreates this directory and its files on first run.
+data/
