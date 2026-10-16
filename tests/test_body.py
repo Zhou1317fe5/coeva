@@ -21,6 +21,16 @@ if _app is None:
     _app = QApplication([])
 
 
+def _isolated_window(pet_dir: Path, tmp_path: Path, *, scale: float = 1.0) -> PetWindow:
+    """Build a PetWindow whose position config lives in tmp_path.
+
+    Without this, constructing a PetWindow reads and (via closeEvent /
+    reset_to_default_position) writes the user's real data/body_position.json,
+    which also makes the persisted scale leak into unrelated tests.
+    """
+    return PetWindow(pet_dir, scale=scale, position_config_path=tmp_path / "body_position.json")
+
+
 def test_spritesheet_load_and_slice(tmp_path: Path) -> None:
     """Test creating and slicing a test image into multiple frames."""
     # Create a 40x10 image with 4 frames of 10x10
@@ -61,10 +71,10 @@ def test_animation_player_logic() -> None:
     player.stop()
 
 
-def test_body_controller_state_and_say() -> None:
+def test_body_controller_state_and_say(tmp_path: Path) -> None:
     """Test BodyController state transition and speech bubble invocation."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
     assert controller.current_state == PetState.IDLE
@@ -79,10 +89,10 @@ def test_body_controller_state_and_say() -> None:
     window.close()
 
 
-def test_pet_window_clamping_and_reset() -> None:
+def test_pet_window_clamping_and_reset(tmp_path: Path) -> None:
     """Test emergency position reset brings pet back into screen bounds."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
 
     # Force position way outside screen
     window.move(99999, 99999)
@@ -139,7 +149,7 @@ def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
     assert idle_sheet.frame_height == 20
 
 
-def test_builtin_pets_loading() -> None:
+def test_builtin_pets_loading(tmp_path: Path) -> None:
     """Test that all three built-in pets (tiko, debug-duck, wangcai) load properly in PetWindow."""
     tiko_dir = Path("assets") / "pets" / "tiko"
     duck_dir = Path("assets") / "pets" / "debug-duck"
@@ -150,7 +160,7 @@ def test_builtin_pets_loading() -> None:
     assert wangcai_dir.is_dir()
 
     # Default pet: Tiko
-    window = PetWindow(tiko_dir, scale=1)
+    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
     assert "idle" in window._loaded_sheets
     assert "review" in window._loaded_sheets
     assert "running" in window._loaded_sheets
@@ -173,10 +183,10 @@ def test_builtin_pets_loading() -> None:
 
     window.close()
 
-def test_pet_window_scale_adjustment() -> None:
+def test_pet_window_scale_adjustment(tmp_path: Path) -> None:
     """Test dynamic scaling adjustment and persistence for pet body."""
     tiko_dir = Path("assets") / "pets" / "tiko"
-    window = PetWindow(tiko_dir, scale=1.0)
+    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
     assert abs(window.scale_factor - 1.0) < 0.01
 
     # Scale down to 50%

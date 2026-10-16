@@ -26,10 +26,19 @@ if _app is None:
     _app = QApplication([])
 
 
-def test_ac1_independent_body_lifecycle() -> None:
+def _isolated_window(pet_dir: Path, tmp_path: Path, *, scale: float = 1.0) -> PetWindow:
+    """Build a PetWindow whose position config lives in tmp_path.
+
+    PetWindow otherwise reads and writes the user's real data/body_position.json
+    on construction and on close.
+    """
+    return PetWindow(pet_dir, scale=scale, position_config_path=tmp_path / "body_position.json")
+
+
+def test_ac1_independent_body_lifecycle(tmp_path: Path) -> None:
     """AC-1: Verify Desktop Body runs independently of any AI agent with idle, drag, and sleep."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
     # Starts in IDLE with no agent running
@@ -46,10 +55,10 @@ def test_ac1_independent_body_lifecycle() -> None:
     window.close()
 
 
-def test_ac2_hermes_pi_to_pet_orchestration() -> None:
+def test_ac2_hermes_pi_to_pet_orchestration(tmp_path: Path) -> None:
     """AC-2: Verify Hermes/Pi events route through EventBus and drive pet states within 1s."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
     bus = LocalEventBus(on_state_suggested=lambda s: controller.set_state(s))
@@ -73,7 +82,7 @@ def test_ac2_hermes_pi_to_pet_orchestration() -> None:
 def test_ac3_slice_feeder_e2e(tmp_path: Path) -> None:
     """AC-3: Verify slice feeding persists to JSONL and triggers pet nod/say confirmation."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
     store = SliceStore(tmp_path / "raw_slices.jsonl")
@@ -105,7 +114,7 @@ def test_ac3_slice_feeder_e2e(tmp_path: Path) -> None:
 def test_ac4_sanctuary_meltdown_e2e(tmp_path: Path) -> None:
     """AC-4: Verify negative venting triggers Sanctuary Guard meltdown with 100% silence."""
     pet_dir = Path("assets") / "pets" / "claw"
-    window = PetWindow(pet_dir, scale=1)
+    window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
     store = SliceStore(tmp_path / "raw_slices.jsonl")

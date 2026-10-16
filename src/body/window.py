@@ -17,6 +17,9 @@ CLICK_DRAG_THRESHOLD_PX = 4
 EDGE_SNAP_DISTANCE_PX = 30  # Snapping threshold set to 30px
 PEEK_REVEAL_WIDTH_PX = 24  # Width of half-body staying visible when docked
 DEFAULT_SCALE = 1.0
+# Persisted window position and scale. Tests point this at tmp_path so they never
+# read or overwrite the user's real file while constructing a PetWindow.
+DEFAULT_POSITION_CONFIG_PATH = Path("data") / "body_position.json"
 
 
 class PetWindow(QWidget):
@@ -34,12 +37,14 @@ class PetWindow(QWidget):
         pet_dir: Path,
         *,
         scale: float = DEFAULT_SCALE,
+        position_config_path: Path | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.pet_dir = pet_dir
         self._scale = scale
         self._current_state = PetState.IDLE
+        self._position_config_path = position_config_path or DEFAULT_POSITION_CONFIG_PATH
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -235,7 +240,7 @@ class PetWindow(QWidget):
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
 
     def _get_config_path(self) -> Path:
-        return Path("data") / "body_position.json"
+        return self._position_config_path
 
     def _restore_position(self) -> None:
         cfg = self._get_config_path()
