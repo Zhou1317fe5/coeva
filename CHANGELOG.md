@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Phase 2A (Chronicle Foundation)
+
+### 🚀 Added（新增）
+- **本地记忆与证据档案库（Chronicle Store, `src/memory/store.py`）**：
+  - Python 原生 SQLite（WAL 模式），`data/companion_chronicle.db`；
+  - 两张表 `slices` / `events` + 一个 `evidence` **视图**（视图而非实体表，避免证据双写导致事实源分裂）；
+  - `import_slices_jsonl()`：对 `data/raw_slices.jsonl` 幂等导入（`INSERT OR IGNORE`），损坏行跳过不中断；
+  - 查询层：`list_slices` / `search_slices` / `list_evidence` / `list_episodes` / `stats`；
+  - `prune()`：按 `retention_class` 删除超期 `transient` 事件（默认 30 天），`durable` 行永不触碰。
+- **行为归因门（Attribution Gate, `src/core/attribution.py`）**：
+  - 纯函数 `classify(event_type) -> (provenance, retention_class)`，无状态、无 I/O、无 LLM；
+  - 只有 `user_prompt` 具备用户归因（`user_action`），其余（含未知事件类型）一律降级为 `agent_context`；
+  - 这是架构规范 Invariant 2「Agent 行为 ≠ 用户行为」在代码中的唯一落点。
+- **Agent 事件持久化**：`LocalEventBus` 新增可选 `store` 依赖；Phase 1 的事件流原先仅存内存、进程重启即清零，现已落盘（保持控制面/数据面分离，写库不触发 UI）。
+- **只读 Chronicle HTTP 端点**：`/api/chronicle/{stats,slices,evidence,episodes}` 与 `POST /api/chronicle/slices/search`；
+  按 `client_address` 做回环判定，**非回环来源一律 403**（WSL 跨网 Agent 路径不受影响）。
+- **规范图谱**：`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`（2A MVP 范围）与对应 task-spec。
+
+### 🧪 Tests（新增测试，45 项全绿）
+- `tests/test_memory.py`：AC-1~AC-6、AC-9 及事件幂等键、Episode 分组；
+- `tests/test_chronicle_http.py`：AC-7 回环限定与端到端只读接口。
+
+### 📌 Known Limitations（如实记录）
+- **检索未用 FTS5**：实测（SQLite 3.53.1）`unicode61` 与 `trigram` 分词器对 **2 字中文词均 0 命中**，
+  FTS5 在中文场景默认不可用。MVP 采用 `LIKE`，切片 > 10k 时再引入中文分词器。
+- **事件幂等键覆盖范围有限**：hook 载荷不带时间戳，服务端打戳，同一条 hook 重投会得到两个不同 id；
+  §4.3 的幂等只覆盖"同对象重复写入"。端到端去重需 connector 侧提供稳定 id。
+- **2A 无用户可见新功能**：桌宠行为与 Phase 1 一致，本阶段只建立证据输入流与档案库。
+- **Pattern / Hypothesis / Chapter 等推理与叙事层全部延后**，逐项启动条件见规范 §8 待做表。
+
+---
+
 ## [0.1.0] - 2026-10-15 (Sprint 1 Milestone)
 
 ### 🚀 Added（新增功能与架构）
@@ -28,7 +60,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 本地事件总线 (`src/connectors/event_bus.py`)；
   - Hermes 生命周期连接器 (`src/connectors/hermes_connector.py`)；
   - 本地伴生体 HTTP 服务 (`src/connectors/http_server.py`)，暴露 `127.0.0.1:17321` 标准端点；
-  - **PI-Desktop 实时伴生桥接扩展 (`imported.pi-companion-bridge`)**，已接入并自动注册至 PI-Desktop 插件注册表。
+- **实装 Clawd 风格多 Agent 设置与介入管理 (Multi-Agent Settings)**：
+  - 建立 Agent 持久化过滤规则层 (`src/connectors/settings.py`，存储至 `data/agent_settings.json`)；
+  - 在 HTTP 服务与事件总线注入多 Agent 开关逻辑，支持物理拦截未勾选 Agent 的遥测事件；
+  - 实现原生深色风格多 Agent 设置面板 (`src/body/settings_window.py`)，支持在托盘菜单直接呼出，自由开启/屏蔽 PI-Desktop、Hermes、Codex CLI、Claude Code 等；
+  - PI-Desktop 伴生体面板 (`renderer/index.html`) 同步增加实时多 Agent 遥测列表与开关卡片；
+  - **实装多环境实例细分隔离 (Windows vs WSL)**：支持同一 Agent（如 Hermes、Pi CLI、Codex）在 Windows 本地与 WSL (Ubuntu-24.04) 独立识别心跳并分别控制开关，实现精细化环境隔离；
+  - **独立区分 PI-Desktop 与 Pi CLI**：卡片上保留 PI-Desktop（桌面工作区扩展）的同时，新增 Pi CLI（终端命令行智能体）独立卡片与双端实例控制；
+  - **迁移 Clawd 风格 Hook 自动管理 (AgentHookManager)**：实现跨 Windows 与 WSL 的 Hook 物理就绪检测 (`check_hook_status`)、一键自动部署 (`install_hook`) 与干净卸载 (`uninstall_hook`)，消除用户手动找路径配置的认知负担，并在设置界面展示实时 HOOK 徽章与操作按钮。
+  - **吸纳 Petdex 协议与资产生态 (Petdex Interop)**：
+    - 经过对 `crafter-station/petdex`（2.3 万行 Zig 源码）的深入审计，确立“坚守 Python 心智基座，但吞噬 Petdex 生态”决议；
+    - 原生兼容 Petdex 9 状态 SpriteSheet 规范 (`src/body/animation.py` 中的 `PetdexAtlasLoader`)，可直接无缝挂载社区海量宠物图谱；
+    - 在 HTTP 服务原生兼容 Petdex 协议端点 (`POST /state`、`POST /bubble`、`GET /health`、`GET /whoami`)，无缝接纳社区开源 Agent 桥接。
+  - **实装 Petdex/SpriteYard 完整标准资产图谱与内置宠物 (Builtin Pets)**：
+    - 增强 `PetdexAtlasLoader`：支持透明空帧自动探测与剔除 (`trim_empty_frames`)，避免行末空帧引起透明闪烁；
+    - 增强 `PetWindow`：自动感知并加载 Petdex `pet.json` 与 `spritesheet.webp` 规范，全面打通 `PetState`（IDLE, SLEEPING, THINKING, WORKING, HAPPY, ERROR, WAITING）到 Petdex 9 状态动作切片的完整映射；
+    - 支持动态无缝切宠 (`PetWindow.load_pet`) 与托盘动态图标响应；
+    - 内置三大精选开源宠物：**Tiko**（好奇单眼小机器人 · 默认）、**Debug Duck**（调试小黄鸭）、**Wangcai**（布偶猫），均已放置于 `assets/pets/` 并通过标准包格式校验；
+    - 托盘菜单新增「🔄 切换伴生体」子菜单，支持随时一键在三大内置宠物间平滑切换。
+    - **新增全方位大小缩放调节 (Pet Scale Adjustment)**：
+      - 增强 `SpriteSheet.scaled()`：突破整数倍限制，支持 `float` 连续任意缩放（平滑插值与最近邻保持清晰）；
+      - 支持 **Ctrl + 鼠标滚轮** 在桌面上无级缩放桌宠（伴随 `🔍 伴生体大小: X%` 瞬态气泡反馈）；
+      - 设置面板「桌面身体偏好」新增「🔍 伴生体缩放与尺寸调节」卡片，提供 50%、75%、100%、125%、150% 快捷档位；
+      - 系统托盘新增「🔍 伴生体大小」子菜单；
+      - 缩放比例持久化至 `data/body_position.json`，重启自动恢复。
 - **规范与文档图谱**：
   - `SPEC.md`、`docs/specs/SPEC.md`、`docs/specs/phase-1-runtime-and-bridge/SPEC.md`；
   - `DESIGN.md`（伴生体空间圣域准则）；
@@ -42,6 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **修复 Hover 离开事件偶发失效**：开启父子控件鼠标追踪，并注入高频光标探针巡检。
 - **修复避风港无反馈误解**：触发避风港时弹出温和接纳气泡（`🍃 收到。先放一放，我陪着你...`），守住不批评、不说教底线的同时给予视觉确认。
 - **修复输入框固定不可动**：`SliceFeederOverlay` 升级为可自由拖拽，并持久化记忆位置 (`data/feeder_position.json`)。
+- **修复 HTTP 服务阻塞风险**：`http_server.py` 从单线程 `HTTPServer` 升级为并发 `ThreadingHTTPServer`，增加 5s 超时与 `Connection: close` 保护，杜绝异常连接挂起整个服务。
+- **修复 PI-Desktop 扩展不可见**：将伴生体桥接插件部署为标准安装插件 `pi.companion-bridge`，并在 `~/.pi-desktop/plugins/registry.json` 中配置注册项，确保在 PI-Desktop「设置 -> 插件」中直接可见并生效。
+- **规范 Windows PowerShell 调用方式**：排查并记录 PowerShell 下 curl 转义剥离双引号导致 Bad Hostname 和 Invalid JSON 根因，明确推荐采用 PowerShell 原生 `Invoke-RestMethod`。
 
 ### 📋 Handover Notes（团队交接与开发须知）
 1. **测试运行**：本地执行 `.venv\Scripts\pytest -v` 必须保证 19 个测试全绿。
