@@ -11,6 +11,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from src.body.chronicle_window import ChronicleViewerWindow
 from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.settings_window import SettingsWindow
@@ -68,6 +69,7 @@ class CompanionApp:
         self.store = SliceStore(Path("data") / "raw_slices.jsonl")
         self.chronicle = ChronicleStore()
         self.chronicle.import_slices_jsonl()
+        self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = SliceFeederOverlay()
         self.overlay.slice_submitted.connect(self._on_slice_submitted)
 
@@ -172,6 +174,11 @@ class CompanionApp:
         settings_action = QAction("⚙️ 伴生体与多 Agent 设置...", self.window)
         settings_action.triggered.connect(self._open_settings)
         menu.addAction(settings_action)
+
+        # 0.5 Chronicle Archive Window trigger (Phase 2A Viewer)
+        archive_action = QAction("📖 记忆与切片档案库 (Chronicle)...", self.window)
+        archive_action.triggered.connect(self._open_chronicle_archive)
+        menu.addAction(archive_action)
 
         # 1. Feeder trigger
         self.feed_action = QAction(
@@ -330,6 +337,13 @@ class CompanionApp:
         self.settings_window.raise_()
         self.settings_window.activateWindow()
 
+    def _open_chronicle_archive(self) -> None:
+        """Open the read-only memory and slice archive window."""
+        self.chronicle_window.refresh_all()
+        self.chronicle_window.show()
+        self.chronicle_window.raise_()
+        self.chronicle_window.activateWindow()
+
     def _on_pet_changed(self, pet_id: str) -> None:
         """Handle dynamic pet switching from Settings or Tray."""
         pet_dir = Path("assets") / "pets" / pet_id
@@ -357,6 +371,7 @@ class CompanionApp:
             self.http_server.stop()
         except Exception:
             pass
+        self.chronicle_window.close()
         self.window.close()
         self.app.quit()
 
