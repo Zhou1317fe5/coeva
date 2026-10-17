@@ -17,6 +17,7 @@ from PySide6.QtCore import (
     QEasingCurve,
     QEvent,
     QPoint,
+    QPointF,
     QRectF,
     Qt,
     QTimer,
@@ -216,76 +217,23 @@ class _CircleIconButton(QWidget):
         self._renderer.render(painter, QRectF(cx, cy, self._icon_size, self._icon_size))
 
 
-class _EditIconButton(QWidget):
-    """Clickable edit icon button rendering the delicate SquarePen vector icon."""
+class _PillControlsWidget(QWidget):
+    """Integrated pill controls matching Codex's synchronous scaling and hover effect."""
 
     clicked = Signal()
+    edit_clicked = Signal()
+    voice_clicked = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setFixedSize(34, 24)
+        self.setFixedSize(76, 28)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip("开始输入")
-        self._is_hovered = False
-        self._renderer = QSvgRenderer(QByteArray(_EDIT_ICON_SVG.encode("utf-8")), self)
-
-    def enterEvent(self, event: object) -> None:  # noqa: N802
-        self._is_hovered = True
-        self.update()
-
-    def leaveEvent(self, event: object) -> None:  # noqa: N802
-        self._is_hovered = False
-        self.update()
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-            event.accept()
-
-    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        if self._is_hovered:
-            painter.setBrush(QColor(241, 245, 249))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 10, 10)
-
-        icon_size = 15.0
-        target_rect = QRectF(
-            (self.width() - icon_size) / 2.0,
-            (self.height() - icon_size) / 2.0,
-            icon_size,
-            icon_size,
-        )
-        self._renderer.render(painter, target_rect)
-
-
-class _DividerWidget(QWidget):
-    """Subtle 1px vertical divider between Edit and Voice buttons."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(1, 12)
-
-    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
-        painter = QPainter(self)
-        painter.setPen(QColor(229, 231, 235))  # #E5E7EB
-        painter.drawLine(0, 0, 0, self.height())
-
-
-class _WaveformIconButton(QWidget):
-    """Clickable audio waveform button with animated pulsing voice lines."""
-
-    clicked = Signal()
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(34, 24)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setToolTip("语音互动 / 倾听模式")
-        self._is_hovered = False
-        self._is_active = False
+        self.setMouseTracking(True)
+        self._edit_renderer = QSvgRenderer(QByteArray(_EDIT_ICON_SVG.encode("utf-8")), self)
+        self._scale: float = 1.0
+        self._opacity: float = 1.0
+        self._hover_btn: str | None = None
+        self._is_voice_active: bool = False
         self._bar_heights: list[float] = [4.0, 12.0, 8.0, 3.5]
         self._anim_step = 0
 
@@ -295,18 +243,27 @@ class _WaveformIconButton(QWidget):
 
     @property
     def is_active(self) -> bool:
-        return self._is_active
+        return self._is_voice_active
+
+    @property
+    def is_voice_active(self) -> bool:
+        return self._is_voice_active
 
     def set_active(self, active: bool) -> None:
-        if self._is_active == active:
+        if self._is_voice_active == active:
             return
-        self._is_active = active
+        self._is_voice_active = active
         if active:
             self._anim_timer.start()
         else:
             self._anim_timer.stop()
             self._bar_heights = [4.0, 12.0, 8.0, 3.5]
         self.update()
+
+    def toggle_voice_mode(self) -> None:
+        new_state = not self._is_voice_active
+        self.set_active(new_state)
+        self.voice_clicked.emit(new_state)
 
     def _on_anim_tick(self) -> None:
         patterns = [
@@ -321,18 +278,30 @@ class _WaveformIconButton(QWidget):
         self._bar_heights = patterns[self._anim_step]
         self.update()
 
-    def enterEvent(self, event: object) -> None:  # noqa: N802
-        self._is_hovered = True
+    def set_morph(self, scale: float, opacity: float) -> None:
+        self._scale = max(0.0, min(1.0, scale))
+        self._opacity = max(0.0, min(1.0, opacity))
         self.update()
 
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        cx = self.width() / 2.0
+        new_hover = "edit" if event.position().x() < cx else "voice"
+        if new_hover != self._hover_btn:
+            self._hover_btn = new_hover
+            self.update()
+
     def leaveEvent(self, event: object) -> None:  # noqa: N802
-        self._is_hovered = False
+        self._hover_btn = None
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-            event.accept()
+            cx = self.width() / 2.0
+            if event.position().x() < cx:
+                self.edit_clicked.emit()
+                self.clicked.emit()
+            else:
+                self.toggle_voice_mode()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self._anim_timer.stop()
@@ -341,22 +310,45 @@ class _WaveformIconButton(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        if self._is_hovered:
-            painter.setBrush(QColor(241, 245, 249))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 10, 10)
-
-        # Active color is deep vibrant blue, idle is refined slate
-        stroke_color = QColor("#2563EB") if self._is_active else QColor("#334155")
-        pen = QPen(stroke_color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-
         cx = self.width() / 2.0
         cy = self.height() / 2.0
-        spacing = 3.2
-        xs = [cx - 1.5 * spacing, cx - 0.5 * spacing, cx + 0.5 * spacing, cx + 1.5 * spacing]
 
+        alpha = int(255 * self._opacity)
+        if alpha <= 0 or self._scale <= 0.05:
+            return
+
+        painter.save()
+        painter.translate(cx, cy)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-cx, -cy)
+
+        # 1. Hover rounded background
+        if self._scale > 0.85 and self._hover_btn:
+            painter.setBrush(QColor(241, 245, 249, int(alpha * 0.9)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            if self._hover_btn == "edit":
+                painter.drawRoundedRect(QRectF(cx - 36, cy - 12, 34, 24), 10, 10)
+            elif self._hover_btn == "voice":
+                painter.drawRoundedRect(QRectF(cx + 2, cy - 12, 34, 24), 10, 10)
+
+        # 2. Left Icon (SquarePen)
+        target_rect = QRectF(cx - 19 - 7.5, cy - 7.5, 15, 15)
+        self._edit_renderer.render(painter, target_rect)
+
+        # 3. Middle Divider
+        painter.setPen(QPen(QColor(229, 231, 235, alpha), 1.0))
+        painter.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
+
+        # 4. Right Waveform
+        color = (
+            QColor(37, 99, 235, alpha) if self._is_voice_active else QColor(51, 65, 85, alpha)
+        )
+        pen = QPen(color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+
+        vx = cx + 19.0
+        spacing = 3.2
+        xs = [vx - 1.5 * spacing, vx - 0.5 * spacing, vx + 0.5 * spacing, vx + 1.5 * spacing]
         for x, h in zip(xs, self._bar_heights, strict=False):
             painter.drawLine(
                 int(round(x)),
@@ -365,6 +357,19 @@ class _WaveformIconButton(QWidget):
                 int(round(cy + h / 2.0)),
             )
 
+        painter.restore()
+
+
+class _EditIconButton(QWidget):
+    clicked = Signal()
+
+
+class _DividerWidget(QWidget):
+    pass
+
+
+class _WaveformIconButton(QWidget):
+    clicked = Signal()
 
 class SliceFeederBar(QWidget):
     """1:1 Codex-style docked interaction pill bar positioned directly beneath the pet.
@@ -410,9 +415,8 @@ class SliceFeederBar(QWidget):
 
         # Smooth Morphing Animation (spring-like fluid transition matching Codex)
         self._morph_anim = QVariantAnimation(self)
-        self._morph_anim.setDuration(190)
+        self._morph_anim.setDuration(240)
         self._morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._morph_anim.valueChanged.connect(self._on_morph_step)
         self._morph_anim.finished.connect(self._on_morph_finished)
 
         self._pill_opacity = QGraphicsOpacityEffect(self._pill_widget)
@@ -429,19 +433,15 @@ class SliceFeederBar(QWidget):
         self._apply_mode(MODE_HANDLE, animate=False)
     def _setup_pill_ui(self) -> None:
         layout = QHBoxLayout(self._pill_widget)
-        layout.setContentsMargins(3, 2, 3, 2)
-        layout.setSpacing(1)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        self._btn_edit = _EditIconButton(self._pill_widget)
-        self._btn_edit.clicked.connect(self.expand_input)
-        layout.addWidget(self._btn_edit)
-
-        self._divider = _DividerWidget(self._pill_widget)
-        layout.addWidget(self._divider)
-
-        self._btn_voice = _WaveformIconButton(self._pill_widget)
-        self._btn_voice.clicked.connect(self._toggle_voice_mode)
-        layout.addWidget(self._btn_voice)
+        self._pill_controls = _PillControlsWidget(self._pill_widget)
+        self._pill_controls.edit_clicked.connect(self.expand_input)
+        self._pill_controls.voice_clicked.connect(self.voice_clicked.emit)
+        self._btn_edit = self._pill_controls
+        self._btn_voice = self._pill_controls
+        layout.addWidget(self._pill_controls)
 
     def _setup_input_ui(self) -> None:
         layout = QHBoxLayout(self._input_widget)
@@ -589,7 +589,16 @@ class SliceFeederBar(QWidget):
             self._input_widget.hide()
             self._pill_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, PILL_WIDTH, PILL_HEIGHT)
             self._pill_widget.show()
-            self._pill_opacity.setOpacity(max(0.0, min(1.0, (val - 0.15) / 0.85)))
+            # Synchronous scale and fade: content grows from 0.35x to 1.0x with OutCubic!
+            scale = 0.35 + 0.65 * val
+            opacity = max(0.0, min(1.0, val * 1.2))
+            self._pill_controls.set_morph(scale, opacity)
+        elif self._current_mode == MODE_HANDLE:
+            # Synchronous scale down: content shrinks from 1.0x to 0.35x!
+            scale = 0.35 + 0.65 * (1.0 - val)
+            opacity = max(0.0, min(1.0, (1.0 - val) * 1.2))
+            self._pill_controls.set_morph(scale, opacity)
+            self._input_opacity.setOpacity(max(0.0, min(1.0, (1.0 - val) / 0.85)))
         elif self._current_mode == MODE_INPUT:
             self._handle_widget.hide()
             self._input_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT)
@@ -620,8 +629,7 @@ class SliceFeederBar(QWidget):
                 SHADOW_MARGIN, SHADOW_MARGIN, PILL_WIDTH, PILL_HEIGHT
             )
             self._pill_widget.show()
-            self._pill_opacity.setOpacity(1.0)
-        else:  # MODE_INPUT
+            self._pill_controls.set_morph(1.0, 1.0)
             self._input_widget.setGeometry(
                 SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
             )

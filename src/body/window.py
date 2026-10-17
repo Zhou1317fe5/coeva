@@ -634,8 +634,9 @@ class PetWindow(QWidget):
 
         schedule = get_schedule_for_time()
         # If in Night Sleep phase, companion stays peaceful
+        # In Night Sleep phase without user working, allow gentle rest activities if available
         if schedule.phase == CircadianPhase.NIGHT_SLEEP and not self._is_user_working:
-            return
+            pass
 
         if self._is_user_working:
             # User is in deep flow working: companion accompanies with focused craft/work
@@ -663,6 +664,11 @@ class PetWindow(QWidget):
                 if act in self._loaded_sheets
             ]
 
+        if not available:
+            # Fallback to any loaded autonomous activity for the pet
+            available = [
+                (act, 40_000) for act in self._loaded_sheets if act not in ("idle", "sleep")
+            ]
         if not available:
             self._schedule_next_autonomous_routine()
             return
