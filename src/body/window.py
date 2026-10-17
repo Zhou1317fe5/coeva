@@ -808,7 +808,14 @@ class PetWindow(QWidget):
         if self._docked_edge is not None and not self._has_moved:
             if not self._retract_timer.isActive():
                 self._retract_timer.start(800)
-        # Feeder bar stays docked beneath the pet
+        cursor_pos = QCursor.pos()
+        if not self._feeder_bar.geometry().contains(cursor_pos):
+            if (
+                self._feeder_bar.current_mode == "pill"
+                and not self._feeder_bar.is_voice_active
+                and hasattr(self._feeder_bar, "_retract_timer")
+            ):
+                self._feeder_bar._retract_timer.start(300)
         super().leaveEvent(event)
 
     def _check_cursor_outside_polling(self) -> None:
@@ -979,6 +986,19 @@ class PetWindow(QWidget):
                 if self._feeder_bar.isVisible():
                     self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
             event.accept()
+        else:
+            cursor_y = event.position().y()
+            if cursor_y >= self.height() - 44:
+                if self._feeder_bar.current_mode == "handle":
+                    self._feeder_bar.show_pill()
+            elif cursor_y < self.height() - 60:
+                if (
+                    self._feeder_bar.current_mode == "pill"
+                    and not self._feeder_bar.is_voice_active
+                    and hasattr(self._feeder_bar, "_retract_timer")
+                ):
+                    self._feeder_bar._retract_timer.start(300)
+            event.accept()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
@@ -1041,6 +1061,7 @@ class PetWindow(QWidget):
         super().showEvent(event)
         if self._docked_edge is None or self._is_peek_expanded:
             self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
+            self._feeder_bar.show_handle()
             self._feeder_bar.show()
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802
         self._feeder_bar.hide()

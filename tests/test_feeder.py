@@ -157,29 +157,35 @@ def test_listener_stop_releases_a_worker_that_has_not_started_yet() -> None:
     assert listener._thread is None
 
 def test_feeder_bar_collapsed_and_expanded_modes() -> None:
-    """SliceFeederBar starts in compact pill mode and expands/collapses properly."""
+    """SliceFeederBar starts in handle mode and expands/collapses properly."""
     bar = SliceFeederBar()
+    assert not bar.is_expanded
+    assert bar.width() == 40
+    assert bar.height() == 18
+    assert bar.current_mode == "handle"
+
+    modes: list[bool] = []
+    bar.mode_changed.connect(lambda exp: modes.append(exp))
+
+    bar.show_pill()
     assert not bar.is_expanded
     assert bar.width() == 88
     assert bar.height() == 40
     assert bar.current_mode == "pill"
-
-    modes: list[bool] = []
-    bar.mode_changed.connect(lambda exp: modes.append(exp))
 
     bar.expand_input()
     assert bar.is_expanded
     assert bar.width() == 272
     assert bar.height() == 46
     assert bar.current_mode == "input"
-    assert modes == [True]
+    assert modes == [False, True]
 
     bar.collapse()
     assert not bar.is_expanded
-    assert bar.width() == 88
-    assert bar.height() == 40
-    assert bar.current_mode == "pill"
-    assert modes == [True, False]
+    assert bar.width() == 40
+    assert bar.height() == 18
+    assert bar.current_mode == "handle"
+    assert modes == [False, True, False]
     bar.close()
 
 
@@ -238,6 +244,7 @@ def test_pet_window_integration_with_feeder_bar(tmp_path: Path) -> None:
     assert win.feeder_bar is not None
     win.show()
     assert win.feeder_bar.isVisible()
+    assert win.feeder_bar.current_mode == "handle"
 
     submitted: list[str] = []
     win.slice_fed.connect(lambda s: submitted.append(s))
@@ -266,11 +273,11 @@ def test_pet_window_integration_with_feeder_bar(tmp_path: Path) -> None:
 
 
 def test_feeder_bar_cancel_collapses() -> None:
-    """Pressing cancel or Esc collapses the input bar back to the pill."""
+    """Pressing cancel or Esc collapses the input bar back to the handle."""
     bar = SliceFeederBar()
     bar.expand_input()
     assert bar.is_expanded
     bar._on_cancel()
     assert not bar.is_expanded
-    assert bar.current_mode == "pill"
+    assert bar.current_mode == "handle"
     bar.close()
