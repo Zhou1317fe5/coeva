@@ -90,6 +90,7 @@ class SpriteSheet:
         frame_width: int,
         frame_height: int,
         default_fps: int = 6,
+        frame_durations_ms: list[int] | None = None,
     ) -> None:
         if not frames:
             raise SpriteSheetError("A SpriteSheet must contain at least one frame.")
@@ -97,7 +98,7 @@ class SpriteSheet:
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.default_fps = default_fps
-
+        self.frame_durations_ms = frame_durations_ms
     @property
     def frame_count(self) -> int:
         return len(self.frames)
@@ -143,6 +144,7 @@ class SpriteSheet:
             frame_width=self.frame_width,
             frame_height=self.frame_height,
             default_fps=self.default_fps,
+            frame_durations_ms=self.frame_durations_ms,
         )
 
     def scaled(self, factor: float) -> SpriteSheet:
@@ -170,6 +172,7 @@ class SpriteSheet:
             frame_width=new_w,
             frame_height=new_h,
             default_fps=self.default_fps,
+            frame_durations_ms=self.frame_durations_ms,
         )
 
 
@@ -186,6 +189,18 @@ class PetdexAtlasLoader:
         6: "waiting",
         7: "running",
         8: "review",
+    }
+
+    CODEX_ROW_DURATIONS: dict[str, list[int]] = {
+        "idle": [280, 110, 110, 140, 140, 320],
+        "running-right": [120, 120, 120, 120, 120, 120, 120, 220],
+        "running-left": [120, 120, 120, 120, 120, 120, 120, 220],
+        "waving": [140, 140, 140, 280],
+        "jumping": [140, 140, 140, 140, 280],
+        "failed": [140, 140, 140, 140, 140, 140, 140, 240],
+        "waiting": [150, 150, 150, 150, 150, 260],
+        "running": [120, 120, 120, 120, 120, 220],
+        "review": [150, 150, 150, 150, 150, 280],
     }
 
     @classmethod
@@ -232,7 +247,13 @@ class PetdexAtlasLoader:
                     raw_frames.pop()
 
             pixmaps = [QPixmap.fromImage(item[0]) for item in raw_frames]
-            sheet = SpriteSheet(pixmaps, frame_width=frame_w, frame_height=frame_h)
+            durations = cls.CODEX_ROW_DURATIONS.get(action_name)
+            sheet = SpriteSheet(
+                pixmaps,
+                frame_width=frame_w,
+                frame_height=frame_h,
+                frame_durations_ms=durations,
+            )
             if abs(scale - 1.0) >= 0.01:
                 sheet = sheet.scaled(scale)
             sheets[action_name] = sheet
@@ -411,8 +432,7 @@ class AnimationPlayer(QObject):
         super().__init__(parent)
         self._sheet: SpriteSheet | None = None
         self._current_index = 0
-        self._loop = True
-        self._loop_delay_range_ms: tuple[int, int] | None = None
+        self._effective_fps = 6
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance)
         self._loop_delay_timer = QTimer(self)
@@ -424,6 +444,16 @@ class AnimationPlayer(QObject):
         if self._sheet is None or not self._sheet.frames:
             return None
         return self._sheet.frames[self._current_index]
+
+    def _frame_interval_ms(self, idx: int, fallback_fps: int = 6) -> int:
+        """Return exact duration for frame `idx` if declared, else 1000/fps."""
+        if (
+            self._sheet is not None
+            and self._sheet.frame_durations_ms
+            and idx < len(self._sheet.frame_durations_ms)
+        ):
+            return max(10, self._sheet.frame_durations_ms[idx])
+        return max(10, int(1000 / max(1, fallback_fps)))
 
     def play(
         self,
@@ -444,8 +474,8 @@ class AnimationPlayer(QObject):
         if sheet.frame_count == 0:
             return
 
-        effective_fps = fps if fps is not None else getattr(sheet, "default_fps", 6)
-        interval_ms = max(10, int(1000 / max(1, effective_fps)))
+        self._effective_fps = fps if fps is not None else getattr(sheet, "default_fps", 6)
+        interval_ms = self._frame_interval_ms(0, self._effective_fps)
         self._timer.setInterval(interval_ms)
         self.frame_changed.emit(sheet.frames[0])
 
@@ -459,6 +489,9 @@ class AnimationPlayer(QObject):
     def _resume_after_delay(self) -> None:
         if self._sheet is not None and self._loop:
             self._current_index = 1 if self._sheet.frame_count > 1 else 0
+            self._timer.setInterval(
+                self._frame_interval_ms(self._current_index, self._effective_fps)
+            )
             self.frame_changed.emit(self._sheet.frames[self._current_index])
             self._timer.start()
 
@@ -485,4 +518,7 @@ class AnimationPlayer(QObject):
         else:
             self._current_index = next_index
 
+        self._timer.setInterval(
+            self._frame_interval_ms(self._current_index, self._effective_fps)
+        )
         self.frame_changed.emit(self._sheet.frames[self._current_index])
