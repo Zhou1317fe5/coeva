@@ -72,6 +72,7 @@ class PetWindow(QWidget):
     scale_changed = Signal(float)
     context_menu_requested = Signal(QPoint)
     slice_fed = Signal(str)
+    user_replied_to_bubble = Signal(str, str)  # (reply_text, original_pet_speech)
 
     def __init__(
         self,
@@ -120,11 +121,13 @@ class PetWindow(QWidget):
         self._feeder_bar = feeder_bar or SliceFeederBar()
         self._feeder_bar.slice_submitted.connect(self._on_slice_submitted)
         self._feeder_bar.voice_clicked.connect(self._on_voice_clicked)
+        self._bubble.user_replied.connect(self._on_bubble_user_replied)
         # Drag state
         self._drag_offset: QPoint | None = None
         self._press_pos: QPoint | None = None
         self._last_drag_x: int = 0
         self._current_drag_dir: str | None = None
+        self._suppress_default_feedback = False
         self._has_moved = False
 
         # Hover jump (Codex hop on cursor hover)
@@ -193,6 +196,10 @@ class PetWindow(QWidget):
     @property
     def feeder_bar(self) -> SliceFeederBar:
         return self._feeder_bar
+    @property
+    def bubble(self) -> SpeechBubble:
+        return self._bubble
+
 
     def open_feeder_input(self) -> None:
         """Open and focus the feeder input bar directly beneath the pet."""
@@ -208,9 +215,13 @@ class PetWindow(QWidget):
         slice_item = RawSlice.create(content)
         self._slice_store.save(slice_item)
         self.apply_state(PetState.HAPPY)
-        feedbacks = ["记下啦~", "存进成长抽屉了", "好灵感！已记录", "已沉淀到记忆库~"]
-        self.say(random.choice(feedbacks), ttl_ms=2500)
+        if not self._suppress_default_feedback:
+            feedbacks = ["记下啦~", "存进成长抽屉了", "好灵感！已记录", "已沉淀到记忆库~"]
+            self.say(random.choice(feedbacks), ttl_ms=2500)
         self.slice_fed.emit(content)
+
+    def _on_bubble_user_replied(self, reply: str, orig: str) -> None:
+        self.user_replied_to_bubble.emit(reply, orig)
 
     def _on_voice_clicked(self, active: bool) -> None:
         if active:
@@ -787,9 +798,8 @@ class PetWindow(QWidget):
         else:
             if not self._trigger_hover_jump():
                 self._start_greeting()
-        if hasattr(self._feeder_bar, "show_pill") and self._docked_edge is None:
+        if self._docked_edge is None:
             self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
-            self._feeder_bar.show_pill()
             self._feeder_bar.show()
         super().enterEvent(event)
 
@@ -798,15 +808,7 @@ class PetWindow(QWidget):
         if self._docked_edge is not None and not self._has_moved:
             if not self._retract_timer.isActive():
                 self._retract_timer.start(800)
-        if (
-            hasattr(self._feeder_bar, "current_mode")
-            and self._feeder_bar.isVisible()
-            and self._feeder_bar.current_mode == "pill"
-            and hasattr(self._feeder_bar, "is_voice_active")
-            and not self._feeder_bar.is_voice_active
-            and hasattr(self._feeder_bar, "_retract_to_handle_timer")
-        ):
-            self._feeder_bar._retract_to_handle_timer.start()
+        # Feeder bar stays docked beneath the pet
         super().leaveEvent(event)
 
     def _check_cursor_outside_polling(self) -> None:
@@ -1037,8 +1039,9 @@ class PetWindow(QWidget):
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
         super().showEvent(event)
-        # Feeder bar starts hidden and only pops up when hovering over the pet
-
+        if self._docked_edge is None or self._is_peek_expanded:
+            self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
+            self._feeder_bar.show()
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802
         self._feeder_bar.hide()
         self._bubble.hide()

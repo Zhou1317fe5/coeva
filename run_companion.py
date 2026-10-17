@@ -74,6 +74,7 @@ class CompanionApp:
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
         self.window = PetWindow(assets_dir)
+        self.window._suppress_default_feedback = True
         self.personality = load_personality(assets_dir)
         self.ai_engine = CompanionAIEngine(config=self.agent_settings.llm_config)
         self.ai_engine.reply_ready.connect(self._on_ai_reply_ready)
@@ -86,6 +87,9 @@ class CompanionApp:
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = self.window.feeder_bar
         self.overlay.slice_submitted.connect(self._on_slice_submitted)
+        self.window.slice_fed.connect(self._on_slice_submitted)
+        self.window.user_replied_to_bubble.connect(self._on_user_reply_to_bubble)
+        self._last_pet_speech: str = ""
 
         # 3. Growth Core & Sanctuary
         self.guard = SanctuaryGuard()
@@ -457,7 +461,51 @@ class CompanionApp:
     def _on_ai_reply_ready(self, reply: str, tag: str) -> None:
         """Deliver AI or fallback generated response directly to the speech bubble."""
         if reply:
-            self.controller.say(reply, ttl_ms=3500)
+            self._last_pet_speech = reply
+            self.controller.say(reply, ttl_ms=4000)
+
+    def _on_user_reply_to_bubble(self, reply_text: str, orig_pet_speech: str) -> None:
+        """Handle user's direct reply to a message the pet said."""
+        is_distressed = self.guard.evaluate_text(reply_text)
+        mood = "frustrated" if is_distressed else "neutral"
+
+        # 1. Save to chronicle
+        slice_item = RawSlice.create(reply_text, mood_flag=mood)
+        self.store.save(slice_item)
+        self.chronicle.record_slice(
+            SliceRecord(
+                id=slice_item.id,
+                timestamp=slice_item.timestamp,
+                content=slice_item.content,
+                mood_flag=slice_item.mood_flag,
+            )
+        )
+
+        # 2. Asynchronous reply with full two-way dialogue context
+        if is_distressed:
+            self.controller.perform_action("rest")
+            prompt_ctx = (
+                f"伴生体刚才对用户说：'{orig_pet_speech}'\n"
+                f"用户心烦或受挫并回答：'{reply_text}'"
+            )
+            self.ai_engine.request_reply(
+                prompt_ctx,
+                self.personality,
+                category="slice_distressed",
+                context_tag="reply_distressed",
+            )
+        else:
+            self.controller.perform_action("jump")
+            prompt_ctx = (
+                f"伴生体刚才对用户说：'{orig_pet_speech}'\n"
+                f"用户回答道：'{reply_text}'"
+            )
+            self.ai_engine.request_reply(
+                prompt_ctx,
+                self.personality,
+                category="slice_normal",
+                context_tag="reply_normal",
+            )
 
     def _on_llm_config_changed(self, cfg: object) -> None:
         if isinstance(cfg, LLMConfig):
@@ -495,8 +543,13 @@ class CompanionApp:
         if is_distressed:
             # AC-4: Enter Sanctuary mode with a gentle, non-preaching acknowledgment bubble
             self.controller.perform_action("rest")
+            ctx = (
+                f"伴生体刚才说：'{self._last_pet_speech}'\n用户心烦或受挫并回复：'{text}'"
+                if self._last_pet_speech
+                else f"用户心烦受挫/死磕遇到阻力：'{text}'"
+            )
             self.ai_engine.request_reply(
-                f"用户心烦受挫/死磕遇到阻力：{text}",
+                ctx,
                 self.personality,
                 category="slice_distressed",
                 context_tag="slice_distressed",
@@ -504,8 +557,13 @@ class CompanionApp:
         else:
             # AC-3: Acknowledge normal slice with gentle confirmation
             self.controller.perform_action("jump")
+            ctx = (
+                f"伴生体刚才说：'{self._last_pet_speech}'\n用户回复/交流道：'{text}'"
+                if self._last_pet_speech
+                else f"用户随手记下想法或与你交流：'{text}'"
+            )
             self.ai_engine.request_reply(
-                f"用户随手记下想法或切片：{text}",
+                ctx,
                 self.personality,
                 category="slice_normal",
                 context_tag="slice_normal",

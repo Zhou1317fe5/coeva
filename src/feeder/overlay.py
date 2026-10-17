@@ -12,10 +12,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QPoint, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QByteArray, QEvent, QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QCloseEvent,
     QColor,
+    QEnterEvent,
     QFocusEvent,
     QFont,
     QKeyEvent,
@@ -378,7 +379,7 @@ class SliceFeederBar(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
 
-        self._current_mode = MODE_HANDLE
+        self._current_mode = MODE_PILL
         self._last_pet_pos: QPoint | None = None
         self._last_pet_size: tuple[int, int] | None = None
         self._drag_offset: QPoint | None = None
@@ -391,14 +392,9 @@ class SliceFeederBar(QWidget):
         self._setup_pill_ui()
         self._setup_input_ui()
 
-        # Hide debouncer timer to smoothly retract back to handle when cursor leaves
-        self._retract_to_handle_timer = QTimer(self)
-        self._retract_to_handle_timer.setSingleShot(True)
-        self._retract_to_handle_timer.setInterval(260)
-        self._retract_to_handle_timer.timeout.connect(self._on_retract_timeout)
 
-        # Start in handle mode
-        self._apply_mode(MODE_HANDLE)
+        # Start in pill mode (docked directly beneath the pet body)
+        self._apply_mode(MODE_PILL)
 
     def _setup_pill_ui(self) -> None:
         layout = QHBoxLayout(self._pill_widget)
@@ -494,13 +490,12 @@ class SliceFeederBar(QWidget):
 
     def show_pill(self) -> None:
         """Switch to full dual-button pill mode and display."""
-        self._retract_to_handle_timer.stop()
         if self._current_mode != MODE_PILL:
             self._apply_mode(MODE_PILL)
         self.show()
+
     def expand_input(self) -> None:
         """Expand into the full input bar mode and focus."""
-        self._retract_to_handle_timer.stop()
         if self._current_mode != MODE_INPUT:
             self._apply_mode(MODE_INPUT)
         self.show()
@@ -581,34 +576,26 @@ class SliceFeederBar(QWidget):
 
         self.move(target_x, target_y)
 
-    def enterEvent(self, event: object) -> None:  # noqa: N802
-        self._retract_to_handle_timer.stop()
-        if self._current_mode == MODE_HANDLE:
-            self.show_pill()
+    def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802
+        super().enterEvent(event)
 
-    def leaveEvent(self, event: object) -> None:  # noqa: N802
-        # Start debounced retract timer when cursor leaves
-        if self._current_mode == MODE_PILL and not self._btn_voice.is_active:
-            self._retract_to_handle_timer.start()
-
-    def _on_retract_timeout(self) -> None:
-        if self._current_mode == MODE_PILL and not self._btn_voice.is_active:
-            self.hide()
+    def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
+        super().leaveEvent(event)
 
     def _on_submit(self) -> None:
         text = self._input.text().strip()
         if text:
             self.slice_submitted.emit(text)
         self._input.clear()
-        self.hide()
+        self.collapse()
 
     def _on_cancel(self) -> None:
         self.cancelled.emit()
         self._input.clear()
-        self.hide()
+        self.collapse()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
-        self._retract_to_handle_timer.stop()
+        # Clear timers
         self._btn_voice.set_active(False)
         super().closeEvent(event)
 
