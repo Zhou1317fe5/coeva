@@ -151,7 +151,7 @@ class AgentSettingsStore:
             except (json.JSONDecodeError, OSError):
                 raw_data = {}
 
-        self._selected_pet = str(raw_data.get("selected_pet", "tiko"))
+        self._selected_pet = str(raw_data.get("selected_pet", "calico"))
         stored_hotkey = parse_hotkey(str(raw_data.get("feeder_hotkey", "")))
         self._feeder_hotkey = (
             stored_hotkey.spec if stored_hotkey is not None else DEFAULT_FEEDER_HOTKEY
@@ -217,6 +217,7 @@ class AgentSettingsStore:
     def get(self, agent_id: str) -> AgentConfig | None:
         """Get config for one agent."""
         return self._configs.get(agent_id)
+
     @property
     def selected_pet(self) -> str:
         """Return the ID of the selected desktop pet (e.g. 'tiko')."""
@@ -224,7 +225,7 @@ class AgentSettingsStore:
 
     def set_selected_pet(self, pet_id: str) -> None:
         """Update and persist the selected desktop pet."""
-        self._selected_pet = pet_id.strip() or "tiko"
+        self._selected_pet = pet_id.strip() or "calico"
         self.save()
 
     @property
@@ -243,7 +244,6 @@ class AgentSettingsStore:
             raise ValueError(f"非法快捷键组合: {spec!r}")
         self._feeder_hotkey = parsed.spec
         self.save()
-
 
     def is_agent_enabled(self, agent_id: str, instance_id: str | None = None) -> bool:
         """Check if an agent (and optionally its specific environment instance) is enabled."""

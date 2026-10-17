@@ -6,7 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - Vasu Phase 2C: 自主行动 running 动画验收
+## [Unreleased] - Calico Theme: 移植接入 Clawd on Desk 经典三花猫并设为默认宠物
+
+### 🚀 Added（新增功能）
+- **原生 APNG 动图主题加载器（`ThemeApngLoader`, `src/body/animation.py`）**：
+  - 支持 Clawd on Desk 规范的 `theme.json` 与 `.apng` 动图主题；
+  - 采用 Pillow 高性能解包 32 位 RGBA 无损序列与帧率（如打字 16 FPS、呼吸 8 FPS），瞬间加载 40+ 个生动日常动作；
+- **Calico 完整动作资产库（`assets/pets/calico/`）**：
+  - 拥有 27 个独立动作、包含 40+ 种丰富生活与互动行为：
+    - 悠闲日常：`calico-idle.apng`（从容呼吸摇尾巴）；
+    - 自主生活：打字（`typing`）、扫地（`sweeping`）、做木工（`building`）、搬运（`carrying`）、抛球杂耍（`juggling`）、指挥音乐（`conducting`）；
+    - 自然入睡序列：打哈欠（`yawning`）、打瞌睡（`dozing`）、趴下入睡（`collapsing`）、深睡（`sleeping`）、伸懒腰醒来（`waking`）；
+    - 交互与反应：被悬空提起的挣扎摇晃（`react-drag`）、戳一戳的轻快回眸（`react-poke`）、开心跳舞（`happy`）、抱头晕倒（`error`）；
+    - 贴边探头：小脑袋探出（`mini-peek`）、贴边开心（`mini-happy`）、贴边打盹（`mini-sleep`）；
+- **交互动作深度联动（`PetWindow`）**：
+  - 鼠标拖拽宠物时自动播放小猫被提起的悬空动作 `react-drag`，松开落地后恢复优雅坐姿；
+  - 鼠标轻点宠物时播放被戳戳的互动动作 `react-poke`；
+  - 贴边探头时播放 `mini-peek`；
+- **全系统默认宠物定音（Default Pet -> Calico）**：
+  - `src/connectors/settings.py`：默认 `selected_pet` 改为 `"calico"`；
+  - `run_companion.py`、`main.py`、`settings_window.py` 均将 Calico 设为首选默认宠物，托盘与设置面板可无缝切换。
+
+---
 
 ### 📝 Art Production（美术制作）
 - 修正 Phase 2A self-work 动作语义：旧闭眼梳理草图仍不作为生产素材；`running` 现表达 Vasu 为自己的小事克制地迈步前行，而非 Agent 任务状态。完成 6 帧色键抽帧、GIF、四行接触表、64px 对照与逐行 QA；已批准行与最终图集均未改动。

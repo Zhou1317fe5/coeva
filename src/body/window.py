@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QCloseEvent,
+    QContextMenuEvent,
     QCursor,
     QEnterEvent,
     QImage,
@@ -22,6 +23,7 @@ from src.body.animation import (
     PetdexAtlasLoader,
     SpriteSheet,
     SpriteSheetError,
+    ThemeApngLoader,
     measure_art_padding,
 )
 from src.body.contracts import PetState
@@ -55,7 +57,7 @@ class PetWindow(QWidget):
     clicked = Signal()
     position_changed = Signal(int, int)
     scale_changed = Signal(float)
-
+    context_menu_requested = Signal(QPoint)
 
     def __init__(
         self,
@@ -139,6 +141,7 @@ class PetWindow(QWidget):
     @property
     def current_state(self) -> PetState:
         return self._current_state
+
     @property
     def scale_factor(self) -> float:
         """Return the current scaling factor."""
@@ -155,7 +158,6 @@ class PetWindow(QWidget):
         self._save_position()
         self.scale_changed.emit(self._scale)
 
-
     def load_pet(self, pet_dir: Path) -> None:
         """Switch to another pet directory dynamically and refresh animation."""
         self.pet_dir = pet_dir
@@ -164,9 +166,34 @@ class PetWindow(QWidget):
         self.apply_state(self._current_state, force=True)  # sheets were replaced
 
     def _load_spritesheets(self) -> None:
-        """Preload sprite sheets from Petdex atlas or legacy sprites directory."""
-        # 1. Try Petdex / Codex unified atlas sheet
+        """Preload sprite sheets from Clawd on Desk theme, Petdex, or legacy sprites."""
+        # 0. Try Clawd on Desk APNG Theme (e.g. Calico with rich autonomous behaviors)
+        theme_json = self.pet_dir / "theme.json"
+        is_theme_format = theme_json.is_file()
         pet_json = self.pet_dir / "pet.json"
+        if not is_theme_format and pet_json.is_file():
+            try:
+                p_meta = json.loads(pet_json.read_text("utf-8"))
+                if p_meta.get("format") == "theme":
+                    is_theme_format = True
+            except Exception:
+                pass
+
+        if is_theme_format:
+            try:
+                sheets = ThemeApngLoader.load_theme(self.pet_dir, scale=self._scale)
+                if sheets:
+                    self._loaded_sheets.update(sheets)
+                    # For Calico themes, viewport margins are around 15px unscaled
+                    self._art_padding_px = (
+                        int(round(15 * self._scale)),
+                        int(round(15 * self._scale)),
+                    )
+                    return
+            except SpriteSheetError:
+                pass
+
+        # 1. Try Petdex / Codex unified atlas sheet
         atlas_candidate: Path | None = None
         cols = 8
         rows = 9
@@ -317,6 +344,7 @@ class PetWindow(QWidget):
 
         if sheet is not None:
             self._player.play(sheet, fps=fps, loop=loop)
+
     def say(self, text: str, *, ttl_ms: int = 4000) -> None:
         """Display a speech bubble above the pet."""
         if self._current_state == PetState.SLEEPING:
@@ -388,12 +416,14 @@ class PetWindow(QWidget):
         try:
             cfg.parent.mkdir(parents=True, exist_ok=True)
             cfg.write_text(
-                json.dumps({
-                    "x": self.x(),
-                    "y": self.y(),
-                    "docked_edge": self._docked_edge,
-                    "scale": round(self._scale, 2),
-                }),
+                json.dumps(
+                    {
+                        "x": self.x(),
+                        "y": self.y(),
+                        "docked_edge": self._docked_edge,
+                        "scale": round(self._scale, 2),
+                    }
+                ),
                 "utf-8",
             )
         except OSError:
@@ -413,12 +443,22 @@ class PetWindow(QWidget):
         if self._current_state == PetState.SLEEPING:
             self.apply_state(PetState.IDLE)
 
+    def play_poke_reaction(self) -> None:
+        """Play short poke reaction if available, then return to current state."""
+        sheet = self._loaded_sheets.get("react-poke") or self._loaded_sheets.get("poke")
+        if sheet is not None:
+            self._player.play(sheet, loop=False)
+            self._wave_timer.start(1200)
+
     def _start_greeting(self) -> None:
         """Wave hello once when the user's cursor reaches the pet."""
         if self._greeting_active or self._current_state == PetState.SLEEPING:
             return
         self._greeting_active = True
-        self.apply_state(PetState.HAPPY)
+        if self._docked_edge is not None and "mini-peek" in self._loaded_sheets:
+            self._player.play(self._loaded_sheets["mini-peek"], loop=False)
+        else:
+            self.apply_state(PetState.HAPPY)
         # Long enough to show the wave, short enough that it never reads as a
         # state the pet is stuck in.
         self._wave_timer.start(1400)
@@ -517,7 +557,13 @@ class PetWindow(QWidget):
             cur_pos = event.globalPosition().toPoint()
             dist = (cur_pos - self._press_pos).manhattanLength()
             if dist >= CLICK_DRAG_THRESHOLD_PX:
-                self._has_moved = True
+                if not self._has_moved:
+                    self._has_moved = True
+                    drag_sheet = self._loaded_sheets.get("react-drag") or self._loaded_sheets.get(
+                        "drag"
+                    )
+                    if drag_sheet is not None:
+                        self._player.play(drag_sheet, loop=True)
                 desired_pos = cur_pos - self._drag_offset
 
                 screen = self.screen() or QApplication.primaryScreen()
@@ -566,7 +612,11 @@ class PetWindow(QWidget):
                         self._save_position()
                 else:
                     self._save_position()
+                # Restore state animation from drag suspension
+                if self._docked_edge is None:
+                    self.apply_state(self._current_state, force=True)
             else:
+                self.play_poke_reaction()
                 self.clicked.emit()
             # The drag is finished, so clear the flag: it only exists to suppress
             # auto-retract *during* a drag. Leaving it set disabled both the
@@ -583,3 +633,7 @@ class PetWindow(QWidget):
         self._bubble.close()
         self._player.stop()
         super().closeEvent(event)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:  # noqa: N802
+        self.context_menu_requested.emit(event.globalPos())
+        event.accept()

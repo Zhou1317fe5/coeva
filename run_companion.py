@@ -63,9 +63,11 @@ class CompanionApp:
         self.settings_window.scale_changed.connect(self._on_scale_changed)
         self.settings_window.hotkey_changed.connect(self._on_hotkey_changed)
 
-        # 1. Desktop Body (Defaults to Tiko, or saved pet preference)
+        # 1. Desktop Body (Defaults to Calico, or saved pet preference)
         selected_pet = self.agent_settings.selected_pet
         assets_dir = Path("assets") / "pets" / selected_pet
+        if not assets_dir.is_dir():
+            assets_dir = Path("assets") / "pets" / "calico"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "tiko"
         if not assets_dir.is_dir():
@@ -251,7 +253,8 @@ class CompanionApp:
         switch_menu = menu.addMenu("切换伴生体")
         switch_menu.setStyleSheet(menu.styleSheet())
         available_pets = [
-            ("Tiko (默认 · 小机器人)", "tiko"),
+            ("Calico (默认 · 三花小猫)", "calico"),
+            ("Tiko (小机器人)", "tiko"),
             ("Debug Duck (调试小黄鸭)", "debug-duck"),
             ("Wangcai (布偶猫)", "wangcai"),
             ("Claw (经典小猫)", "claw"),
@@ -441,6 +444,7 @@ class CompanionApp:
             if cur_idle and cur_idle.frames:
                 self.tray.setIcon(QIcon(cur_idle.frames[0]))
             names = {
+                "calico": "Calico (三花小猫)",
                 "tiko": "Tiko (小机器人)",
                 "debug-duck": "Debug Duck (小黄鸭)",
                 "wangcai": "Wangcai (布偶猫)",

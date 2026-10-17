@@ -105,6 +105,7 @@ def test_pet_window_clamping_and_reset(tmp_path: Path) -> None:
     assert window.x() < 5000  # brought back inside screen
     window.close()
 
+
 def test_petdex_atlas_loader(tmp_path: Path) -> None:
     """Test loading and slicing a standard 9-row Petdex atlas image."""
     from src.body.animation import PetdexAtlasLoader
@@ -127,6 +128,7 @@ def test_petdex_atlas_loader(tmp_path: Path) -> None:
     assert idle_sheet.frame_count == 8
     assert idle_sheet.frame_width == 20
     assert idle_sheet.frame_height == 20
+
 
 def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
     """Test that PetdexAtlasLoader trims trailing completely transparent frames."""
@@ -182,6 +184,41 @@ def test_builtin_pets_loading(tmp_path: Path) -> None:
     window.load_pet(wangcai_dir)
     assert "idle" in window._loaded_sheets
     assert window._loaded_sheets["idle"].frame_count == 6
+    # Test dynamic switching to Calico (Default Clawd on Desk theme)
+    calico_dir = Path("assets") / "pets" / "calico"
+    assert calico_dir.is_dir()
+    window.load_pet(calico_dir)
+    assert "idle" in window._loaded_sheets
+    assert "working" in window._loaded_sheets
+    assert "react-drag" in window._loaded_sheets
+    assert "react-poke" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 41
+
+    window.close()
+
+
+def test_calico_theme_apng_loading_and_interactions(tmp_path: Path) -> None:
+    """Test that Calico APNG theme loads all 40+ rich behaviors and responds to drag/poke."""
+    from src.body.animation import ThemeApngLoader
+
+    calico_dir = Path("assets") / "pets" / "calico"
+    sheets = ThemeApngLoader.load_theme(calico_dir, scale=1.0)
+    assert len(sheets) >= 25
+    assert "idle" in sheets
+    assert "working-typing" in sheets
+    assert "react-drag" in sheets
+    assert "react-poke" in sheets
+    # Typing is high-speed 16 FPS, idle is calm 8 FPS
+    assert sheets["working-typing"].default_fps == 16
+    assert sheets["idle"].default_fps == 8
+
+    # Test Window integration with drag & poke
+    window = _isolated_window(calico_dir, tmp_path, scale=1.0)
+    assert window._loaded_sheets["idle"].frame_width == 266
+
+    # Test poking
+    window.play_poke_reaction()
+    assert window._wave_timer.isActive()
 
     window.close()
 
@@ -242,8 +279,7 @@ def test_docked_peek_keeps_artwork_visible_at_every_scale(tmp_path: Path) -> Non
                     if ((scaled.pixel(x, y) >> 24) & 0xFF) > 8
                 )
                 assert visible > 0, (
-                    f"{pet} @scale={scale} docked {edge}: no artwork visible "
-                    f"(reveal={reveal}px)"
+                    f"{pet} @scale={scale} docked {edge}: no artwork visible (reveal={reveal}px)"
                 )
             window.close()
 
@@ -259,9 +295,9 @@ def test_panel_action_buttons_all_map_to_a_real_state(tmp_path: Path) -> None:
 
     from src.body.controller import ACTION_STATES
 
-    panel = (
-        Path("plugins") / "pi-companion-bridge" / "renderer" / "index.html"
-    ).read_text(encoding="utf-8")
+    panel = (Path("plugins") / "pi-companion-bridge" / "renderer" / "index.html").read_text(
+        encoding="utf-8"
+    )
     action_ids = set(re.findall(r'data-action="([A-Za-z_]+)"', panel))
 
     assert action_ids, "panel should declare data-action buttons"

@@ -85,13 +85,14 @@ def test_hermes_connector_lifecycle() -> None:
 
     assert len(bus.history) == 6
 
+
 def test_agent_settings_pet_preference(tmp_path: Path) -> None:
     """Test that selected desktop pet preference defaults to tiko and persists correctly."""
     from src.connectors.settings import AgentSettingsStore
 
     settings_file = tmp_path / "agent_settings.json"
     store = AgentSettingsStore(settings_file)
-    assert store.selected_pet == "tiko"
+    assert store.selected_pet == "calico"
 
     store.set_selected_pet("debug-duck")
     assert store.selected_pet == "debug-duck"
@@ -147,6 +148,7 @@ def test_feeder_hotkey_falls_back_when_stored_value_is_invalid(tmp_path: Path) -
         json.dumps({"version": 2, "selected_pet": "tiko", "agents": {}}), encoding="utf-8"
     )
     assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
+
 
 def test_codex_hook_lifecycle(tmp_path: Path) -> None:
     """Test one-click installation, status check and clean uninstall of Codex CLI hook."""
@@ -216,4 +218,3 @@ def test_claude_code_hook_lifecycle(tmp_path: Path) -> None:
     # 5. Status check -> not installed
     status_final = mgr.check_hook_status("claude-code", "windows")
     assert status_final["installed"] is False
-

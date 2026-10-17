@@ -1,16 +1,16 @@
-"""Modern multi-agent and companion settings window inspired by Clawd on Desk."""
+"""Modern multi-agent and companion settings window inspired by Clawd on Desk (Light Mode)."""
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal
-from PySide6.QtGui import QFocusEvent, QFont, QKeyEvent, QMouseEvent
+from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal
+from PySide6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QCheckBox,
     QDoubleSpinBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.body.harvest_dialog import HarvestHistoryDialog
+from src.body.widgets import CLAWD_ICONS, SwitchButton, svg_to_icon
 from src.connectors.hook_manager import AgentHookManager
 from src.core.llm_client import PRESET_PROVIDERS, LLMClient, LLMConfig
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, hotkey_display, hotkey_from_qt
@@ -96,12 +97,11 @@ class _HotkeyRecorderEdit(QLineEdit):
         if spec is None:
             self.capture_rejected.emit("组合键无效：需包含 Ctrl / Alt / Shift / Win 修饰键")
             return
-        # Show the result immediately; focus may never change (e.g. tests, or a
-        # window that keeps focus), so the text must not depend on focus-out.
         self._stop_recording()
         self.set_current(spec.spec)
         self.hotkey_captured.emit(spec.spec)
         self.clearFocus()
+
 
 class _LLMPingThread(QThread):
     """Background worker for testing LLM API connection without blocking GUI."""
@@ -118,11 +118,11 @@ class _LLMPingThread(QThread):
 
 
 class SettingsWindow(QWidget):
-    """Full-featured preferences and multi-agent management dialog."""
+    """Full-featured preferences and multi-agent management dialog in elegant Light Mode."""
+
     pet_changed = Signal(str)
     scale_changed = Signal(float)
     hotkey_changed = Signal(str)
-
 
     def __init__(
         self,
@@ -138,37 +138,37 @@ class SettingsWindow(QWidget):
         self.store = settings_store
         self.hook_manager = hook_manager or AgentHookManager()
         self.chronicle = chronicle_store
-        # Live Growth Core handles. When absent the page reports "未接入" instead of
-        # pretending these switches are configurable (they are not: Sanctuary is a
-        # safety floor, and the cold-start stage is derived from real elapsed days).
         self._sanctuary = sanctuary
         self._cold_start = cold_start
-        self.setWindowTitle("桌面伴生体设置 (Companion Settings)")
-        self.resize(720, 520)
-        self.setMinimumSize(640, 460)
 
-        # Apply dark modern design styling
+        self.setWindowTitle("桌面伴生体设置 (Companion Settings)")
+        self.resize(840, 580)
+        self.setMinimumSize(720, 480)
+
+        # Apply Clawd on Desk clean white styling
         self._apply_styling()
 
-        # Main layout: Left sidebar navigation + Right content stack
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # 1. Left Navigation Sidebar
+        # 1. Left Navigation Sidebar (200px width, matching Clawd on Desk exactly)
         self.nav_list = QListWidget()
-        self.nav_list.setFixedWidth(180)
+        self.nav_list.setFixedWidth(200)
         self.nav_list.setObjectName("navSidebar")
+        self.nav_list.setIconSize(QSize(18, 18))
 
-        items = [
-            ("🤖  多 Agent 接入", "agents"),
-            ("🧠  大模型服务", "llm"),
-            ("🐾  桌面身体偏好", "body"),
-            ("🍃  心智与避风港", "core"),
-            ("ℹ️  关于与规范", "about"),
+        tabs_info = [
+            ("多 Agent 接入", "agents", "agents"),
+            ("大模型服务", "llm", "general"),
+            ("桌面身体偏好", "body", "theme"),
+            ("心智与避风港", "core", "core"),
+            ("关于与规范", "about", "about"),
         ]
-        for title, key in items:
+        for title, key, icon_key in tabs_info:
             item = QListWidgetItem(title)
+            svg_str = CLAWD_ICONS.get(icon_key, CLAWD_ICONS["about"])
+            item.setIcon(svg_to_icon(svg_str, size=18, color_hex="#6b6b70"))
             item.setData(Qt.ItemDataRole.UserRole, key)
             self.nav_list.addItem(item)
 
@@ -179,106 +179,148 @@ class SettingsWindow(QWidget):
         self.stack = QStackedWidget()
         self.stack.setObjectName("contentStack")
 
-        # Page 1: Multi-Agent Telemetry
         self.agents_page = self._build_agents_page()
         self.stack.addWidget(self.agents_page)
 
-        # Page 2: LLM Service Config (Phase 2D)
         self.llm_page = self._build_llm_page()
         self.stack.addWidget(self.llm_page)
 
-        # Page 3: Body Preferences
         self.body_page = self._build_body_page()
         self.stack.addWidget(self.body_page)
 
-        # Page 4: Mind & Sanctuary
         self.core_page = self._build_core_page()
         self.stack.addWidget(self.core_page)
 
-        # Page 5: About
         self.about_page = self._build_about_page()
         self.stack.addWidget(self.about_page)
 
         main_layout.addWidget(self.stack, 1)
-
         self.nav_list.setCurrentRow(0)
 
     def _apply_styling(self) -> None:
         self.setStyleSheet("""
             QWidget {
-                background-color: #1e1e20;
-                color: #e5e7eb;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background-color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
                 font-size: 13px;
             }
             QListWidget#navSidebar {
-                background-color: #161618;
+                background-color: #f5f5f7;
                 border: none;
-                border-right: 1px solid #2e2e32;
-                padding-top: 12px;
+                border-right: 1px solid rgba(0, 0, 0, 0.08);
+                padding-top: 14px;
+                padding-bottom: 14px;
+                outline: none;
             }
             QListWidget#navSidebar::item {
                 height: 38px;
-                padding-left: 16px;
+                padding-left: 12px;
                 margin: 2px 8px;
-                border-radius: 6px;
-                color: #9ca3af;
+                border-radius: 7px;
+                color: #6b6b70;
                 font-weight: 500;
             }
-            QListWidget#navSidebar::item:selected {
-                background-color: #2a2a2e;
-                color: #ffffff;
-            }
             QListWidget#navSidebar::item:hover:!selected {
-                background-color: #222226;
-                color: #d1d5db;
+                background-color: rgba(0, 0, 0, 0.05);
+                color: #18181b;
+            }
+            QListWidget#navSidebar::item:selected {
+                background-color: #ffffff;
+                color: #0a0a0c;
+                font-weight: 600;
+                border: 1px solid rgba(0, 0, 0, 0.06);
+            }
+            QStackedWidget#contentStack, QScrollArea, QScrollArea > QWidget > QWidget {
+                background-color: #ffffff;
             }
             QScrollArea {
                 border: none;
-                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                width: 6px;
+                background: transparent;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(0, 0, 0, 0.15);
+                min-height: 24px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(0, 0, 0, 0.28);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: transparent;
+                height: 0px;
             }
             .cardFrame {
-                background-color: #242428;
-                border: 1px solid #323238;
-                border-radius: 8px;
-                padding: 14px;
+                background-color: #fbfbfd;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                border-radius: 10px;
+                padding: 16px;
             }
             .cardTitle {
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 600;
-                color: #f3f4f6;
+                color: #18181b;
             }
             .cardDesc {
-                color: #9ca3af;
+                color: #6b6b70;
                 font-size: 12px;
-                margin-top: 2px;
+                line-height: 1.4;
             }
-            QCheckBox {
-                color: #e5e7eb;
+            QPushButton {
+                background-color: #ffffff;
+                border: 1px solid #d4d4d8;
+                border-radius: 6px;
+                padding: 6px 14px;
+                color: #18181b;
+                font-weight: 500;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #f4f4f5;
+                border-color: #a1a1aa;
+            }
+            QPushButton:pressed {
+                background-color: #e4e4e7;
+            }
+            QPushButton:disabled {
+                color: #a1a1aa;
+                background-color: #f4f4f5;
+                border-color: #e4e4e7;
+            }
+            QLineEdit, QSpinBox, QDoubleSpinBox {
+                background-color: #ffffff;
+                border: 1px solid #d4d4d8;
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #18181b;
+                font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+                font-size: 12px;
+                selection-background-color: #d97757;
+                selection-color: #ffffff;
+            }
+            QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+                border-color: #d97757;
+            }
+            QRadioButton {
+                color: #18181b;
                 font-size: 13px;
                 spacing: 8px;
             }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 4px;
-                border: 1px solid #4b5563;
-                background-color: #1f2937;
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                border: 1px solid #a1a1aa;
+                background-color: #ffffff;
             }
-            QCheckBox::indicator:checked {
-                background-color: #10b981;
-                border-color: #10b981;
-            }
-            QPushButton {
-                background-color: #2a2a2e;
-                border: 1px solid #3f3f46;
-                border-radius: 6px;
-                padding: 6px 12px;
-                color: #f3f4f6;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #38383e;
+            QRadioButton::indicator:checked {
+                background-color: #d97757;
+                border-color: #d97757;
             }
         """)
 
@@ -291,29 +333,34 @@ class SettingsWindow(QWidget):
         elif key == "core":
             self.refresh_core_status()
 
-    # ── Page 1: Multi-Agent Management (Like Clawd on Desk) ──
-    def _build_agents_page(self) -> QWidget:
+    @staticmethod
+    def _wrap_scrollable(container: QWidget) -> QScrollArea:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(container)
+        return scroll
 
+    # ── Page 1: Multi-Agent Management (Clawd on Desk Style) ──
+    def _build_agents_page(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(16)
 
         header_row = QHBoxLayout()
         header = QLabel("多 Agent 遥测与接入控制")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        header.setFont(title_font)
+        header.setStyleSheet("font-size: 18px; font-weight: 700; color: #18181b;")
         header_row.addWidget(header)
         header_row.addStretch()
 
-        wsl_btn = QPushButton("🐧 扫描 WSL 并一键接入")
+        wsl_btn = QPushButton("🐧 扫描 WSL 并接入")
         wsl_btn.setToolTip("自动检测 WSL 并在 Linux 家目录下一键挂载伴生体 Hook")
         wsl_btn.clicked.connect(self._scan_and_deploy_all_wsl)
         header_row.addWidget(wsl_btn)
+
         harvest_btn = QPushButton("📦 历史会话收割...")
         harvest_btn.setToolTip("从本机与 WSL 中收割历史会话客观事件入库")
         harvest_btn.clicked.connect(self._open_harvest_dialog)
@@ -322,9 +369,9 @@ class SettingsWindow(QWidget):
         layout.addLayout(header_row)
 
         desc = QLabel(
-            "自动发现本机与 WSL 中的 AI 终端。支持一键安装 Hook 传感器，实现无感遥测。"
+            "自动发现本机与 WSL 中的 AI 终端。支持一键安装 Hook 传感器，实现无感遥测与状态桥接。"
         )
-        desc.setStyleSheet("color: #9ca3af; font-size: 12px; margin-bottom: 8px;")
+        desc.setStyleSheet("color: #6b6b70; font-size: 12px; margin-bottom: 6px;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
@@ -333,10 +380,9 @@ class SettingsWindow(QWidget):
         layout.addLayout(self.cards_container)
 
         layout.addStretch()
-
         self.refresh_agents()
-        scroll.setWidget(container)
-        return scroll
+        return self._wrap_scrollable(container)
+
     def refresh_agents(self) -> None:
         """Re-render agent cards based on current settings store."""
         while self.cards_container.count():
@@ -359,107 +405,133 @@ class SettingsWindow(QWidget):
         card.setProperty("class", "cardFrame")
 
         card_layout = QVBoxLayout(card)
-        card_layout.setSpacing(8)
+        card_layout.setContentsMargins(16, 14, 16, 14)
+        card_layout.setSpacing(10)
 
-        # Header row: Name + Status Badge + Enable Toggle
+        # Header row: Name + Status Badge + SwitchButton
         top_row = QHBoxLayout()
+        top_row.setSpacing(10)
 
         name_label = QLabel(cfg.name)
-        name_font = QFont()
-        name_font.setPointSize(14)
-        name_font.setBold(True)
-        name_label.setFont(name_font)
+        name_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #18181b;")
         top_row.addWidget(name_label)
 
-        # Status badge (Online / Idle / Disconnected)
         if cfg.last_seen:
-            badge = QLabel("🟢 已接入 (Active)")
-            badge.setStyleSheet("color: #10b981; font-weight: 500; font-size: 11px;")
+            badge = QLabel("● 已接入 (Active)")
+            badge.setStyleSheet(
+                "background-color: rgba(16, 185, 129, 0.12); color: #059669; "
+                "border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 4px; "
+                "padding: 2px 8px; font-size: 11px; font-weight: 500;"
+            )
         else:
-            badge = QLabel("⚪ 未连接 (Idle)")
-            badge.setStyleSheet("color: #6b7280; font-weight: 500; font-size: 11px;")
+            badge = QLabel("○ 未连接 (Idle)")
+            badge.setStyleSheet(
+                "background-color: rgba(0, 0, 0, 0.04); color: #71717a; "
+                "border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 4px; "
+                "padding: 2px 8px; font-size: 11px;"
+            )
         top_row.addWidget(badge)
         top_row.addStretch()
 
-        enable_cb = QCheckBox("启用接入")
-        enable_cb.setChecked(cfg.enabled)
-        enable_cb.toggled.connect(
+        enable_lbl = QLabel("启用接入")
+        enable_lbl.setStyleSheet("color: #6b6b70; font-size: 12px;")
+        top_row.addWidget(enable_lbl)
+
+        enable_switch = SwitchButton(checked=cfg.enabled)
+        enable_switch.toggled.connect(
             lambda checked, aid=agent_id: self.store.update_agent(aid, enabled=checked)
         )
-        top_row.addWidget(enable_cb)
-
+        top_row.addWidget(enable_switch)
         card_layout.addLayout(top_row)
 
         # Description
         desc_label = QLabel(cfg.description or f"Agent 标识: {agent_id}")
-        desc_label.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        desc_label.setStyleSheet("color: #6b6b70; font-size: 12px;")
+        desc_label.setWordWrap(True)
         card_layout.addWidget(desc_label)
 
-        # Fine-grained controls
+        # Fine-grained controls (Bubble + Action triggers)
         sub_controls = QHBoxLayout()
-        sub_controls.setSpacing(16)
+        sub_controls.setSpacing(24)
 
-        bubble_cb = QCheckBox("展示说话气泡")
-        bubble_cb.setChecked(cfg.allow_bubble)
-        bubble_cb.toggled.connect(
+        b_item = QHBoxLayout()
+        b_item.setSpacing(8)
+        b_label = QLabel("展示说话气泡")
+        b_label.setStyleSheet("font-size: 12px; color: #18181b;")
+        b_sw = SwitchButton(checked=cfg.allow_bubble)
+        b_sw.toggled.connect(
             lambda checked, aid=agent_id: self.store.update_agent(aid, allow_bubble=checked)
         )
-        sub_controls.addWidget(bubble_cb)
+        b_item.addWidget(b_sw)
+        b_item.addWidget(b_label)
+        sub_controls.addLayout(b_item)
 
-        action_cb = QCheckBox("触发动作动效")
-        action_cb.setChecked(cfg.allow_action)
-        action_cb.toggled.connect(
+        a_item = QHBoxLayout()
+        a_item.setSpacing(8)
+        a_label = QLabel("触发动作动效")
+        a_label.setStyleSheet("font-size: 12px; color: #18181b;")
+        a_sw = SwitchButton(checked=cfg.allow_action)
+        a_sw.toggled.connect(
             lambda checked, aid=agent_id: self.store.update_agent(aid, allow_action=checked)
         )
-        sub_controls.addWidget(action_cb)
+        a_item.addWidget(a_sw)
+        a_item.addWidget(a_label)
+        sub_controls.addLayout(a_item)
+
         sub_controls.addStretch()
         card_layout.addLayout(sub_controls)
 
-        # Environment instances rows (Clawd style Windows vs WSL)
+        # Environment instances rows (Windows vs WSL)
         if cfg.instances:
             inst_box = QFrame()
             inst_box.setStyleSheet(
-                "background-color: #1a1a1c; border-radius: 6px; padding: 6px 10px; margin-top: 4px;"
+                "background-color: #f4f4f6; border: 1px solid rgba(0, 0, 0, 0.06); "
+                "border-radius: 8px; padding: 6px 12px; margin-top: 4px;"
             )
             inst_layout = QVBoxLayout(inst_box)
-            inst_layout.setContentsMargins(4, 4, 4, 4)
-            inst_layout.setSpacing(6)
+            inst_layout.setContentsMargins(6, 6, 6, 6)
+            inst_layout.setSpacing(8)
 
-            inst_header = QLabel("运行环境实例 (Environment Instances)")
-            inst_header.setStyleSheet("color: #6b7280; font-size: 11px; font-weight: 600;")
+            inst_header = QLabel("运行环境实例 (ENVIRONMENT INSTANCES)")
+            inst_header.setStyleSheet(
+                "color: #8e8e93; font-size: 11px; font-weight: 700; letter-spacing: 0.05em;"
+            )
             inst_layout.addWidget(inst_header)
 
             for iid, inst in cfg.instances.items():
                 row = QHBoxLayout()
-                row.setSpacing(8)
+                row.setSpacing(10)
 
                 icon_str = "🐧" if "wsl" in iid.lower() else "🖥️"
                 lbl = QLabel(f"{icon_str}  {inst.label}")
-                lbl.setStyleSheet("font-size: 12px; font-weight: 500;")
+                lbl.setStyleSheet("font-size: 12px; font-weight: 500; color: #18181b;")
                 row.addWidget(lbl)
+
                 h_info = self.hook_manager.check_hook_status(agent_id, iid)
                 is_installed = h_info.get("installed", False)
 
                 if is_installed:
                     hbadge = QLabel("HOOK 就绪")
                     hbadge.setStyleSheet(
-                        "background-color: #064e3b; color: #34d399; "
-                        "padding: 1px 6px; border-radius: 4px; font-size: 10px;"
+                        "background-color: rgba(16, 185, 129, 0.12); color: #059669; "
+                        "border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 4px; "
+                        "font-size: 10px; padding: 1px 6px;"
                     )
                 else:
                     hbadge = QLabel("HOOK 未安装")
                     hbadge.setStyleSheet(
-                        "background-color: #451a03; color: #f59e0b; "
-                        "padding: 1px 6px; border-radius: 4px; font-size: 10px;"
+                        "background-color: rgba(217, 119, 6, 0.12); color: #d97706; "
+                        "border: 1px solid rgba(217, 119, 6, 0.25); border-radius: 4px; "
+                        "font-size: 10px; padding: 1px 6px;"
                     )
                 row.addWidget(hbadge)
 
                 if inst.last_seen:
-                    ibadge = QLabel("🟢 活跃")
-                    ibadge.setStyleSheet("color: #10b981; font-size: 10px;")
+                    ibadge = QLabel("● 活跃")
+                    ibadge.setStyleSheet("color: #059669; font-size: 11px;")
                 else:
-                    ibadge = QLabel("⚪ 未活动")
-                    ibadge.setStyleSheet("color: #6b7280; font-size: 10px;")
+                    ibadge = QLabel("○ 空闲")
+                    ibadge.setStyleSheet("color: #8e8e93; font-size: 11px;")
                 row.addWidget(ibadge)
 
                 row.addStretch()
@@ -467,7 +539,8 @@ class SettingsWindow(QWidget):
                 if is_installed:
                     un_btn = QPushButton("卸载")
                     un_btn.setStyleSheet(
-                        "padding: 2px 8px; font-size: 11px; background-color: #27272a;"
+                        "padding: 2px 8px; font-size: 11px; background-color: #ffffff; "
+                        "border: 1px solid #d4d4d8; color: #18181b;"
                     )
                     un_btn.clicked.connect(
                         lambda _, aid=agent_id, inst_id=iid: self._uninstall_hook_and_refresh(
@@ -479,7 +552,7 @@ class SettingsWindow(QWidget):
                     in_btn = QPushButton("一键接入")
                     in_btn.setStyleSheet(
                         "padding: 2px 8px; font-size: 11px; "
-                        "background-color: #059669; color: white;"
+                        "background-color: #d97757; color: white; border: none;"
                     )
                     in_btn.clicked.connect(
                         lambda _, aid=agent_id, inst_id=iid: self._install_hook_and_refresh(
@@ -488,14 +561,14 @@ class SettingsWindow(QWidget):
                     )
                     row.addWidget(in_btn)
 
-                ichk = QCheckBox("启用")
-                ichk.setChecked(inst.enabled)
-                ichk.toggled.connect(
+                row.addWidget(QLabel("启用:"))
+                isw = SwitchButton(checked=inst.enabled)
+                isw.toggled.connect(
                     lambda checked, aid=agent_id, inst_id=iid: self.store.update_instance(
                         aid, inst_id, enabled=checked
                     )
                 )
-                row.addWidget(ichk)
+                row.addWidget(isw)
                 inst_layout.addLayout(row)
 
             card_layout.addWidget(inst_box)
@@ -536,26 +609,20 @@ class SettingsWindow(QWidget):
 
     # ── Page 2: LLM Service Config (Phase 2D) ──
     def _build_llm_page(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(16)
 
         header = QLabel("大模型服务与章节叙事配置")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        header.setFont(title_font)
+        header.setStyleSheet("font-size: 18px; font-weight: 700; color: #18181b;")
         layout.addWidget(header)
 
         desc = QLabel(
             "配置 OpenAI 兼容格式大模型接口，用于生成人生章节（Growth Chapters）与深度心智反思。\n"
             "支持官方 API、DeepSeek、本地 Ollama / vLLM 或第三方代理。Key 安全保存在本地。"
         )
-        desc.setStyleSheet("color: #9ca3af; font-size: 12px; line-height: 1.4;")
+        desc.setStyleSheet("color: #6b6b70; font-size: 12px; line-height: 1.4;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
 
@@ -563,47 +630,47 @@ class SettingsWindow(QWidget):
         preset_box = QFrame()
         preset_box.setProperty("class", "cardFrame")
         p_layout = QVBoxLayout(preset_box)
-        p_layout.setSpacing(8)
+        p_layout.setSpacing(10)
 
-        p_title = QLabel("🚀 常用服务商快速预设 (Presets)")
-        p_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #e4e4e7;")
+        p_title = QLabel("常用服务商快速预设 (PRESETS)")
+        p_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
         p_layout.addWidget(p_title)
-
-        p_row = QHBoxLayout()
-        p_row.setSpacing(8)
-        for name, p_data in PRESET_PROVIDERS.items():
+        p_grid = QGridLayout()
+        p_grid.setSpacing(8)
+        cols = 3
+        for idx, (name, p_data) in enumerate(PRESET_PROVIDERS.items()):
             btn = QPushButton(name)
-            btn.setFixedHeight(28)
+            btn.setFixedHeight(30)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             u_val = p_data["base_url"]
             m_val = p_data["default_model"]
             btn.clicked.connect(lambda _c, u=u_val, m=m_val: self._apply_llm_preset(u, m))
-            p_row.addWidget(btn)
-        p_row.addStretch()
-        p_layout.addLayout(p_row)
+            p_grid.addWidget(btn, idx // cols, idx % cols)
+        p_layout.addLayout(p_grid)
         layout.addWidget(preset_box)
 
         # Parameters Card
         card = QFrame()
         card.setProperty("class", "cardFrame")
         c_layout = QVBoxLayout(card)
-        c_layout.setSpacing(10)
+        c_layout.setSpacing(12)
 
         self.llm_config = LLMConfig.load()
 
-        # Base URL
         url_lbl = QLabel("接口地址 (Base URL):")
-        url_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        url_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         c_layout.addWidget(url_lbl)
         self.llm_url_edit = QLineEdit(self.llm_config.base_url)
         self.llm_url_edit.setPlaceholderText("https://api.openai.com/v1 或 http://localhost:11434/v1")
         c_layout.addWidget(self.llm_url_edit)
 
-        # API Key
         key_lbl = QLabel("API Key (密码掩码):")
-        key_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        key_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         c_layout.addWidget(key_lbl)
         key_row = QHBoxLayout()
+        key_row.setSpacing(8)
         self.llm_key_edit = QLineEdit(self.llm_config.api_key)
         self.llm_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.llm_key_edit.setPlaceholderText("sk-...")
@@ -614,21 +681,19 @@ class SettingsWindow(QWidget):
         key_row.addWidget(self.btn_toggle_key)
         c_layout.addLayout(key_row)
 
-        # Model Name
         model_lbl = QLabel("模型名称 (Model):")
-        model_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        model_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         c_layout.addWidget(model_lbl)
         self.llm_model_edit = QLineEdit(self.llm_config.model)
         self.llm_model_edit.setPlaceholderText("例如: gpt-4o, deepseek-chat, gemini-3.8-flash")
         c_layout.addWidget(self.llm_model_edit)
 
-        # Temperature & Max Tokens
         param_row = QHBoxLayout()
         param_row.setSpacing(16)
 
         temp_col = QVBoxLayout()
         temp_lbl = QLabel("温度 (Temperature):")
-        temp_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        temp_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         temp_col.addWidget(temp_lbl)
         self.llm_temp_spin = QDoubleSpinBox()
         self.llm_temp_spin.setRange(0.0, 2.0)
@@ -639,7 +704,7 @@ class SettingsWindow(QWidget):
 
         tok_col = QVBoxLayout()
         tok_lbl = QLabel("单次最大 Token (Max Tokens):")
-        tok_lbl.setStyleSheet("font-size: 12px; color: #9ca3af;")
+        tok_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         tok_col.addWidget(tok_lbl)
         self.llm_tok_spin = QSpinBox()
         self.llm_tok_spin.setRange(256, 16384)
@@ -654,32 +719,31 @@ class SettingsWindow(QWidget):
         action_row = QHBoxLayout()
         action_row.setSpacing(12)
 
-        self.btn_test_llm = QPushButton("⚡ 测试连接 (Test Connection)")
+        self.btn_test_llm = QPushButton("⚡ 测试连接")
         self.btn_test_llm.setFixedHeight(32)
         self.btn_test_llm.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_test_llm.clicked.connect(self._test_llm_connection)
         action_row.addWidget(self.btn_test_llm)
 
-        self.btn_save_llm = QPushButton("💾 保存配置 (Save)")
+        self.btn_save_llm = QPushButton("💾 保存配置")
         self.btn_save_llm.setFixedHeight(32)
         self.btn_save_llm.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save_llm.setStyleSheet(
-            "background-color: #059669; color: #ffffff; font-weight: bold; "
-            "border-radius: 6px; padding: 0 16px;"
+            "background-color: #d97757; color: #ffffff; font-weight: bold; "
+            "border: none; border-radius: 6px; padding: 0 18px;"
         )
         self.btn_save_llm.clicked.connect(self._save_llm_config)
         action_row.addWidget(self.btn_save_llm)
 
         self.llm_status_badge = QLabel("就绪")
-        self.llm_status_badge.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        self.llm_status_badge.setStyleSheet("color: #6b6b70; font-size: 12px;")
         action_row.addWidget(self.llm_status_badge)
 
         action_row.addStretch()
         layout.addLayout(action_row)
 
         layout.addStretch()
-        scroll.setWidget(container)
-        return scroll
+        return self._wrap_scrollable(container)
 
     def _apply_llm_preset(self, url: str, model: str) -> None:
         self.llm_url_edit.setText(url)
@@ -703,7 +767,7 @@ class SettingsWindow(QWidget):
         cfg.save()
         self.llm_config = cfg
         self.llm_status_badge.setText("✅ 配置已安全保存至 data/llm_config.json")
-        self.llm_status_badge.setStyleSheet("color: #10b981; font-weight: bold;")
+        self.llm_status_badge.setStyleSheet("color: #059669; font-weight: bold;")
 
     def _test_llm_connection(self) -> None:
         cfg = LLMConfig(
@@ -714,7 +778,7 @@ class SettingsWindow(QWidget):
             timeout_seconds=10.0,
         )
         self.llm_status_badge.setText("⏳ 正在测试连通性...")
-        self.llm_status_badge.setStyleSheet("color: #9ca3af;")
+        self.llm_status_badge.setStyleSheet("color: #6b6b70;")
         self.btn_test_llm.setEnabled(False)
         self._llm_thread = _LLMPingThread(LLMClient(cfg), parent=self)
         self._llm_thread.finished_ping.connect(self._on_llm_ping_finished)
@@ -724,44 +788,50 @@ class SettingsWindow(QWidget):
         self.btn_test_llm.setEnabled(True)
         if ok:
             self.llm_status_badge.setText(f"✅ 连通正常！延迟: {latency:.0f}ms")
-            self.llm_status_badge.setStyleSheet("color: #10b981; font-weight: bold;")
+            self.llm_status_badge.setStyleSheet("color: #059669; font-weight: bold;")
         else:
             self.llm_status_badge.setText(f"❌ 失败: {msg[:40]}")
-            self.llm_status_badge.setStyleSheet("color: #ef4444;")
+            self.llm_status_badge.setStyleSheet("color: #dc2626;")
 
     # ── Page 3: Desktop Body Preferences ──
     def _build_body_page(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(16)
 
         header = QLabel("桌面伴生体偏好设置")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        header.setFont(title_font)
+        header.setStyleSheet("font-size: 18px; font-weight: 700; color: #18181b;")
         layout.addWidget(header)
+
         # 0. Pet Appearance Selection
         pet_card = QFrame()
         pet_card.setProperty("class", "cardFrame")
         pet_layout = QVBoxLayout(pet_card)
         pet_layout.setSpacing(10)
 
-        pet_title = QLabel("🐾 伴生体形象与外观 (Companion Pet)")
-        pet_title.setStyleSheet("font-weight: 600; font-size: 14px;")
-        pet_desc = QLabel(
-            "选择桌面常驻的桌宠形象。"
-            "原生支持 Petdex / SpriteYard 标准精灵图规范，即选即换并自动保存。"
+        pet_title = QLabel("伴生体形象与外观 (COMPANION PET)")
+        pet_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
         )
+        pet_desc = QLabel(
+            "选择桌面常驻的桌宠形象。原生支持 Petdex / SpriteYard 精灵图规范，即选即换并自动保存。"
+        )
+        pet_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
         pet_desc.setWordWrap(True)
         pet_layout.addWidget(pet_title)
         pet_layout.addWidget(pet_desc)
 
         pet_options = [
             (
+                "calico",
+                "🐱 Calico (默认 · 独立三花猫伙伴)",
+                "来自 Clawd on Desk。拥有生动呼吸、打字、扫地、做木工、"
+                "抛球玩耍、打瞌睡与被拖拽悬空挣扎等40+动作，有自己的独立生活线。",
+            ),
+            (
                 "tiko",
-                "🤖 Tiko (默认 · 好奇单眼工具机器人)",
+                "🤖 Tiko (好奇单眼工具机器人)",
                 "来自 Petdex。自带单眼摄像头与履带，工坊并肩作战伙伴，80% 极简陪伴。",
             ),
             (
@@ -777,7 +847,7 @@ class SettingsWindow(QWidget):
             (
                 "claw",
                 "🐾 Claw (复古经典猫咪)",
-                "初版轻量 2D 像素猫咪形象。",
+                "Clawd 经典像素猫咪形象，极简灵活。",
             ),
         ]
 
@@ -791,7 +861,7 @@ class SettingsWindow(QWidget):
             row_layout.setSpacing(2)
 
             radio = QRadioButton(title_text)
-            radio.setStyleSheet("font-weight: 500; font-size: 13px; color: #f3f4f6;")
+            radio.setStyleSheet("font-weight: 500; font-size: 13px; color: #18181b;")
             if pet_id == current_pet:
                 radio.setChecked(True)
 
@@ -806,7 +876,7 @@ class SettingsWindow(QWidget):
             self.pet_button_group.addButton(radio)
 
             detail = QLabel(desc_text)
-            detail.setStyleSheet("color: #9ca3af; font-size: 11px; margin-left: 20px;")
+            detail.setStyleSheet("color: #6b6b70; font-size: 11px; margin-left: 24px;")
             detail.setWordWrap(True)
 
             row_layout.addWidget(radio)
@@ -821,19 +891,18 @@ class SettingsWindow(QWidget):
         scale_layout = QVBoxLayout(scale_card)
         scale_layout.setSpacing(10)
 
-        scale_title = QLabel("🔍 伴生体缩放与尺寸调节 (Pet Scale)")
-        scale_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        scale_title = QLabel("伴生体缩放与尺寸调节 (PET SCALE)")
+        scale_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
         scale_desc = QLabel(
-            "自由调节桌宠在桌面的显示大小。"
+            "自由调节桌宠在桌面的显示大小。\n"
             "（提示：在桌面上直接按住 Ctrl + 鼠标滚轮 亦可实时快捷无级缩放）"
         )
-        scale_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        scale_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
         scale_desc.setWordWrap(True)
         scale_layout.addWidget(scale_title)
         scale_layout.addWidget(scale_desc)
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
         scale_presets = [
             ("50% (极小)", 0.5),
             ("75% (小巧)", 0.75),
@@ -847,27 +916,31 @@ class SettingsWindow(QWidget):
                 self.scale_changed.emit(val)
             return _h
 
-        for label, s_val in scale_presets:
+        scale_grid = QGridLayout()
+        scale_grid.setSpacing(8)
+        cols = 3
+        for idx, (label, s_val) in enumerate(scale_presets):
             btn = QPushButton(label)
             btn.setFixedHeight(30)
             btn.clicked.connect(_make_scale_handler(s_val))
-            btn_row.addWidget(btn)
+            scale_grid.addWidget(btn, idx // cols, idx % cols)
 
-        scale_layout.addLayout(btn_row)
+        scale_layout.addLayout(scale_grid)
         layout.addWidget(scale_card)
-
         # 1. Peek Docking
         peek_card = QFrame()
         peek_card.setProperty("class", "cardFrame")
         peek_layout = QVBoxLayout(peek_card)
-        peek_title = QLabel("🧭 贴边探头与半身收纳 (Peek Mode)")
-        peek_title.setStyleSheet("font-weight: 600; font-size: 14px;")
-        peek_desc = QLabel(
-            "当桌宠拖拽至屏幕左右边缘（≤ 30px）时，"
-            "会自动贴墙收纳仅露出 24px 半身，极大保护屏幕工作空间。\n"
-            "鼠标悬停探头展开，鼠标离开 800ms 自动静默缩回。"
+        peek_layout.setSpacing(8)
+        peek_title = QLabel("贴边探头与半身收纳 (PEEK MODE)")
+        peek_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
         )
-        peek_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        peek_desc = QLabel(
+            "当桌宠拖拽至屏幕左右边缘（≤ 30px）时，会自动贴墙收纳仅露出 24px 半身，"
+            "极大保护屏幕空间。\n鼠标悬停探头展开，鼠标离开 800ms 自动静默缩回。"
+        )
+        peek_desc.setStyleSheet("color: #6b6b70; font-size: 12px; line-height: 1.4;")
         peek_desc.setWordWrap(True)
         peek_layout.addWidget(peek_title)
         peek_layout.addWidget(peek_desc)
@@ -877,12 +950,15 @@ class SettingsWindow(QWidget):
         feed_card = QFrame()
         feed_card.setProperty("class", "cardFrame")
         feed_layout = QVBoxLayout(feed_card)
-        feed_title = QLabel("🌱 随手投喂切片 (Slice Feeder)")
-        feed_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        feed_layout.setSpacing(10)
+        feed_title = QLabel("随手投喂切片 (SLICE FEEDER)")
+        feed_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
         feed_desc = QLabel(
             "在任何软件或网页下即可随时唤起半透明磨砂输入弹窗，输入回车瞬时存盘，失焦秒隐。"
         )
-        feed_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        feed_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
         feed_desc.setWordWrap(True)
         feed_layout.addWidget(feed_title)
         feed_layout.addWidget(feed_desc)
@@ -903,58 +979,46 @@ class SettingsWindow(QWidget):
         feed_layout.addLayout(hotkey_row)
 
         self.hotkey_hint = QLabel("")
-        self.hotkey_hint.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        self.hotkey_hint.setStyleSheet("color: #6b6b70; font-size: 12px;")
         self.hotkey_hint.setWordWrap(True)
         feed_layout.addWidget(self.hotkey_hint)
         layout.addWidget(feed_card)
 
         layout.addStretch()
-        return container
+        return self._wrap_scrollable(container)
 
-    # ── Feeder Hotkey Handlers ──
     def _on_hotkey_captured(self, spec: str) -> None:
-        """Persist a freshly recorded hotkey and tell the app to re-register it.
-
-        ``spec`` is already a validated canonical combination, so the store
-        cannot reject it; the emitted signal is what makes it live without a
-        restart.
-        """
         self.store.set_feeder_hotkey(spec)
         self.hotkey_edit.set_current(spec)
         self.hotkey_hint.setText(f"✅ 已更新为 {hotkey_display(spec)}，立即生效，无需重启。")
         self.hotkey_changed.emit(spec)
 
     def _on_hotkey_rejected(self, message: str) -> None:
-        """Surface why a recording attempt was refused, leaving the value intact."""
         self.hotkey_edit.set_current(self.store.feeder_hotkey)
         self.hotkey_hint.setText(f"⚠️ {message}")
 
     def _on_hotkey_reset(self) -> None:
-        """Restore the shipped default combination."""
         self._on_hotkey_captured(DEFAULT_FEEDER_HOTKEY)
         self.hotkey_hint.setText(
             f"↺ 已恢复默认 {hotkey_display(DEFAULT_FEEDER_HOTKEY)}，立即生效。"
         )
 
-    # ── Page 3: Growth Core & Sanctuary ──
+    # ── Page 4: Growth Core & Sanctuary ──
     def _build_core_page(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(16)
 
         header = QLabel("长盛心智与避风港状态")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        header.setFont(title_font)
+        header.setStyleSheet("font-size: 18px; font-weight: 700; color: #18181b;")
         layout.addWidget(header)
 
         note = QLabel(
             "以下为运行时的真实状态，供你确认系统当前的行为边界；"
             "这里不提供开关——避风港是安全底线，冷启动阶段按真实天数自动推进。"
         )
-        note.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        note.setStyleSheet("color: #6b6b70; font-size: 12px;")
         note.setWordWrap(True)
         layout.addWidget(note)
 
@@ -962,14 +1026,17 @@ class SettingsWindow(QWidget):
         sanc_card = QFrame()
         sanc_card.setProperty("class", "cardFrame")
         sanc_layout = QVBoxLayout(sanc_card)
-        sanc_title = QLabel("🍃 情绪避风港守卫 (Sanctuary Guard)")
-        sanc_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        sanc_layout.setSpacing(8)
+        sanc_title = QLabel("情绪避风港守卫 (SANCTUARY GUARD)")
+        sanc_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
         self.sanctuary_status = QLabel()
         self.sanctuary_status.setStyleSheet("font-size: 13px; font-weight: 600;")
         sanc_desc = QLabel(
             "激活时 100% 熔断一切分析、说教与 Agent 气泡，只保留安静陪伴。"
         )
-        sanc_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        sanc_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
         sanc_desc.setWordWrap(True)
         sanc_layout.addWidget(sanc_title)
         sanc_layout.addWidget(self.sanctuary_status)
@@ -980,15 +1047,18 @@ class SettingsWindow(QWidget):
         cold_card = QFrame()
         cold_card.setProperty("class", "cardFrame")
         cold_layout = QVBoxLayout(cold_card)
-        cold_title = QLabel("🧊 冷启动破冰策略 (Cold Start)")
-        cold_title.setStyleSheet("font-weight: 600; font-size: 14px;")
+        cold_layout.setSpacing(8)
+        cold_title = QLabel("冷启动破冰策略 (COLD START)")
+        cold_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
         self.coldstart_status = QLabel()
         self.coldstart_status.setStyleSheet("font-size: 13px; font-weight: 600;")
         cold_desc = QLabel(
             "Day 1~3 每日主动发言上限 1 次；Day 4~7 上限 2 次；Day 8~14 上限 3 次；"
             "第 15 天起进入成熟期。上限同时约束 Agent 事件触发的气泡。"
         )
-        cold_desc.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        cold_desc.setStyleSheet("color: #6b6b70; font-size: 12px; line-height: 1.4;")
         cold_desc.setWordWrap(True)
         cold_layout.addWidget(cold_title)
         cold_layout.addWidget(self.coldstart_status)
@@ -997,38 +1067,33 @@ class SettingsWindow(QWidget):
 
         layout.addStretch()
         self.refresh_core_status()
-        return container
+        return self._wrap_scrollable(container)
 
     def set_core_handles(
         self, sanctuary: SanctuaryGuard, cold_start: ColdStartPolicy
     ) -> None:
-        """Attach the live Growth Core instances for the status page.
-
-        Called after construction because the runner builds the settings window
-        before it builds the Growth Core; the page then reports real state instead
-        of static prose.
-        """
+        """Attach live Growth Core instances for status reflection."""
         self._sanctuary = sanctuary
         self._cold_start = cold_start
         self.refresh_core_status()
 
     def refresh_core_status(self) -> None:
-        """Re-read the Growth Core state, so the page never shows stale facts."""
-        muted = "font-size: 13px; font-weight: 600; color: #9ca3af;"
-        active = "font-size: 13px; font-weight: 600; color: #34d399;"
+        """Re-read Growth Core state to ensure freshness."""
+        muted = "font-size: 13px; font-weight: 600; color: #8e8e93;"
+        active = "font-size: 13px; font-weight: 600; color: #059669;"
 
         if self._sanctuary is None:
-            self.sanctuary_status.setText("⚪ 未接入（当前进程未提供避风港实例）")
+            self.sanctuary_status.setText("○ 未接入（当前进程未提供避风港实例）")
             self.sanctuary_status.setStyleSheet(muted)
         elif self._sanctuary.is_active:
-            self.sanctuary_status.setText("🟢 已激活 · 正在静默陪伴，暂停一切主动发言")
+            self.sanctuary_status.setText("● 已激活 · 正在静默陪伴，暂停一切主动发言")
             self.sanctuary_status.setStyleSheet(active)
         else:
-            self.sanctuary_status.setText("⚪ 未激活 · 常规观察中")
+            self.sanctuary_status.setText("○ 未激活 · 常规观察中")
             self.sanctuary_status.setStyleSheet(muted)
 
         if self._cold_start is None:
-            self.coldstart_status.setText("⚪ 未接入（当前进程未提供冷启动实例）")
+            self.coldstart_status.setText("○ 未接入（当前进程未提供冷启动实例）")
             self.coldstart_status.setStyleSheet(muted)
             return
 
@@ -1052,37 +1117,39 @@ class SettingsWindow(QWidget):
             f"今日主动发言配额 {policy.daily_speech_quota} 次，剩余 {remaining} 次"
             f" · 深度心理分析：{analysis}"
         )
-        self.coldstart_status.setStyleSheet("font-size: 13px; font-weight: 600; color: #60a5fa;")
+        self.coldstart_status.setStyleSheet("font-size: 13px; font-weight: 600; color: #2563eb;")
 
-    # ── Page 4: About ──
+    # ── Page 5: About ──
     def _build_about_page(self) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setSpacing(16)
 
         header = QLabel("关于 Co-evolving AI Companion")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        header.setFont(title_font)
+        header.setStyleSheet("font-size: 18px; font-weight: 700; color: #18181b;")
         layout.addWidget(header)
 
         about_card = QFrame()
         about_card.setProperty("class", "cardFrame")
         about_layout = QVBoxLayout(about_card)
+        about_layout.setSpacing(10)
+
+        about_title = QLabel("系统愿景与架构规范")
+        about_title.setStyleSheet("font-weight: 600; font-size: 14px; color: #18181b;")
+        about_layout.addWidget(about_title)
+
         about_desc = QLabel(
-            "版本：v0.1.0 (Phase 1 MVP)\n"
+            "版本：v0.1.0 (Phase 1 & Phase 2)\n"
             "架构原则：Body ≠ Brain ≠ Memory（极简小身体 + 独立大心智）\n"
             "核心理念：You shape it. It helps you shape yourself.\n"
-            "遥测通信：127.0.0.1:17321"
+            "通信网关：127.0.0.1:17321 (REST / Webhook)"
         )
-        about_desc.setStyleSheet("color: #9ca3af; font-size: 13px; line-height: 1.6;")
+        about_desc.setStyleSheet("color: #6b6b70; font-size: 13px; line-height: 1.6;")
         about_layout.addWidget(about_desc)
         layout.addWidget(about_card)
-
         layout.addStretch()
-        return container
+        return self._wrap_scrollable(container)
 
     def _open_harvest_dialog(self) -> None:
         """Open the multi-agent historical session harvesting dialog."""

@@ -23,8 +23,8 @@ def main() -> int:
         app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # Default pet is Tiko, with fallback to debug-duck, wangcai, or claw
-    preferred_pets = ["tiko", "debug-duck", "wangcai", "claw"]
+    # Default pet is Calico, with fallback to tiko, debug-duck, wangcai, or claw
+    preferred_pets = ["calico", "tiko", "debug-duck", "wangcai", "claw"]
     assets_root: Path | None = None
     for pet_name in preferred_pets:
         cand = Path("assets") / "pets" / pet_name
@@ -33,7 +33,7 @@ def main() -> int:
             break
 
     if assets_root is None:
-        assets_root = Path("assets") / "pets" / "tiko"
+        assets_root = Path("assets") / "pets" / "calico"
 
     window = PetWindow(assets_root)
     controller = BodyController(window)
@@ -74,7 +74,8 @@ def main() -> int:
     switch_menu = tray_menu.addMenu("切换伴生体")
     switch_menu.setStyleSheet(tray_menu.styleSheet())
     available_pets = [
-        ("Tiko (默认 · 小机器人)", Path("assets") / "pets" / "tiko"),
+        ("Calico (默认 · 三花小猫)", Path("assets") / "pets" / "calico"),
+        ("Tiko (小机器人)", Path("assets") / "pets" / "tiko"),
         ("Debug Duck (调试小黄鸭)", Path("assets") / "pets" / "debug-duck"),
         ("Wangcai (布偶猫)", Path("assets") / "pets" / "wangcai"),
         ("Claw (经典小猫)", Path("assets") / "pets" / "claw"),

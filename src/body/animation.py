@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from PIL import Image, ImageSequence
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 
@@ -69,12 +71,20 @@ def measure_art_padding(image: QImage, *, cols: int, rows: int) -> tuple[int, in
 class SpriteSheet:
     """A row of animation frames sliced horizontally from a single image."""
 
-    def __init__(self, frames: list[QPixmap], *, frame_width: int, frame_height: int) -> None:
+    def __init__(
+        self,
+        frames: list[QPixmap],
+        *,
+        frame_width: int,
+        frame_height: int,
+        default_fps: int = 6,
+    ) -> None:
         if not frames:
             raise SpriteSheetError("A SpriteSheet must contain at least one frame.")
         self.frames = frames
         self.frame_width = frame_width
         self.frame_height = frame_height
+        self.default_fps = default_fps
 
     @property
     def frame_count(self) -> int:
@@ -134,6 +144,7 @@ class SpriteSheet:
             scaled_frames,
             frame_width=new_w,
             frame_height=new_h,
+            default_fps=self.default_fps,
         )
 
 
@@ -203,6 +214,136 @@ class PetdexAtlasLoader:
 
         return sheets
 
+
+class ThemeApngLoader:
+    """Loader for Clawd on Desk APNG themes (e.g. Calico)."""
+
+    @classmethod
+    def load_apng_as_spritesheet(
+        cls, apng_path: Path, *, scale: float = 1.0
+    ) -> SpriteSheet:
+        """Decode an animated PNG into a SpriteSheet with exact frame rate."""
+        if not apng_path.is_file():
+            raise SpriteSheetError(f"APNG file not found: {apng_path}")
+
+        try:
+            im = Image.open(apng_path)
+        except Exception as e:
+            raise SpriteSheetError(f"Failed to read APNG: {apng_path}: {e}") from e
+
+        pixmaps: list[QPixmap] = []
+        durations: list[float] = []
+
+        for frame in ImageSequence.Iterator(im):
+            frame_rgba = frame.convert("RGBA")
+            raw_bytes = frame_rgba.tobytes()
+            w, h = frame_rgba.size
+            qimg = QImage(raw_bytes, w, h, QImage.Format.Format_RGBA8888)
+            pixmaps.append(QPixmap.fromImage(qimg))
+            durations.append(float(frame.info.get("duration", 125.0)))
+
+        if not pixmaps:
+            raise SpriteSheetError(f"No frames decoded from {apng_path}")
+
+        avg_dur_ms = sum(durations) / len(durations) if durations else 125.0
+        fps = max(1, min(60, int(round(1000.0 / max(10.0, avg_dur_ms)))))
+
+        sheet = SpriteSheet(
+            pixmaps,
+            frame_width=pixmaps[0].width(),
+            frame_height=pixmaps[0].height(),
+            default_fps=fps,
+        )
+        if abs(scale - 1.0) >= 0.01:
+            sheet = sheet.scaled(scale)
+        return sheet
+
+    @classmethod
+    def load_theme(
+        cls, theme_dir: Path, *, scale: float = 1.0
+    ) -> dict[str, SpriteSheet]:
+        """Load all APNG animation sheets declared in a Clawd on Desk theme directory."""
+        theme_json_path = theme_dir / "theme.json"
+        assets_dir = theme_dir / "assets"
+        if not assets_dir.is_dir():
+            assets_dir = theme_dir
+
+        sheets: dict[str, SpriteSheet] = {}
+        file_to_sheet: dict[str, SpriteSheet] = {}
+
+        # 1. Scan and load all apng files
+        for apng_file in assets_dir.glob("*.apng"):
+            try:
+                sheet = cls.load_apng_as_spritesheet(apng_file, scale=scale)
+                file_to_sheet[apng_file.name] = sheet
+                # Register by clean file action name, e.g. "calico-idle.apng" -> "idle"
+                clean_name = apng_file.stem
+                for prefix in ("calico-", "clawd-", "theme-"):
+                    if clean_name.startswith(prefix):
+                        clean_name = clean_name[len(prefix) :]
+                sheets[clean_name] = sheet
+            except SpriteSheetError:
+                continue
+
+        # 2. Parse theme.json mappings if available
+        if theme_json_path.is_file():
+            try:
+                meta = json.loads(theme_json_path.read_text(encoding="utf-8"))
+                states = meta.get("states", {})
+                for state_name, file_list in states.items():
+                    if isinstance(file_list, list) and file_list:
+                        fname = str(file_list[0])
+                        if fname in file_to_sheet:
+                            sheets[state_name] = file_to_sheet[fname]
+
+                # Map reactions
+                reactions = meta.get("reactions", {})
+                for r_name, r_conf in reactions.items():
+                    if isinstance(r_conf, dict) and "file" in r_conf:
+                        rfname = str(r_conf["file"])
+                        if rfname in file_to_sheet:
+                            sheets[f"react-{r_name}"] = file_to_sheet[rfname]
+
+                # Map miniMode
+                mini_states = meta.get("miniMode", {}).get("states", {})
+                for m_name, m_list in mini_states.items():
+                    if isinstance(m_list, list) and m_list:
+                        mfname = str(m_list[0])
+                        if mfname in file_to_sheet:
+                            sheets[m_name] = file_to_sheet[mfname]
+            except Exception:
+                pass
+
+        # 3. Ensure Core PetState standard candidates are established
+        aliases = {
+            "idle": ["idle", "calico-idle", "mini-idle"],
+            "sleeping": ["sleeping", "mini-sleep", "collapsing", "dozing"],
+            "thinking": ["thinking", "review"],
+            "working": ["working-typing", "working", "typing", "running"],
+            "happy": ["happy", "mini-happy", "waving", "notification"],
+            "error": ["error", "failed"],
+            "waiting": ["thinking", "waiting", "mini-idle"],
+            "waving": ["happy", "notification", "mini-happy"],
+            "jump": ["happy"],
+            "wave": ["happy", "notification"],
+            "work": ["working-typing", "working"],
+            "think": ["thinking"],
+            "rest": ["idle"],
+            "sleep": ["sleeping"],
+            "yawn": ["yawning"],
+            "poke": ["react-poke", "react-clickLeft"],
+            "drag": ["react-drag"],
+        }
+        for target, cand_list in aliases.items():
+            if target not in sheets:
+                for c in cand_list:
+                    if c in sheets:
+                        sheets[target] = sheets[c]
+                        break
+
+        return sheets
+
+
 class AnimationPlayer(QObject):
     """Timer-driven player for a SpriteSheet."""
 
@@ -223,8 +364,8 @@ class AnimationPlayer(QObject):
             return None
         return self._sheet.frames[self._current_index]
 
-    def play(self, sheet: SpriteSheet, *, fps: int = 6, loop: bool = True) -> None:
-        """Load sheet and start playback at given FPS."""
+    def play(self, sheet: SpriteSheet, *, fps: int | None = None, loop: bool = True) -> None:
+        """Load sheet and start playback at given FPS (defaults to sheet's own fps)."""
         self._timer.stop()
         self._sheet = sheet
         self._current_index = 0
@@ -233,7 +374,8 @@ class AnimationPlayer(QObject):
         if sheet.frame_count == 0:
             return
 
-        interval_ms = max(10, int(1000 / max(1, fps)))
+        effective_fps = fps if fps is not None else getattr(sheet, "default_fps", 6)
+        interval_ms = max(10, int(1000 / max(1, effective_fps)))
         self._timer.setInterval(interval_ms)
         self.frame_changed.emit(sheet.frames[0])
 

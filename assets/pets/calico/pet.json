@@ -1,0 +1,12 @@
+{
+  "id": "calico",
+  "displayName": "Calico (三花小猫)",
+  "description": "来自 Clawd on Desk 的经典三花小猫，拥有细腻逼真的呼吸、打字、扫地、做木工、抛球、搬运、打瞌睡与被拖拽挣扎等丰富生活动作。",
+  "species": "calico_cat",
+  "author": "rullerzhou / Clawd on Desk",
+  "source": "https://github.com/rullerzhou/clawd-on-desk",
+  "format": "theme",
+  "themePath": "theme.json",
+  "assetsDir": "assets",
+  "defaultState": "idle"
+}
