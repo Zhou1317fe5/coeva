@@ -17,7 +17,7 @@ from src.feeder.hotkey import (
     hotkey_from_qt,
     parse_hotkey,
 )
-from src.feeder.overlay import SliceFeederOverlay
+from src.feeder.overlay import SliceFeederBar, SliceFeederOverlay
 from src.feeder.storage import SliceStore
 
 _app = QApplication.instance()
@@ -155,3 +155,119 @@ def test_listener_stop_releases_a_worker_that_has_not_started_yet() -> None:
     time.sleep(0.5)
     assert listener._listener is None
     assert listener._thread is None
+
+def test_feeder_bar_collapsed_and_expanded_modes() -> None:
+    """SliceFeederBar starts in handle mode and expands to input/pill properly."""
+    bar = SliceFeederBar()
+    assert not bar.is_expanded
+    assert bar.width() == 40
+    assert bar.height() == 18
+    assert bar.current_mode == "handle"
+
+    modes: list[bool] = []
+    bar.mode_changed.connect(lambda exp: modes.append(exp))
+
+    bar.show_pill()
+    assert not bar.is_expanded
+    assert bar.width() == 88
+    assert bar.height() == 40
+    assert bar.current_mode == "pill"
+
+    bar.expand_input()
+    assert bar.is_expanded
+    assert bar.width() == 272
+    assert bar.height() == 46
+    assert bar.current_mode == "input"
+    assert modes == [False, True]
+
+    bar.collapse()
+    assert not bar.is_expanded
+    assert bar.width() == 88
+    assert bar.height() == 40
+    assert modes == [False, True, False]
+
+    bar.show_handle()
+    assert bar.current_mode == "handle"
+    bar.close()
+
+
+def test_feeder_bar_voice_toggle() -> None:
+    """Waveform button toggles listening mode and emits signals."""
+    bar = SliceFeederBar()
+    assert not bar.is_voice_active
+
+    voice_events: list[bool] = []
+    bar.voice_clicked.connect(lambda active: voice_events.append(active))
+
+    bar._toggle_voice_mode()
+    assert bar.is_voice_active
+    assert voice_events == [True]
+
+    bar._toggle_voice_mode()
+    assert not bar.is_voice_active
+    assert voice_events == [True, False]
+    bar.close()
+
+
+def test_feeder_bar_anchor_to_pet() -> None:
+    """Bar anchors centered directly beneath the pet body."""
+    from PySide6.QtCore import QPoint
+
+    bar = SliceFeederBar()
+    pet_pos = QPoint(400, 300)
+    pet_w, pet_h = 100, 100
+    bar.show_pill()
+    bar.anchor_to_pet(pet_pos, pet_w, pet_h)
+
+    # In pill mode (width 88), ideal center x is 400 + 50 = 450 -> x = 450 - 44 = 406
+    assert bar.x() == 406
+    # Pet bottom is 300 + 100 = 400. Below pet: 400 + 3 - 6 (margin) = 397
+    assert bar.y() == 397
+
+    # Expanding re-anchors centered around the pet
+    bar.expand_input()
+    assert bar.x() == 450 - 272 // 2  # 314
+    bar.close()
+
+def test_pet_window_integration_with_feeder_bar(tmp_path: Path) -> None:
+    """PetWindow owns a docked SliceFeederBar, handles submission and voice feedback."""
+    from src.body.contracts import PetState
+    from src.body.window import PetWindow
+
+    pet_dir = Path("assets") / "pets" / "vasu"
+    store_file = tmp_path / "test_slices.jsonl"
+    store = SliceStore(store_file)
+
+    win = PetWindow(
+        pet_dir,
+        position_config_path=tmp_path / "body_pos.json",
+        slice_store=store,
+    )
+    assert win.feeder_bar is not None
+
+    submitted: list[str] = []
+    win.slice_fed.connect(lambda s: submitted.append(s))
+
+    # Trigger feeder input
+    win.open_feeder_input()
+    assert win.feeder_bar.isVisible()
+    assert win.feeder_bar.is_expanded
+
+    # Submit a slice
+    win.feeder_bar._input.setText("共生伴生体成长切片测试")
+    win.feeder_bar._on_submit()
+
+    assert len(submitted) == 1
+    assert submitted[0] == "共生伴生体成长切片测试"
+    assert store.count() == 1
+    assert store.load_recent(1)[0].content == "共生伴生体成长切片测试"
+    assert win.current_state == PetState.HAPPY
+
+    # Trigger voice toggle
+    win.feeder_bar._toggle_voice_mode()
+    assert win.current_state == PetState.THINKING
+    win.feeder_bar._toggle_voice_mode()
+    assert win.current_state == PetState.IDLE
+
+    win.close()
+    assert not win.feeder_bar.isVisible()
