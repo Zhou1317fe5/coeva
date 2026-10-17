@@ -79,7 +79,7 @@
       "mirror_policy": {},
       "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a1459a-a443-7093-8f95-689ef433bfbe\\exec-326ac968-d289-4c74-901a-208a8475ae5e.png",
       "completed_at": "2026-10-16T16:49:19Z",
-      "visual_qa": "pending-deterministic-review"
+      "visual_qa": "pass"
     },
     {
       "id": "running-right",
@@ -127,14 +127,14 @@
         "reason": "no deterministic derivation is configured for this state"
       },
       "mirror_policy": {},
-      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a1459a-dd73-74a3-8ce7-229f36c95d5c\\exec-f1bf5b66-c7db-458f-95ce-eca9f73946db.png",
-      "completed_at": "2026-10-16T16:49:19Z",
-      "visual_qa": "pending-deterministic-review"
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a14689-9be2-7833-90c7-05546483227a\\exec-c60b0f19-8a80-4c05-9cb2-10506706eaf1.png",
+      "completed_at": "2026-10-16T21:10:31Z",
+      "visual_qa": "pass"
     },
     {
       "id": "running-left",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/running-left.md",
       "retry_prompt_file": "prompts/row-retries/running-left.md",
       "input_images": [
@@ -195,6 +195,21 @@
         "derivation": "framewise-horizontal-mirror-preserving-order",
         "requires_explicit_approval": true,
         "fallback_generation_skill": "$imagegen"
+      },
+      "source_path": "decoded\\running-right.png",
+      "derived_from": "running-right",
+      "completed_at": "2026-10-17T00:39:42.168594+00:00",
+      "metadata": {
+        "width": 2172,
+        "height": 724,
+        "mode": "RGBA",
+        "format": "PNG"
+      },
+      "mirror_decision": {
+        "approved": true,
+        "approved_at": "2026-10-17T00:39:42.168594+00:00",
+        "note": "Approved rightward frames have no one-sided markings, props, or directional lighting cues; cream face/chest, ears, paws and thick attached tail remain the same identity when flipped. Mirror each of the eight frame slots in place to preserve temporal gait order.",
+        "transform": "framewise-horizontal-mirror-preserving-order"
       }
     },
     {

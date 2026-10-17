@@ -7,7 +7,7 @@
       0,
       255
     ],
-    "threshold": 96.0
+    "threshold": 200.0
   },
   "rows": [
     {
@@ -34,7 +34,7 @@
         "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\06.png",
         "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\07.png"
       ],
-      "method": "components"
+      "method": "stable-slots"
     }
   ]
 }

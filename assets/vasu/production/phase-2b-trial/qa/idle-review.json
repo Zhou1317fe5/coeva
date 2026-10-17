@@ -1,0 +1,101 @@
+{
+  "state": "idle",
+  "expected_frames": 6,
+  "actual_frames": 6,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20598,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20759,
+      "bbox": [
+        5,
+        15,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20677,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20617,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20747,
+      "bbox": [
+        5,
+        15,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20578,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

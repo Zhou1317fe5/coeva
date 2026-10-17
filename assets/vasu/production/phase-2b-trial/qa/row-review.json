@@ -15,90 +15,90 @@
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\00.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 21171,
+          "nontransparent_pixels": 20598,
           "bbox": [
             5,
-            17,
+            16,
             187,
-            190
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 244
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 1,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\01.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20838,
+          "nontransparent_pixels": 20759,
           "bbox": [
             5,
-            18,
+            15,
             187,
-            190
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 237
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 2,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\02.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20730,
+          "nontransparent_pixels": 20677,
           "bbox": [
             5,
-            18,
+            16,
             187,
-            189
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 220
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 3,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\03.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20472,
+          "nontransparent_pixels": 20617,
           "bbox": [
             5,
-            19,
+            16,
             187,
-            189
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 210
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 4,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\04.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20659,
+          "nontransparent_pixels": 20747,
           "bbox": [
             5,
-            18,
+            15,
             187,
-            189
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 228
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 5,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\05.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 20585,
+          "nontransparent_pixels": 20578,
           "bbox": [
             5,
-            18,
+            16,
             187,
-            189
+            192
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 228
+          "chroma_adjacent_pixels": 0
         }
       ]
     },
@@ -106,134 +106,138 @@
       "state": "running-right",
       "expected_frames": 8,
       "actual_frames": 8,
-      "extraction_method": "components",
+      "extraction_method": "stable-slots",
       "ok": true,
       "errors": [],
-      "warnings": [],
+      "warnings": [
+        "running-right used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
       "frames": [
         {
           "index": 0,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\00.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 11380,
+          "nontransparent_pixels": 9031,
           "bbox": [
-            5,
-            49,
-            187,
-            158
+            8,
+            52,
+            182,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 182
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 1,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\01.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 10697,
+          "nontransparent_pixels": 8545,
           "bbox": [
-            5,
-            49,
-            187,
-            158
+            10,
+            52,
+            182,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 211
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 2,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\02.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 10612,
+          "nontransparent_pixels": 8892,
           "bbox": [
-            5,
-            51,
-            187,
-            157
+            8,
+            52,
+            184,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 196
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 3,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\03.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 9980,
+          "nontransparent_pixels": 9387,
           "bbox": [
-            5,
-            57,
-            187,
-            151
+            6,
+            52,
+            186,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 168
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 4,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\04.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 10855,
+          "nontransparent_pixels": 8768,
           "bbox": [
-            5,
-            49,
-            187,
-            158
+            8,
+            52,
+            183,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 199
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 5,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\05.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 11441,
+          "nontransparent_pixels": 8723,
           "bbox": [
-            5,
-            47,
-            187,
-            161
+            10,
+            51,
+            182,
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 189
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 6,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\06.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 10827,
+          "nontransparent_pixels": 9007,
           "bbox": [
-            5,
+            7,
             52,
-            187,
+            185,
             156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 187
+          "chroma_adjacent_pixels": 0
         },
         {
           "index": 7,
           "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\07.png",
           "width": 192,
           "height": 208,
-          "nontransparent_pixels": 10821,
+          "nontransparent_pixels": 8906,
           "bbox": [
-            5,
-            50,
+            6,
+            51,
             187,
-            158
+            156
           ],
           "edge_pixels": 0,
-          "chroma_adjacent_pixels": 208
+          "chroma_adjacent_pixels": 0
         }
       ]
     }
   ],
   "errors": [],
-  "warnings": []
+  "warnings": [
+    "running-right used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ]
 }
