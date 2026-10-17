@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 2B: idle 与 running-right 双行动画试产
+
+### 📝 Art Production（美术制作）
+- 完成 `idle` 6 帧与 `running-right` 8 帧的色键抽帧、64px 对照、GIF/接触表和逐行 QA。定向修复洋红溢色及右行第 4 帧的尺寸跳动；两行通过试产门槛。其余行与最终图集未制作。
+
 ## [Unreleased] - Philosophy: 独立生命个体与朋友式共存哲学入档
 
 ### 📝 Docs & Philosophy（设计哲学与产品规范确立）

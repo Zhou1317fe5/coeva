@@ -57,8 +57,8 @@ class ChronicleViewerWindow(QWidget):
         self.model_mgr = SelfModelManager()
         self.chapter_generator = ChapterGenerator(self.store)
         self.setWindowTitle("📖 记忆与切片档案 (Chronicle Archive)")
-        self.resize(760, 560)
-        self.setMinimumSize(600, 420)
+        self.resize(880, 580)
+        self.setMinimumSize(720, 480)
 
         self._setup_ui()
         self._apply_styling()
@@ -117,7 +117,8 @@ class ChronicleViewerWindow(QWidget):
         # Left Nav List
         self.nav_list = QListWidget()
         self.nav_list.setObjectName("chronicleNav")
-        self.nav_list.setFixedWidth(160)
+        self.nav_list.setFixedWidth(180)
+        self.nav_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.nav_list.addItem("🌱 投喂切片 (Slices)")
         self.nav_list.addItem("🧭 经历会话 (Episodes)")
         self.nav_list.addItem("🔍 记忆检索 (Search)")
@@ -133,6 +134,7 @@ class ChronicleViewerWindow(QWidget):
         self.stack.addWidget(self._build_search_page())
         self.stack.addWidget(self._build_self_model_page())
         self.stack.addWidget(self._build_chapters_page())
+        splitter.addWidget(self.stack)
 
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
