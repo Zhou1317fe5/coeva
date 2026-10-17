@@ -1,0 +1,71 @@
+{
+  "state": "waving",
+  "expected_frames": 4,
+  "actual_frames": 4,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-candidate\\waving\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20598,
+      "bbox": [
+        5,
+        17,
+        187,
+        190
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-candidate\\waving\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20763,
+      "bbox": [
+        5,
+        16,
+        187,
+        191
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-candidate\\waving\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 19610,
+      "bbox": [
+        5,
+        20,
+        187,
+        188
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-candidate\\waving\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20943,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

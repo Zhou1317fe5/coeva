@@ -1,0 +1,150 @@
+{
+  "state": "failed",
+  "expected_frames": 8,
+  "actual_frames": 8,
+  "extraction_method": "stable-slots",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "failed used extraction method stable-slots; component extraction is preferred"
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20123,
+      "bbox": [
+        10,
+        11,
+        181,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20013,
+      "bbox": [
+        10,
+        12,
+        182,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 19841,
+      "bbox": [
+        11,
+        16,
+        181,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20032,
+      "bbox": [
+        7,
+        15,
+        187,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 17903,
+      "bbox": [
+        10,
+        38,
+        182,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 19710,
+      "bbox": [
+        10,
+        15,
+        181,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 6,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\06.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20090,
+      "bbox": [
+        10,
+        12,
+        181,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 7,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\07.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20186,
+      "bbox": [
+        10,
+        12,
+        178,
+        197
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ],
+  "timing_ms": [
+    160,
+    150,
+    180,
+    260,
+    220,
+    150,
+    140,
+    260
+  ],
+  "timing_total_ms": 1520,
+  "timing_only_refinement": true,
+  "visual_repair": false,
+  "integrity": {
+    "failed_decoded_unchanged": true,
+    "all_approved_row_frames_unchanged": true
+  }
+}

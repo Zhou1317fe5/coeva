@@ -21,9 +21,7 @@ def _store() -> ChronicleStore:
     return ChronicleStore(Path(":memory:"))
 
 
-def _event(
-    event_type: AgentEventType, *, session: str = "s1", tool: str = "bash"
-) -> AgentEvent:
+def _event(event_type: AgentEventType, *, session: str = "s1", tool: str = "bash") -> AgentEvent:
     return AgentEvent.create("hermes", event_type, session_id=session, tool_name=tool)
 
 

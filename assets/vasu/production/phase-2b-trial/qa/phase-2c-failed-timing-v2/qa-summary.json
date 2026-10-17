@@ -1,0 +1,66 @@
+{
+  "state": "failed",
+  "result": "pass",
+  "timing": {
+    "old_ms": [
+      140,
+      140,
+      140,
+      140,
+      140,
+      140,
+      140,
+      240
+    ],
+    "new_ms": [
+      160,
+      150,
+      180,
+      260,
+      220,
+      150,
+      140,
+      260
+    ],
+    "old_total_ms": 1220,
+    "new_total_ms": 1520,
+    "change_ms": 300
+  },
+  "visual_repair": {
+    "performed": false,
+    "reason": "timing-only review was sufficient"
+  },
+  "row_validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": [
+      "failed used extraction method stable-slots; component extraction is preferred"
+    ],
+    "frames": 8
+  },
+  "frame_integrity": {
+    "all_rows_and_decoded_strips_unchanged": true,
+    "per_state_unchanged": {
+      "idle": true,
+      "running-right": true,
+      "running-left": true,
+      "waiting": true,
+      "review": true,
+      "running": true,
+      "waving": true,
+      "jumping": true,
+      "failed": true
+    },
+    "approved_rows_byte_for_byte_unchanged": true,
+    "failed_visual_frames_byte_for_byte_unchanged": true
+  },
+  "qa_artifacts": {
+    "gif": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed.gif",
+    "standard_preview": "assets\\vasu\\production\\phase-2b-trial\\qa\\previews\\failed.gif",
+    "old_preview_backup": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed-v1.gif",
+    "timing": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\timing.json",
+    "full_contact": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed-contact.png",
+    "64px_contact": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed-64px-contact.png",
+    "row_validation": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed-row-validation.json"
+  }
+}

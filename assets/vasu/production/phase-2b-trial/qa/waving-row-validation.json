@@ -1,0 +1,73 @@
+{
+  "state": "waving",
+  "expected_frames": 4,
+  "actual_frames": 4,
+  "extraction_method": "stable-slots",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "waving used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 18674,
+      "bbox": [
+        7,
+        19,
+        185,
+        188
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 18269,
+      "bbox": [
+        9,
+        19,
+        183,
+        187
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 18624,
+      "bbox": [
+        5,
+        19,
+        186,
+        187
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 18477,
+      "bbox": [
+        8,
+        19,
+        184,
+        188
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

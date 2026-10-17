@@ -1,0 +1,198 @@
+{
+  "source_run": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial",
+  "approved_rows": [
+    {
+      "state": "idle",
+      "row": 0,
+      "frame_count": 6,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\idle.png",
+      "source_strip_sha256": "77f91f9b3fbaec756bf4ba02f20f654447cc7a23fb36c0a90cab73d7dce284ab",
+      "frame_hashes": {
+        "00.png": "e096d85ffaab221e305535bc6bc48df89a1b7da7d1fc349f6daf5473b38cc513",
+        "01.png": "a11ef13152a94d32f25ac445afc73890d0738a20c2a3344f55d222b7cbdb29db",
+        "02.png": "c11dfe4ce9c1dde4f7aef5c1c3379a9f06843002c0674c8249ba8f04e9bb4230",
+        "03.png": "76cc400b2ba8682a65b4cbea02186a82b10b8d89090fe2eac3bfb8104c9c2b7b",
+        "04.png": "bb95a701c8e4dbc9a9c56e4ee1f4e1bf627d3a066228c648a93b2039d2bb23bd",
+        "05.png": "b731a02313c52d1a462f3d8707c4384fc66649ba825b60121a4519e8f134b195"
+      },
+      "extraction": {
+        "method": "components",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "running-right",
+      "row": 1,
+      "frame_count": 8,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\running-right.png",
+      "source_strip_sha256": "2a037ff125f5876652763b650f8fae541e793c2bdd3deb8c7ef8c53fa45dc75f",
+      "frame_hashes": {
+        "00.png": "e3c87f1e75aa8d4ef2bb040d258c5cd523b0f1d28e75f60cb760f53e312c84b0",
+        "01.png": "d8366810bb46aa05f85822bab59c1d4cceee37dcc30f0959d4f7ce9a83130154",
+        "02.png": "8a45891d05f15c75ddf2e8a016f33a5f344bf750f5f8efb11c09359e93095cd4",
+        "03.png": "c524b5fcf828c1418d14a5402d22520e7150d31bfc2143e6c3d5a2230f14726d",
+        "04.png": "844f95dea66f31253180e204af22fbbd2b49b523b37d3decbee1e4fbe5974e65",
+        "05.png": "8fd98fecdeb1134d0af5252238d4edaec523433dac12faf36c1b8e814e690c42",
+        "06.png": "1fcb2ad899fa7f58271124783ef7276edaa0ae31eab5cc06d066a98a39d05cf5",
+        "07.png": "080c1cd09a5cd706981768b17dee157e47cdc664f2e9eb3f9747a5085a428079"
+      },
+      "extraction": {
+        "method": "stable-slots",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "running-left",
+      "row": 2,
+      "frame_count": 8,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\running-left.png",
+      "source_strip_sha256": "6d65543afadb03129e9b33168978b8c73bfe198590dc4d253679d0003d07915e",
+      "frame_hashes": {
+        "00.png": "f3346ba3651d3ac2d0f4684d0a44af023cb508319be63d5ba10421ee632b6750",
+        "01.png": "e7086067b423daa4dd6148bd140b6747e45e26369deb0cadb8912ee8efbef3fb",
+        "02.png": "b8d8157c03b657c8a4615aea91e075ef1e95f5893ba9680c7d9e5eb36382d2b4",
+        "03.png": "7eade2488f271c474f0eef3eaa2d61a828d8f10ae9321c72ec5ff5ded3c9ca2f",
+        "04.png": "b44f755fc5bdb2e856f9028699c7e8d77ce92ebde3b2f8297120254b0dc6a834",
+        "05.png": "459742b8c3c390307e0cf1d60e556d581d1e9b4c1948ccc13abd959c334ae046",
+        "06.png": "3e00f47549418a5d72e596944c2efef0c8411787c789ca14ad7a14a1b67fcdde",
+        "07.png": "c9c0e502bc632f1ed6fa38a6df3de24d2ddeadc5288981d0b6be728cd41756d0"
+      },
+      "extraction": {
+        "method": "stable-slots",
+        "derived_from": "running-right",
+        "transform": "approved-framewise-horizontal-mirror-preserving-order"
+      }
+    },
+    {
+      "state": "waving",
+      "row": 3,
+      "frame_count": 4,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\waving.png",
+      "source_strip_sha256": "240b0c67712b1fabdd0e540c1a5c7fe470cc002941524c447b2d2c0e91fbcd96",
+      "frame_hashes": {
+        "00.png": "6b8e925b3aabbfc28f7f86f6ddc05d535e12b5c7b740a41c8d95b57f46bac1da",
+        "01.png": "67ab24ffc997465ca7a4fa7208bd27e7b3243e63d46fd41318038dddb2477230",
+        "02.png": "6302ca93983f5d3689642c8bb88dfd3ccbea9983f1a3733f060ce49ea73aa661",
+        "03.png": "e8807f82b9a4fc45091d98b482fe65e714ae9d75a98a288cb5a92edf56fc3ec5"
+      },
+      "extraction": {
+        "method": "stable-slots",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "jumping",
+      "row": 4,
+      "frame_count": 5,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\jumping.png",
+      "source_strip_sha256": "7fec9cc1f20700f6cfa0d8db527ff49b617349a50f0407e78e675284e6ff0825",
+      "frame_hashes": {
+        "00.png": "b5b4b6d37b932f09ed5209299fa372e968ba621be7fa4d00398eb0e667a4f840",
+        "01.png": "58b8b4a4530598c87ec6269505898c6992be4065bb51d6dce7bfa5d068082a4b",
+        "02.png": "2395aadab8e2518dbcf573b0b874784b3ec6ed69b789727d608087e5c312856e",
+        "03.png": "8790b07408dae2e6b1bb2ea5539b7665965b5e1608bf0a5f93787a872fbe8396",
+        "04.png": "f50ac410bfad27f4258690610275dce9d189cd205c5d63746c3d4a12870b0e0e"
+      },
+      "extraction": {
+        "method": "stable-slots",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "failed",
+      "row": 5,
+      "frame_count": 8,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\failed.png",
+      "source_strip_sha256": "4a0d9a488a3d84d2d2713706a54b9cf651ab8757d77a20690833bc1fa14c2e6b",
+      "frame_hashes": {
+        "00.png": "4d98157ecf30ee939177b296e97f475b414f19f390ddac72076c3d0776f0af1c",
+        "01.png": "8a72a95cf308c812c4b9651aa25de04d49589d80117c2238f835d1e5df62fd50",
+        "02.png": "9ac07f7d1c89f915fa4198b6a2649a6dde3c334df438fa5d05753cf803dd53d5",
+        "03.png": "51203e68395bc3b9b68404df2f7049fff9a2205ab892bd24a43bab34facf2d67",
+        "04.png": "9b64706dac404e6676f3468d38d2744faf939dc9024b8c9bb89cac73672073f1",
+        "05.png": "25775b6b6f0d0ffffa717835f52a32e3cbd2ad96ab7e69c75ec76170643955c0",
+        "06.png": "2524dc124c4a209b6eafbc2ac6af3f9404474023277c16ec2aa039bab0315874",
+        "07.png": "84701a22eb9fef2c626fb6e7253f2c76a2d581a88c2dfedb09ee3cbf89db3078"
+      },
+      "extraction": {
+        "method": "stable-slots",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "waiting",
+      "row": 6,
+      "frame_count": 6,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\waiting.png",
+      "source_strip_sha256": "97c0462008d3ca9dd41b1942bbe28989d8c00e31a17f91e7072f343d0ae97a14",
+      "frame_hashes": {
+        "00.png": "3eee676642e37558f4f90b17887212e0fef4ef1f9db8cef8b8185a92cdad67a0",
+        "01.png": "7b4ae9b3ace616387c7fbad5535108571a369b1e5fc81a62ca386dab0e5600f2",
+        "02.png": "7115fe4dddf25d40bfa5211355fc210fae39e93704c632b92bee5333ce7d5951",
+        "03.png": "4097c75de2e4adae533fe133903b5b3d7001e843e50fd97ebc357b7b4414a8cf",
+        "04.png": "fdb5f9359a8c111055274676160af929344ca4b4c5decc41162b43f31081e5f8",
+        "05.png": "25a620b6c442de5fb3e0622bd29a418cdcd88e85a2e1c240bdf92142057f055e"
+      },
+      "extraction": {
+        "method": "components",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "running",
+      "row": 7,
+      "frame_count": 6,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\running.png",
+      "source_strip_sha256": "cc7479421bb7c0f85e38a9062c564b9502958cf97a67aeae56fa093788f022dd",
+      "frame_hashes": {
+        "00.png": "63fab62f8b4dea7e6f829fefe1ac5c717c3332b6ea87ad7f373f9b9db2c0b7c3",
+        "01.png": "2aebc735d548784e153373db1e348398268a99cd48d3a0f6db139d07bd6d9f06",
+        "02.png": "0c957c3e063af1fbb08bdb0d6c4bda58f338fa86a9a72baea76711a5db04f669",
+        "03.png": "f3d2d2798e7de7a2dd076053424eea0a53fbad97ed74933ebd8d254e167e2bf9",
+        "04.png": "c7c4985555051c79ca2cd24d7f09a14b50ee1215cddec5296fa1790a2113765c",
+        "05.png": "88d708709c032cdee4eaea052de710ef96e825bf47675ef0bb823c67dd9b975b"
+      },
+      "extraction": {
+        "method": "components",
+        "derived_from": null,
+        "transform": null
+      }
+    },
+    {
+      "state": "review",
+      "row": 8,
+      "frame_count": 6,
+      "approved_frame_directory": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review",
+      "approved_source_strip": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\decoded\\review.png",
+      "source_strip_sha256": "a9625e46856de1d663ab831ea4aa4e89182e10a06f7121361f900d2afcd1ad77",
+      "frame_hashes": {
+        "00.png": "76030e25f07101da2851f7b703485dc33100b66ea660b86311e0a48d164d754f",
+        "01.png": "fb30a73a7488fa3e7f3b83478500dd2207bb856ace7e16a2a86390dae7097179",
+        "02.png": "ef51ba30fc9ffff4514dc9de36a4ed9b9498b4c8531e6252123adaf0977eea49",
+        "03.png": "ef6a6f00c6e4655d34d03c403ddca8c59729707cedf3cab14fab7a4bde635557",
+        "04.png": "c752e5386bdb74df8420daa3cdc38822e70c0179ab92781d69b41ed0764b4277",
+        "05.png": "6687823cdac9a00ee6c97764ebcfdfeb13b44018f1c2e77ed7479e521a95b4a3"
+      },
+      "extraction": {
+        "method": "components",
+        "derived_from": null,
+        "transform": null
+      }
+    }
+  ],
+  "source_frames_manifest": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\frames-manifest.json"
+}

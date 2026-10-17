@@ -62,7 +62,7 @@ def test_bridge_reports_successful_tool_calls() -> None:
 def test_bridge_still_fails_silently_when_the_companion_is_down() -> None:
     """PI-Desktop must never be blocked or slowed by a missing companion."""
     source = _source()
-    assert "req.on(\"error\"" in source
+    assert 'req.on("error"' in source
     assert "timeout" in source
 
 

@@ -1,0 +1,133 @@
+{
+  "state": "running-left",
+  "expected_frames": 8,
+  "actual_frames": 8,
+  "extraction_method": "stable-slots",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "running-left used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 9031,
+      "bbox": [
+        10,
+        52,
+        184,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 8545,
+      "bbox": [
+        10,
+        52,
+        182,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 8892,
+      "bbox": [
+        8,
+        52,
+        184,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 9387,
+      "bbox": [
+        6,
+        52,
+        186,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 8768,
+      "bbox": [
+        9,
+        52,
+        184,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 8723,
+      "bbox": [
+        10,
+        51,
+        182,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 6,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\06.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 9007,
+      "bbox": [
+        7,
+        52,
+        185,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 7,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\07.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 8906,
+      "bbox": [
+        5,
+        51,
+        186,
+        156
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

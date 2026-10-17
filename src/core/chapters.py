@@ -116,9 +116,9 @@ class ChapterEligibilityGate:
         latest_date: str | None = None
 
         if episodes:
-            timestamps = [
-                e.started_at for e in episodes if e.started_at
-            ] + [e.ended_at for e in episodes if e.ended_at]
+            timestamps = [e.started_at for e in episodes if e.started_at] + [
+                e.ended_at for e in episodes if e.ended_at
+            ]
             if timestamps:
                 earliest_date = min(timestamps)[:10]
                 latest_date = max(timestamps)[:10]
@@ -247,10 +247,12 @@ class ChapterGenerator:
             f"- [{p.pattern_id}] {p.description} (支持会话: {len(p.supporting_episodes)})"
             for p in patterns
         )
-        insights_summary = "\n".join(
-            f"- [共识] {ins.statement} (批注: {ins.user_confirmation_text})"
-            for ins in insights
-        ) or "暂无显式确认的 Insight，以客观行为模式为主。"
+        insights_summary = (
+            "\n".join(
+                f"- [共识] {ins.statement} (批注: {ins.user_confirmation_text})" for ins in insights
+            )
+            or "暂无显式确认的 Insight，以客观行为模式为主。"
+        )
 
         sample_episodes = "\n".join(
             f"- Session {ep.session_id[:12]}: 事件数 {ep.event_count}, Agents {ep.agent_ids}"

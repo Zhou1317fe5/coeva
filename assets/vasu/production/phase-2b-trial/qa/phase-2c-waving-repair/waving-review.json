@@ -1,0 +1,71 @@
+{
+  "state": "waving",
+  "expected_frames": 4,
+  "actual_frames": 4,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-repair\\waving\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20420,
+      "bbox": [
+        5,
+        17,
+        187,
+        191
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-repair\\waving\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20832,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-repair\\waving\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 19527,
+      "bbox": [
+        5,
+        20,
+        187,
+        188
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-waving-repair\\waving\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20760,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

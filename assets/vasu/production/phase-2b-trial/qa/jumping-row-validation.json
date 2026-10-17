@@ -1,0 +1,88 @@
+{
+  "state": "jumping",
+  "expected_frames": 5,
+  "actual_frames": 5,
+  "extraction_method": "stable-slots",
+  "ok": true,
+  "errors": [],
+  "warnings": [
+    "jumping used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "file": "assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 16486,
+      "bbox": [
+        16,
+        30,
+        176,
+        193
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 15233,
+      "bbox": [
+        6,
+        65,
+        186,
+        193
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 14299,
+      "bbox": [
+        11,
+        14,
+        181,
+        161
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 15107,
+      "bbox": [
+        5,
+        55,
+        187,
+        193
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 16525,
+      "bbox": [
+        12,
+        31,
+        180,
+        193
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

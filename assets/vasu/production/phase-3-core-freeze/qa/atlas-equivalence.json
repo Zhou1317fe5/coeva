@@ -1,0 +1,24 @@
+{
+  "pixel_equivalent_png_to_webp": true,
+  "pixel_difference_count": 0,
+  "dimensions": {
+    "png": [
+      1536,
+      1872
+    ],
+    "webp": [
+      1536,
+      1872
+    ]
+  },
+  "hashes": {
+    "atlas_png": "7f322b747282e14124965ce46b38828d91bad4319fdfc8d3aa144fb57b013d26",
+    "atlas_webp": "e4b0cc0a29421084c0e8f9cdd5ac1760e87da7575c8b6f26fae995fe40fdb4be",
+    "core_webp": "e4b0cc0a29421084c0e8f9cdd5ac1760e87da7575c8b6f26fae995fe40fdb4be",
+    "codex_webp": "e4b0cc0a29421084c0e8f9cdd5ac1760e87da7575c8b6f26fae995fe40fdb4be",
+    "phase3_pet_json": "4c6468b2a01e56d8560f6bfdc9bde0dfd36e429efdf9dfaebb320577931dc2b0",
+    "core_pet_json": "4c6468b2a01e56d8560f6bfdc9bde0dfd36e429efdf9dfaebb320577931dc2b0",
+    "codex_pet_json": "4c6468b2a01e56d8560f6bfdc9bde0dfd36e429efdf9dfaebb320577931dc2b0"
+  },
+  "package_copies_match": true
+}

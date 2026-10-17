@@ -1,0 +1,101 @@
+{
+  "state": "review",
+  "expected_frames": 6,
+  "actual_frames": 6,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20439,
+      "bbox": [
+        5,
+        16,
+        187,
+        191
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20312,
+      "bbox": [
+        5,
+        16,
+        187,
+        191
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20351,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20174,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20118,
+      "bbox": [
+        5,
+        16,
+        187,
+        192
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-3-review-candidate\\review\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 20419,
+      "bbox": [
+        5,
+        16,
+        187,
+        191
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

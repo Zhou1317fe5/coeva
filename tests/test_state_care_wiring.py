@@ -114,6 +114,7 @@ def test_state_care_timer_interval_and_call_site() -> None:
     assert _CARE_CHECK_INTERVAL_MS == 5 * 60 * 1000
 
     import inspect
+
     src = inspect.getsource(run_companion.CompanionApp.__init__)
     assert "_setup_state_care()" in src
 

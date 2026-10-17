@@ -233,9 +233,7 @@ class PiDesktopParser(BaseSessionParser):
 
                     completed_at_raw = b.get("completedAt")
                     comp_ts = (
-                        normalize_timestamp(str(completed_at_raw))
-                        if completed_at_raw
-                        else call_ts
+                        normalize_timestamp(str(completed_at_raw)) if completed_at_raw else call_ts
                     )
 
                     is_err = bool(b.get("isError") or b.get("status") == "error")

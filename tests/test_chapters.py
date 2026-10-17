@@ -44,9 +44,7 @@ def test_llm_client_mock_completion() -> None:
     client = LLMClient(cfg)
 
     mock_resp_json = {
-        "choices": [
-            {"message": {"role": "assistant", "content": "Mock Chapter Content"}}
-        ]
+        "choices": [{"message": {"role": "assistant", "content": "Mock Chapter Content"}}]
     }
 
     mock_response = MagicMock()

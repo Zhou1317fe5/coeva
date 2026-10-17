@@ -84,7 +84,7 @@ Growth Core 与桌宠 Body 的内部通信协议（支持直接调用或本地 s
 ```json
 {
   "version": 2,
-  "selected_pet": "tiko",
+  "selected_pet": "calico",
   "feeder_hotkey": "<alt>+<space>",
   "agents": {}
 }

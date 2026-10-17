@@ -1,0 +1,101 @@
+{
+  "state": "waiting",
+  "expected_frames": 6,
+  "actual_frames": 6,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 22793,
+      "bbox": [
+        5,
+        7,
+        187,
+        200
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23130,
+      "bbox": [
+        5,
+        7,
+        187,
+        201
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23527,
+      "bbox": [
+        5,
+        5,
+        187,
+        203
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23257,
+      "bbox": [
+        5,
+        5,
+        186,
+        203
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 22845,
+      "bbox": [
+        5,
+        7,
+        187,
+        200
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-candidate\\waiting\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23433,
+      "bbox": [
+        6,
+        5,
+        185,
+        203
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

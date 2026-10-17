@@ -198,7 +198,7 @@
       },
       "source_path": "decoded\\running-right.png",
       "derived_from": "running-right",
-      "completed_at": "2026-10-17T00:39:42.168594+00:00",
+      "completed_at": "2026-10-17T08:39:42.168594+08:00",
       "metadata": {
         "width": 2172,
         "height": 724,
@@ -207,41 +207,40 @@
       },
       "mirror_decision": {
         "approved": true,
-        "approved_at": "2026-10-17T00:39:42.168594+00:00",
+        "approved_at": "2026-10-17T08:39:42.168594+08:00",
         "note": "Approved rightward frames have no one-sided markings, props, or directional lighting cues; cream face/chest, ears, paws and thick attached tail remain the same identity when flipped. Mirror each of the eight frame slots in place to preserve temporal gait order.",
         "transform": "framewise-horizontal-mirror-preserving-order"
-      }
+      },
+      "visual_qa": "pass",
+      "approved_frames_path": "frames/running-left",
+      "approved_frame_derivation": "exact same-index horizontal mirror of approved frames/running-right; packed decoded strip was not used for final frame extraction because slot boundaries changed scale"
     },
     {
       "id": "waving",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/waving.md",
       "retry_prompt_file": "prompts/row-retries/waving.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-03.png",
-          "role": "pet reference"
+          "role": "secondary relational mood board only; never geometry"
         },
         {
-          "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "path": "decoded/idle.png",
+          "role": "approved idle body scale and baseline comparator only; not identity authority"
         },
         {
           "path": "references/layout-guides/waving.png",
-          "role": "layout guide for 4 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "four-slot layout guide only; do not copy marks"
         }
       ],
       "output_path": "decoded/waving.png",
@@ -261,38 +260,35 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a14891-3eb4-7f01-b496-a1b4e92765de\\exec-7f79aa92-1d61-4ba4-8e67-9c68aa8984bf.png",
+      "completed_at": "2026-10-17T06:41:42Z",
+      "visual_qa": "pass",
+      "repairs_performed": "Corrected frames 01 and 02 to use one lifted forepaw plus one planted forepaw; stable-slot extraction retained common body scale.",
+      "final_source_path": "decoded/waving.png"
     },
     {
       "id": "jumping",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/jumping.md",
       "retry_prompt_file": "prompts/row-retries/jumping.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-03.png",
-          "role": "pet reference"
-        },
-        {
-          "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "role": "secondary play/mood board only; never geometry"
         },
         {
           "path": "references/layout-guides/jumping.png",
-          "role": "layout guide for 5 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "five-slot layout guide only; do not copy marks"
         }
       ],
       "output_path": "decoded/jumping.png",
@@ -312,38 +308,34 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a14905-a648-7e73-9eb6-8ee0085728f0\\exec-e7b94d9a-2ea0-493b-9b61-e0edba6b41e2.png",
+      "completed_at": "2026-10-17T08:44:50Z",
+      "visual_qa": "pass",
+      "repairs_performed": "Deterministic stable-slot extraction retained low airborne scale and common observation window; no image regeneration."
     },
     {
       "id": "failed",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/failed.md",
       "retry_prompt_file": "prompts/row-retries/failed.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-03.png",
-          "role": "pet reference"
-        },
-        {
-          "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "role": "secondary ordinary-life emotion board only; never error/status semantics"
         },
         {
           "path": "references/layout-guides/failed.png",
-          "role": "layout guide for 8 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "eight-slot layout guide only; do not copy marks"
         }
       ],
       "output_path": "decoded/failed.png",
@@ -363,38 +355,34 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a1491d-1c8b-7561-a515-f84028bb31d1\\exec-9893b7a1-3c37-48d7-a7e0-c5667273aa6e.png",
+      "completed_at": "2026-10-17T09:10:22Z",
+      "visual_qa": "pass",
+      "repairs_performed": "First candidate repaired twice: frames 03-05 received a smaller head/pose arc; final full-row scale repair matched quiet-row body band and common baseline."
     },
     {
       "id": "waiting",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/waiting.md",
       "retry_prompt_file": "prompts/row-retries/waiting.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-03.png",
-          "role": "pet reference"
-        },
-        {
-          "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "role": "secondary semantic and atmosphere board only; never geometry"
         },
         {
           "path": "references/layout-guides/waiting.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "layout guide for six separated frame slots only; do not copy guide marks"
         }
       ],
       "output_path": "decoded/waiting.png",
@@ -414,38 +402,38 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a14795-2495-73f2-bca3-6e9f789bf7c3\\exec-22420070-cd3b-4ba2-aa4b-4f8bcf2f05c6.png",
+      "completed_at": "2026-10-17T02:06:28Z",
+      "visual_qa": "pass",
+      "repairs_performed": "Two waiting-only regenerations: first still too tall/upright; final third strip matches idle scale and passes visual QA."
     },
     {
       "id": "running",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/running.md",
       "retry_prompt_file": "prompts/row-retries/running.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
-        },
-        {
-          "path": "references\\reference-03.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "role": "accepted Phase2A low locomotion SILHOUETTE only; not face authority"
+        },
+        {
+          "path": "references\\reference-03.png",
+          "role": "secondary semantic life/mood board only; never geometry"
         },
         {
           "path": "references/layout-guides/running.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "six-slot layout guide only; do not copy marks"
         }
       ],
       "output_path": "decoded/running.png",
@@ -465,38 +453,37 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a147d0-5b35-76f2-aa39-ee9ce6c9ab63\\exec-6ba72f42-0c13-49cc-9926-0e1f41968c38.png",
+      "completed_at": "2026-10-17T03:08:00Z",
+      "visual_qa": "pass"
     },
     {
       "id": "review",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/review.md",
       "retry_prompt_file": "prompts/row-retries/review.md",
       "input_images": [
         {
-          "path": "references\\reference-01.png",
-          "role": "pet reference"
+          "path": "references/canonical-base.png",
+          "role": "HIGHEST priority original vasu-canonical.png identity authority"
+        },
+        {
+          "path": "decoded/waiting.png",
+          "role": "approved waiting row for seated body size and baseline only; review must have more sustained directed attention; NOT face authority"
         },
         {
           "path": "references\\reference-02.png",
-          "role": "pet reference"
+          "role": "64x64 pixel readability reference only"
         },
         {
           "path": "references\\reference-03.png",
-          "role": "pet reference"
-        },
-        {
-          "path": "references\\reference-04.png",
-          "role": "pet reference"
+          "role": "secondary semantic atmosphere board only; never geometry"
         },
         {
           "path": "references/layout-guides/review.png",
-          "role": "layout guide for 6 frame slots; use for spacing only, do not copy guide lines"
-        },
-        {
-          "path": "references/canonical-base.png",
-          "role": "canonical identity reference"
+          "role": "layout guide for six separated slots only; do not copy guide marks"
         }
       ],
       "output_path": "decoded/review.png",
@@ -516,7 +503,10 @@
         "may_derive": false,
         "reason": "state requires its own generated animation semantics"
       },
-      "mirror_policy": {}
+      "mirror_policy": {},
+      "source_path": "C:\\Users\\Admin\\.codex\\generated_images\\01a147b2-3b20-7412-a83c-04d16bb7cab6\\exec-2f419685-106c-4914-b598-2e13cb7eea39.png",
+      "completed_at": "2026-10-17T02:34:57Z",
+      "visual_qa": "pass"
     }
   ]
 }

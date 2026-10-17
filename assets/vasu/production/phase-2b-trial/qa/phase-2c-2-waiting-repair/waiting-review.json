@@ -1,0 +1,101 @@
+{
+  "state": "waiting",
+  "expected_frames": 6,
+  "actual_frames": 6,
+  "extraction_method": "components",
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "frames": [
+    {
+      "index": 0,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\00.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23241,
+      "bbox": [
+        5,
+        8,
+        187,
+        200
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 1,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\01.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23517,
+      "bbox": [
+        5,
+        7,
+        187,
+        201
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 2,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\02.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23619,
+      "bbox": [
+        5,
+        6,
+        187,
+        201
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 3,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\03.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23265,
+      "bbox": [
+        5,
+        7,
+        187,
+        200
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 4,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\04.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23590,
+      "bbox": [
+        5,
+        6,
+        187,
+        202
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    },
+    {
+      "index": 5,
+      "file": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\05.png",
+      "width": 192,
+      "height": 208,
+      "nontransparent_pixels": 23749,
+      "bbox": [
+        5,
+        6,
+        187,
+        202
+      ],
+      "edge_pixels": 0,
+      "chroma_adjacent_pixels": 0
+    }
+  ]
+}

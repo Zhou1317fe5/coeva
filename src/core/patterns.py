@@ -122,8 +122,7 @@ class PatternBuilder:
                 pattern_id="pat_agent_autonomous_recovery",
                 category="friction_response",
                 description=(
-                    "面对工具执行报错摩擦时，倾向于给予 Agent 充分自主修复空间，"
-                    "不频繁介入打断。"
+                    "面对工具执行报错摩擦时，倾向于给予 Agent 充分自主修复空间，不频繁介入打断。"
                 ),
                 supporting_episodes=tuple(autonomous_healing_episodes),
                 counter_episodes=tuple(intervened_episodes),

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.core.llm_client import LLMConfig
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, parse_hotkey
 
 DEFAULT_AGENTS: dict[str, dict[str, Any]] = {
@@ -156,6 +157,11 @@ class AgentSettingsStore:
         self._feeder_hotkey = (
             stored_hotkey.spec if stored_hotkey is not None else DEFAULT_FEEDER_HOTKEY
         )
+        llm_data = raw_data.get("llm")
+        if isinstance(llm_data, dict) and llm_data.get("api_key"):
+            self._llm_config = LLMConfig.from_dict(llm_data)
+        else:
+            self._llm_config = LLMConfig.load()
         agents_data = raw_data.get("agents", {})
         self._configs = {}
 
@@ -205,6 +211,7 @@ class AgentSettingsStore:
             "version": 2,
             "selected_pet": self._selected_pet,
             "feeder_hotkey": self._feeder_hotkey,
+            "llm": self._llm_config.to_dict(),
             "agents": {aid: cfg.to_dict() for aid, cfg in self._configs.items()},
         }
         with open(self.file_path, "w", encoding="utf-8") as f:
@@ -243,6 +250,17 @@ class AgentSettingsStore:
         if parsed is None:
             raise ValueError(f"非法快捷键组合: {spec!r}")
         self._feeder_hotkey = parsed.spec
+        self.save()
+
+    @property
+    def llm_config(self) -> LLMConfig:
+        """Return current LLM configuration."""
+        return self._llm_config
+
+    def set_llm_config(self, config: LLMConfig) -> None:
+        """Update and persist LLM configuration to both settings stores."""
+        self._llm_config = config
+        config.save()
         self.save()
 
     def is_agent_enabled(self, agent_id: str, instance_id: str | None = None) -> bool:

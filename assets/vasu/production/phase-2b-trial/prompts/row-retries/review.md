@@ -1,13 +1,13 @@
 Create Codex pet row `review` for `vasu`: exactly 6 full-body frames in one horizontal strip on flat pure magenta #FF00FF.
 
-Use the attached canonical base for identity and the layout guide only for spacing. Same pet in every frame: Vasu: the exact canonical small river otter; warm brown fur, cream blunt muzzle and broad bib, small calm dark eyes, small round ears, compact natural body, thick attached otter tail, no clothing or props. Canonical portrait controls identity; Phase 2A side pose controls locomotion silhouette only.. Preserve silhouette, face, palette, material, proportions, markings, and props.
+Use the original canonical Vasu portrait as highest identity authority and the guide for six-slot spacing only. Preserve small calm eyes, rounded muzzle, broad cream bib, warm-brown fur, compact body and thick attached tail. The 64px reference is for readability; the board supplies mood only; approved waiting supplies body scale/baseline only.
 
 Keep apparent pet scale and baseline stable within the row unless the state itself intentionally changes vertical position, such as `jumping`.
 
-Action: Ready-review loop: focused inspection of completed output with lean, blink, narrowed eyes, head tilt, or paw pose.
+Action: Vasu quietly studies one interesting point to its right in the shared environment, then settles. It is curious for its own reasons, not checking Agent output or user work.
 
 State requirements:
-- Show review through lean, blink, narrowed eyes, head tilt, or paw/hand position.
-- Do not add magnifying glasses, papers, code, UI, punctuation, symbols, or other new props unless they already exist in the base pet identity.
+- Six stable planted poses, source body band near y238–537 on 2172×724 canvas. Small directed gaze/head/neck shift held briefly and returned; more focused than waiting, no repeated scanning.
+- No alert wide eyes, looming pose, evaluator stare, code, magnifier, papers, UI, bubble, props, full-body bounce or Agent status energy.
 
 One centered complete pose per invisible slot. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or #FF00FF colors in the pet.

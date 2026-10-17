@@ -38,6 +38,7 @@ class CodexCliParser(BaseSessionParser):
                 Path.home() / ".codex" / "sessions",
             ]
             self.search_paths = [p for p in candidates if p.is_dir()]
+
     @property
     def source_id(self) -> str:
         return "codex"

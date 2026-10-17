@@ -91,11 +91,14 @@ SCHEDULE_CONFIGS: dict[CircadianPhase, PhaseSchedule] = {
         phase=CircadianPhase.MORNING_WORK,
         default_state="idle",
         allowed_activities=(
-            ("working-typing", 70_000),    # ~70s focused keyboard coding
-            ("working-building", 60_000),  # ~60s woodwork carpentry
-            ("thinking", 40_000),          # ~40s deep pondering
-            ("working-sweeping", 45_000),  # ~45s workspace cleaning
-            ("working-carrying", 35_000),  # ~35s carrying crates
+            ("working-typing", 70_000),    # Calico
+            ("working-building", 60_000),  # Calico
+            ("review", 60_000),            # Vasu 专注审查/思考
+            ("waiting", 45_000),           # Vasu 专注凝视
+            ("running", 35_000),           # Vasu 活力奔跑
+            ("thinking", 40_000),          # Calico
+            ("working-sweeping", 45_000),  # Calico
+            ("working-carrying", 35_000),  # Calico
         ),
         min_pause_ms=25_000,   # 25s - 50s breather between focused work bouts
         max_pause_ms=50_000,
@@ -107,6 +110,7 @@ SCHEDULE_CONFIGS: dict[CircadianPhase, PhaseSchedule] = {
         allowed_activities=(
             ("yawning", 10_000),
             ("dozing", 30_000),
+            ("waiting", 25_000),           # Vasu 午间放空
             ("thinking", 20_000),
             ("waking", 8_000),
         ),
@@ -118,11 +122,16 @@ SCHEDULE_CONFIGS: dict[CircadianPhase, PhaseSchedule] = {
         phase=CircadianPhase.AFTERNOON_FOCUS,
         default_state="idle",
         allowed_activities=(
-            ("working-building", 75_000),  # ~75s woodwork carpentry
-            ("working-typing", 70_000),    # ~70s coding typing
-            ("working-sweeping", 45_000),  # ~45s tidying workshop
-            ("thinking", 40_000),          # ~40s problem solving
-            ("working-carrying", 35_000),  # ~35s workshop logistics
+            ("working-building", 75_000),  # Calico
+            ("working-typing", 70_000),    # Calico
+            ("review", 65_000),            # Vasu 下午深度复盘与构思
+            ("waiting", 45_000),           # Vasu 耐心等待与凝视
+            ("running", 35_000),           # Vasu 奔跑
+            ("running-right", 30_000),     # Vasu 向右小跑
+            ("running-left", 30_000),      # Vasu 向左小跑
+            ("working-sweeping", 45_000),  # Calico
+            ("thinking", 40_000),          # Calico
+            ("working-carrying", 35_000),  # Calico
         ),
         min_pause_ms=25_000,   # 25s - 50s breather between focused work bouts
         max_pause_ms=50_000,
@@ -132,9 +141,14 @@ SCHEDULE_CONFIGS: dict[CircadianPhase, PhaseSchedule] = {
         phase=CircadianPhase.EVENING_LEISURE,
         default_state="idle",
         allowed_activities=(
-            ("working-conducting", 35_000),  # listening to music & conducting
-            ("working-juggling", 30_000),    # juggling balls
+            ("working-conducting", 35_000),
+            ("working-juggling", 30_000),
+            ("jumping", 25_000),           # Vasu 欢快跳跃玩耍
+            ("waving", 15_000),            # Vasu 招手挥爪致意
+            ("running-right", 20_000),     # Vasu 闲暇小跑
+            ("running-left", 20_000),      # Vasu
             ("thinking", 20_000),
+            ("waiting", 25_000),           # Vasu 发呆放空
             ("yawning", 10_000),
         ),
         min_pause_ms=90_000,   # 1.5 - 3 minutes

@@ -1,13 +1,13 @@
 Create Codex pet row `waiting` for `vasu`: exactly 6 full-body frames in one horizontal strip on flat pure magenta #FF00FF.
 
-Use the attached canonical base for identity and the layout guide only for spacing. Same pet in every frame: Vasu: the exact canonical small river otter; warm brown fur, cream blunt muzzle and broad bib, small calm dark eyes, small round ears, compact natural body, thick attached otter tail, no clothing or props. Canonical portrait controls identity; Phase 2A side pose controls locomotion silhouette only.. Preserve silhouette, face, palette, material, proportions, markings, and props.
+Use the original canonical Vasu portrait as highest identity authority and the guide for six-slot spacing only. Preserve its small calm eyes, blunt cream muzzle, broad bib, warm-brown fur, compact body and thick attached tail. The 64px reference is for readability; the board supplies mood only.
 
 Keep apparent pet scale and baseline stable within the row unless the state itself intentionally changes vertical position, such as `jumping`.
 
-Action: Needs-input loop: expectant asking pose for approval, help, or user input.
+Action: Vasu has quietly paused its own activity, awake and self-possessed in shared space.
 
 State requirements:
-- Show that Codex needs approval, help, or user input through an expectant asking pose.
-- Keep the motion patient and readable, without turning it into ordinary idle or review.
+- Six planted, stable poses with a tiny sideward gaze/head-angle or ear adjustment and return. Mild environmental awareness distinguishes this from idle's private breath/blink at 64px.
+- No asking, pleading, leaning toward the user, oversized eyes, repeated waving, user-service or Agent-status expression, body bounce, or new props.
 
 One centered complete pose per invisible slot. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or #FF00FF colors in the pet.

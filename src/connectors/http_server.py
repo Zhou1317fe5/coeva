@@ -234,7 +234,6 @@ class _CompanionHandler(BaseHTTPRequestHandler):
             updated = self.settings_store.get(aid)
             self._send_json(200, {"ok": True, "agent": updated.to_dict() if updated else {}})
 
-
         elif self.path == "/api/agents/hook/install":
             aid = str(data.get("agent_id", "")).strip()
             iid = str(data.get("instance_id", "")).strip()

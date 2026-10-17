@@ -1,13 +1,13 @@
 Create Codex pet row `running` for `vasu`: exactly 6 full-body frames in one horizontal strip on flat pure magenta #FF00FF.
 
-Use the attached canonical base for identity and the layout guide only for spacing. Same pet in every frame: Vasu: the exact canonical small river otter; warm brown fur, cream blunt muzzle and broad bib, small calm dark eyes, small round ears, compact natural body, thick attached otter tail, no clothing or props. Canonical portrait controls identity; Phase 2A side pose controls locomotion silhouette only.. Preserve silhouette, face, palette, material, proportions, markings, and props.
+Use original canonical Vasu as highest identity authority, 64px master for readability, Phase 2A side pose for low locomotion silhouette only, board for life/mood only, and guide for six-slot spacing only. Preserve small calm eyes, rounded cream muzzle and bib, warm-brown compact body and thick attached tail; no props.
 
 Keep apparent pet scale and baseline stable within the row unless the state itself intentionally changes vertical position, such as `jumping`.
 
-Action: Working loop: focused active-task processing, thinking, typing, scanning, or effortful concentration; not literal foot-running, jogging, sprinting, treadmill motion, raised knees, long steps, pumping arms, or directional travel.
+Action: Vasu has chosen to move toward its own small purpose, independent of Agent tools, code, user work or task progress.
 
 State requirements:
-- Show the pet actively working or processing, as if running a task: focused posture, busy hands or paws, purposeful bobbing, thinking motion, tool or prop motion only if already part of the pet identity, or other non-locomotion activity.
-- Do not show literal foot-running, jogging, sprinting, treadmill motion, raised knees, long steps, pumping arms, directional travel, speed lines, dust clouds, floor shadows, motion trails, or detached motion effects.
+- Six calm sequential short grounded steps, a planted paw each beat, steady torso length/baseline, minimal head or body bounce, connected thick tail and small forward gaze. Distinct from seated idle/waiting/review and from the eight-frame drag gait.
+- No sprinting, long legs, pointed muzzle, tools, screens, symbols, progress/status cues, user-facing service expression, detached effects or shadows.
 
 One centered complete pose per invisible slot. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or #FF00FF colors in the pet.

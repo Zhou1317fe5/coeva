@@ -52,6 +52,7 @@ class HarvestWorkerThread(QThread):
 
     def run(self) -> None:
         try:
+
             def _on_prog(src: str, cur: int, total: int) -> None:
                 self.progress_msg.emit(f"[{src}] 正在提取会话: {cur}/{total}...")
 

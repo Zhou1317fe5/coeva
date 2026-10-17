@@ -1,14 +1,12 @@
 Create Codex pet row `failed` for `vasu`: exactly 8 full-body frames in one horizontal strip on flat pure magenta #FF00FF.
 
-Use the attached canonical base for identity and the layout guide only for spacing. Same pet in every frame: Vasu: the exact canonical small river otter; warm brown fur, cream blunt muzzle and broad bib, small calm dark eyes, small round ears, compact natural body, thick attached otter tail, no clothing or props. Canonical portrait controls identity; Phase 2A side pose controls locomotion silhouette only.. Preserve silhouette, face, palette, material, proportions, markings, and props.
+Use original canonical Vasu as highest identity authority, 64px master for readability, board for ordinary-life mood only, and guide for eight-slot spacing only. Preserve small calm eyes, rounded muzzle, broad bib, warm-brown compact body and thick attached tail; no props.
 
 Keep apparent pet scale and baseline stable within the row unless the state itself intentionally changes vertical position, such as `jumping`.
 
-Action: Blocked/failed loop: slumped or deflated reaction with sad or closed eyes.
+Action: Vasu's own small intention did not work; mild puzzlement/disappointment followed by emotional recovery, unrelated to Agent/user failure.
 
 State requirements:
-- Show failure through slumped pose, drooping ears/limbs, closed or sad eyes, and lower body position.
-- Tears, small smoke puffs, or tiny stars are allowed only if attached to or overlapping the pet silhouette and kept inside the same frame slot.
-- Do not draw red X marks, floating symbols, detached stars, separated smoke clouds, falling tear drops, dust, or other loose effects.
+- Eight subtle beats from calm notice through a small puzzled/lowered posture back to neutral settle. Use gaze/head/ear/eyelid changes and slight compression only. No tears, drama, symbols, UI, error imagery, props, shadows, panic or tantrum.
 
 One centered complete pose per invisible slot. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or #FF00FF colors in the pet.

@@ -188,17 +188,19 @@ class ChronicleStore:
         rows = []
         for event in events:
             provenance, retention_class = classify(event.event_type)
-            rows.append((
-                event_id(event),
-                event.timestamp,
-                event.agent_id,
-                event.session_id,
-                str(event.event_type),
-                event.tool_name,
-                event.error_message,
-                provenance,
-                retention_class,
-            ))
+            rows.append(
+                (
+                    event_id(event),
+                    event.timestamp,
+                    event.agent_id,
+                    event.session_id,
+                    str(event.event_type),
+                    event.tool_name,
+                    event.error_message,
+                    provenance,
+                    retention_class,
+                )
+            )
         if not rows:
             return 0
         cursor = self._conn.executemany(
@@ -405,9 +407,7 @@ class ChronicleStore:
 
         out: list[DevelopmentHypothesis] = []
         for r in self._conn.execute(sql, params):
-            lenses = tuple(
-                DevelopmentLens(x) for x in r["lenses"].split(",") if x
-            )
+            lenses = tuple(DevelopmentLens(x) for x in r["lenses"].split(",") if x)
             out.append(
                 DevelopmentHypothesis(
                     hypothesis_id=r["id"],
@@ -443,9 +443,7 @@ class ChronicleStore:
         )
         self._conn.commit()
 
-    def list_insights(
-        self, *, status: InsightStatus | None = None
-    ) -> list[ConfirmedInsight]:
+    def list_insights(self, *, status: InsightStatus | None = None) -> list[ConfirmedInsight]:
         """Query confirmed insights, optionally filtered by status."""
         sql = "SELECT * FROM insights"
         params: list[Any] = []
@@ -456,9 +454,7 @@ class ChronicleStore:
 
         out: list[ConfirmedInsight] = []
         for r in self._conn.execute(sql, params):
-            lenses = tuple(
-                DevelopmentLens(x) for x in r["lenses"].split(",") if x
-            )
+            lenses = tuple(DevelopmentLens(x) for x in r["lenses"].split(",") if x)
             out.append(
                 ConfirmedInsight(
                     insight_id=r["id"],
@@ -490,9 +486,7 @@ class ChronicleStore:
         )
         self._conn.commit()
 
-    def list_themes(
-        self, *, status: ThemeStatus | None = None
-    ) -> list[GrowthTheme]:
+    def list_themes(self, *, status: ThemeStatus | None = None) -> list[GrowthTheme]:
         """Query active or historical growth themes."""
         sql = "SELECT * FROM growth_themes"
         params: list[Any] = []

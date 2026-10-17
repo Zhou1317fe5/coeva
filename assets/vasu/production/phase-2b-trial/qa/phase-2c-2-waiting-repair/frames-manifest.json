@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "threshold": 200.0
+  },
+  "rows": [
+    {
+      "state": "waiting",
+      "frames": [
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\00.png",
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\01.png",
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\02.png",
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\03.png",
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\04.png",
+        "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-2-waiting-repair\\waiting\\05.png"
+      ],
+      "method": "components"
+    }
+  ]
+}

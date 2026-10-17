@@ -108,6 +108,7 @@ def test_intervention_policy_3_gates() -> None:
     assert guard.is_active
     assert engine.evaluate_intervention(is_task_in_flight=False) is None
 
+
 def test_agent_bubbles_are_gated_so_routine_telemetry_stays_silent() -> None:
     """Routine agent telemetry must move the pet without ever speaking.
 

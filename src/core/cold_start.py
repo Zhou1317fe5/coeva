@@ -38,9 +38,7 @@ def read_or_create_first_seen(path: Path | None = None, *, today: date | None = 
 
     try:
         resolved_path.parent.mkdir(parents=True, exist_ok=True)
-        resolved_path.write_text(
-            json.dumps({"first_seen": current.isoformat()}), encoding="utf-8"
-        )
+        resolved_path.write_text(json.dumps({"first_seen": current.isoformat()}), encoding="utf-8")
     except OSError:
         pass  # a read-only filesystem must not stop the companion from starting
     return current

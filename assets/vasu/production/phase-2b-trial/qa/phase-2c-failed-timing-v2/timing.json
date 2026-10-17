@@ -1,0 +1,28 @@
+{
+  "state": "failed",
+  "old_durations_ms": [
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    240
+  ],
+  "new_durations_ms": [
+    160,
+    150,
+    180,
+    260,
+    220,
+    150,
+    140,
+    260
+  ],
+  "old_total_ms": 1220,
+  "new_total_ms": 1520,
+  "frames_unchanged": true,
+  "visual_repair": false,
+  "gif": "assets\\vasu\\production\\phase-2b-trial\\qa\\phase-2c-failed-timing-v2\\failed.gif"
+}

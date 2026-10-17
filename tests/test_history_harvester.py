@@ -172,9 +172,7 @@ def test_hermes_db_parser(tmp_path: Path) -> None:
     """Verify HermesDbParser parses SQLite sessions and tool errors."""
     db_file = tmp_path / "hermes_test.db"
     conn = sqlite3.connect(db_file)
-    conn.execute(
-        "CREATE TABLE sessions (id TEXT PRIMARY KEY, started_at REAL, ended_at REAL)"
-    )
+    conn.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, started_at REAL, ended_at REAL)")
     conn.execute(
         "CREATE TABLE messages ("
         "  id TEXT, session_id TEXT, role TEXT, content TEXT, "
@@ -238,16 +236,20 @@ def test_harvester_dry_run_and_idempotent_ingestion(tmp_path: Path) -> None:
             + "\n"
         )
         f.write(
-            json.dumps({
-                "type": "message",
-                "role": "assistant",
-                "createdAt": "2026-10-01T10:02:00Z",
-                "blocks": [{
-                    "type": "tool_call",
-                    "name": "Bash",
-                    "completedAt": "2026-10-01T10:03:00Z",
-                }],
-            })
+            json.dumps(
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "createdAt": "2026-10-01T10:02:00Z",
+                    "blocks": [
+                        {
+                            "type": "tool_call",
+                            "name": "Bash",
+                            "completedAt": "2026-10-01T10:03:00Z",
+                        }
+                    ],
+                }
+            )
             + "\n"
         )
 
@@ -307,6 +309,7 @@ def test_cold_start_policy_relational_anchor_preservation(tmp_path: Path) -> Non
     assert policy_after.day_count == 1
     assert policy_after.daily_speech_quota == 1
     assert not policy_after.allows_psychological_analysis
+
 
 def test_pi_cli_nested_message_format(tmp_path: Path) -> None:
     """Verify PiDesktopParser correctly parses Pi CLI nested message structure."""

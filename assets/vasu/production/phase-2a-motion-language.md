@@ -16,12 +16,14 @@ This is a static pose study for [the locked Phase 1 contract](../../../docs/spec
 | --- | --- | --- | --- |
 | Right-facing standing / locomotion base | Low, slightly elongated side silhouette; short planted legs; thick tail extending behind; calm head facing right. | An otter ready to take an unhurried step. | Upright mascot stance, long-legged run, bouncing, skinny or disconnected tail. |
 | Observe | Mostly planted body; a slight head or gaze lift toward the surroundings. | Quiet curiosity without urgency. | Wide eyes, alert icon posture, surveillance or Agent-status look. |
-| Self-work | Forepaws occupied with a small purposeful self-grooming action; no object required. | Vasu tending to its own life. | Coding, tool props, serving the user, frantic paw movement. |
+| Self-work / purposeful activity | Low, compact body taking a short grounded step toward a place Vasu has chosen; one paw planted, gaze calmly directed ahead, tail attached. No object required. | Vasu decides to go about its own small business. | Coding, tool props, Agent-task pantomime, serving the user, frantic steps or bouncing. |
 | Rest | Settled low with relaxed shoulders, half-open eyes and a comfortably supported head. | Awake and at ease, distinct from sleep. | Closed eyes, `zzz`, bed or blanket, collapsed/sad posture. |
 | Play | Brief low crouch and a small self-directed tail glance or paw reach. | Private curiosity and light amusement. | Victory jump, confetti, grin, oversized bounce, invitation to watch. |
 | Relate / respond | A glance toward the user and one small paw or head acknowledgment, then settle. | Friendly recognition within shared life. | Repeated wave, begging, saluting, speech bubble, eager helper stance. |
 
 Exploration is not a seventh key pose in this phase. Its later motion can combine the right-facing grounded step with the quiet gaze of Observe; it should not become a constant search animation.
+
+For the Codex-compatible `running` row, the state name is an asset slot, not an Agent progress cue. Its current Vasu drawing represents self-chosen purposeful movement; the drawing can be replaced later without changing the higher-level state contract.
 
 ## Review gate
 
@@ -37,7 +39,7 @@ Compare every candidate against the canonical face, bib shape, body mass, tail a
 | --- | --- |
 | Right-facing standing / locomotion base | **Motion anchor accepted for Phase 2B trials.** The focused study corrects the first sheet's overlong torso and pointed muzzle. Short planted legs and a thick attached tail read clearly at 64 pixels. Keep the canonical smaller calm eyes, rounded muzzle and restrained mouth when drawing animation frames; this still is a guide, not a finished frame. |
 | Observe | **Revise before its own animation.** The draft lifts the whole chest and looks alert. Keep the body planted; move only gaze and a little head angle. |
-| Self-work | **Revise before its own animation.** Forepaw grooming is a prop-free purposeful action, but the closed eyes read like sleep at 64 pixels. Keep the eyes open and the paw action deliberate. |
+| Self-work / purposeful activity | **Phase 2C semantic correction.** The draft's closed-eye grooming reads like sleep at 64 pixels and is not approved production art. Use the accepted right-facing low locomotion silhouette for a new self-directed step toward Vasu's own destination; keep eyes open, short legs grounded, head/chest moving together, and no work/Agent props. The `running` trial row must prove this reading before it is locked. |
 | Rest | **Revise before its own animation.** The draft lounges with bright eyes and a smile, so it reads closer to play than peaceful waking rest. Use half-lidded eyes and a supported, settled head while remaining visibly awake. |
 | Play | **Revise before its own animation.** Tail attention is suitably self-directed and low-energy, but the head-down pose overlaps grooming/rest at 64 pixels. Show a small, awake glance or paw reach toward the tail without a jump or celebratory expression. |
 | Relate / respond | **Revise before its own animation.** The raised paw is close to a mascot wave. Prefer a glance or tiny head acknowledgment, with the paw kept near the chest. |

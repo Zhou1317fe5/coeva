@@ -1,0 +1,50 @@
+{
+  "all_approved_rows_unchanged": true,
+  "rows": [
+    {
+      "state": "idle",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "running-right",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "running-left",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "waving",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "jumping",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "failed",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "waiting",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "running",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    },
+    {
+      "state": "review",
+      "decoded_unchanged": true,
+      "frames_unchanged": true
+    }
+  ]
+}

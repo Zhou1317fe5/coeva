@@ -84,6 +84,7 @@ def test_companion_http_server_endpoints() -> None:
     finally:
         server.stop()
 
+
 def test_agent_filtering_and_settings(tmp_path: Path) -> None:
     from src.connectors.settings import AgentSettingsStore
 
@@ -110,9 +111,7 @@ def test_agent_filtering_and_settings(tmp_path: Path) -> None:
             assert agents["hermes"]["enabled"] is True
 
         # 2. Disable hermes via POST /api/agents/update
-        update_payload = json.dumps(
-            {"agent_id": "hermes", "enabled": False}
-        ).encode("utf-8")
+        update_payload = json.dumps({"agent_id": "hermes", "enabled": False}).encode("utf-8")
         req_up = urllib.request.Request(
             "http://127.0.0.1:17390/api/agents/update",
             data=update_payload,
@@ -124,9 +123,9 @@ def test_agent_filtering_and_settings(tmp_path: Path) -> None:
             assert data["agent"]["enabled"] is False
 
         # 3. Post event from hermes -> Should be filtered out
-        event_payload = json.dumps(
-            {"agent_id": "hermes", "event_type": "user_prompt"}
-        ).encode("utf-8")
+        event_payload = json.dumps({"agent_id": "hermes", "event_type": "user_prompt"}).encode(
+            "utf-8"
+        )
         req_ev = urllib.request.Request(
             "http://127.0.0.1:17390/api/event",
             data=event_payload,
@@ -144,9 +143,7 @@ def test_agent_filtering_and_settings(tmp_path: Path) -> None:
         assert len(states_received) == 0
 
         # 4. Re-enable hermes
-        re_enable = json.dumps(
-            {"agent_id": "hermes", "enabled": True}
-        ).encode("utf-8")
+        re_enable = json.dumps({"agent_id": "hermes", "enabled": True}).encode("utf-8")
         req_re = urllib.request.Request(
             "http://127.0.0.1:17390/api/agents/update",
             data=re_enable,
@@ -170,6 +167,7 @@ def test_agent_filtering_and_settings(tmp_path: Path) -> None:
 
     finally:
         server.stop()
+
 
 def test_multi_environment_instance_isolation(tmp_path: Path) -> None:
     """Test isolating Windows vs WSL instances of the same Agent (e.g. Hermes)."""
@@ -256,6 +254,7 @@ def test_multi_environment_instance_isolation(tmp_path: Path) -> None:
     finally:
         server.stop()
 
+
 def test_hook_lifecycle_endpoints(tmp_path: Path) -> None:
     """Test one-click install, inspection and uninstall of Agent hooks via HTTP API."""
     from src.connectors.hook_manager import AgentHookManager
@@ -266,9 +265,11 @@ def test_hook_lifecycle_endpoints(tmp_path: Path) -> None:
 
     # Create mock hook manager targeting isolated temp directory
     hook_mgr = AgentHookManager()
+
     # Override target resolver to point inside tmp_path
     def _mock_target(aid: str, iid: str) -> Path:
         return tmp_path / "mock_hooks" / aid / iid.replace(":", "_")
+
     hook_mgr._resolve_target_dir = _mock_target  # type: ignore[method-assign]
 
     bus = LocalEventBus()
@@ -287,9 +288,9 @@ def test_hook_lifecycle_endpoints(tmp_path: Path) -> None:
             assert agents["hermes"]["instances"]["windows"]["hook_status"] == "not_installed"
 
         # 2. One-click install hook for hermes on windows
-        install_payload = json.dumps(
-            {"agent_id": "hermes", "instance_id": "windows"}
-        ).encode("utf-8")
+        install_payload = json.dumps({"agent_id": "hermes", "instance_id": "windows"}).encode(
+            "utf-8"
+        )
         req_in = urllib.request.Request(
             "http://127.0.0.1:17392/api/agents/hook/install",
             data=install_payload,
@@ -306,9 +307,7 @@ def test_hook_lifecycle_endpoints(tmp_path: Path) -> None:
             assert agents["hermes"]["instances"]["windows"]["hook_status"] == "installed"
 
         # 4. Uninstall hook
-        un_payload = json.dumps(
-            {"agent_id": "hermes", "instance_id": "windows"}
-        ).encode("utf-8")
+        un_payload = json.dumps({"agent_id": "hermes", "instance_id": "windows"}).encode("utf-8")
         req_un = urllib.request.Request(
             "http://127.0.0.1:17392/api/agents/hook/uninstall",
             data=un_payload,
@@ -326,6 +325,7 @@ def test_hook_lifecycle_endpoints(tmp_path: Path) -> None:
 
     finally:
         server.stop()
+
 
 def test_petdex_wire_endpoints_compatibility(tmp_path: Path) -> None:
     """Test compatibility with Petdex wire endpoints: POST /state and POST /bubble."""

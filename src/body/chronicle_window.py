@@ -185,7 +185,9 @@ class ChronicleViewerWindow(QWidget):
         self.episode_detail = QTextEdit()
         self.episode_detail.setReadOnly(True)
         self.episode_detail.setFixedHeight(110)
-        self.episode_detail.setPlaceholderText("点击上方会话可查看完整起止时间、参与端与详细统计...")
+        self.episode_detail.setPlaceholderText(
+            "点击上方会话可查看完整起止时间、参与端与详细统计..."
+        )
         layout.addWidget(self.episode_detail)
 
         return container
@@ -200,7 +202,9 @@ class ChronicleViewerWindow(QWidget):
         search_bar.setSpacing(8)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("输入关键词检索切片或历史会话/工具（如：代码、Bash、error、01a0）...")
+        self.search_input.setPlaceholderText(
+            "输入关键词检索切片或历史会话/工具（如：代码、Bash、error、01a0）..."
+        )
         self.search_input.returnPressed.connect(self._do_search)
         search_bar.addWidget(self.search_input, 1)
 
@@ -255,9 +259,7 @@ class ChronicleViewerWindow(QWidget):
         hyp_btn_row.setSpacing(8)
 
         self.btn_hyp_yes = QPushButton("✨ 认同该理解 (Yes)")
-        self.btn_hyp_yes.clicked.connect(
-            lambda: self._trigger_calibration(CalibrationResponse.YES)
-        )
+        self.btn_hyp_yes.clicked.connect(lambda: self._trigger_calibration(CalibrationResponse.YES))
         hyp_btn_row.addWidget(self.btn_hyp_yes)
 
         self.btn_hyp_partly = QPushButton("✏️ 补充校准 (Partly)")
@@ -267,9 +269,7 @@ class ChronicleViewerWindow(QWidget):
         hyp_btn_row.addWidget(self.btn_hyp_partly)
 
         self.btn_hyp_no = QPushButton("❌ 否定此判断 (No)")
-        self.btn_hyp_no.clicked.connect(
-            lambda: self._trigger_calibration(CalibrationResponse.NO)
-        )
+        self.btn_hyp_no.clicked.connect(lambda: self._trigger_calibration(CalibrationResponse.NO))
         hyp_btn_row.addWidget(self.btn_hyp_no)
 
         layout.addLayout(hyp_btn_row)
@@ -382,6 +382,7 @@ class ChronicleViewerWindow(QWidget):
         self._refresh_episodes()
         self._refresh_chapters()
         self._refresh_self_model()
+
     def _refresh_slices(self) -> None:
         self.slices_list.clear()
         slices: list[SliceRecord] = self.store.list_slices(limit=100)
@@ -432,9 +433,7 @@ class ChronicleViewerWindow(QWidget):
         ep: Episode | None = item.data(Qt.ItemDataRole.UserRole)
         if ep is not None:
             action_desc = (
-                "用户主动下发了指令/提示词"
-                if ep.has_user_action
-                else "全程由 Agent 自主执行与修复"
+                "用户主动下发了指令/提示词" if ep.has_user_action else "全程由 Agent 自主执行与修复"
             )
             agents_str = ", ".join(ep.agent_ids) if ep.agent_ids else "未知"
             self.episode_detail.setText(
@@ -484,6 +483,7 @@ class ChronicleViewerWindow(QWidget):
             empty_item = QListWidgetItem(f"未找到与 “{kw}” 相关的切片或事件")
             empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.search_results.addItem(empty_item)
+
     def _on_slice_selected(self, item: QListWidgetItem) -> None:
         record: SliceRecord | None = item.data(Qt.ItemDataRole.UserRole)
         if record is not None:
@@ -515,7 +515,7 @@ class ChronicleViewerWindow(QWidget):
         """Force re-run pattern builder on all latest episodes and re-synthesize hypotheses."""
         self._refresh_self_model(force_remine=True)
         stats = self.store.stats()
-        ep_c = stats.get('episodes', 0)
+        ep_c = stats.get("episodes", 0)
         pats = PatternBuilder(self.store).build_patterns(min_episodes=2)
         QMessageBox.information(
             self,
@@ -541,9 +541,7 @@ class ChronicleViewerWindow(QWidget):
         for h in hyps:
             lenses_str = " · ".join(f"[{lens.value}]" for lens in h.lenses)
             counter_tag = (
-                f"⚠️ 反例: {len(h.counter_episodes)}处"
-                if h.has_counter_evidence
-                else "无反例"
+                f"⚠️ 反例: {len(h.counter_episodes)}处" if h.has_counter_evidence else "无反例"
             )
             item_text = (
                 f"🌱 {h.statement}\n"
@@ -700,7 +698,9 @@ class ChronicleViewerWindow(QWidget):
 
         refl_row = QHBoxLayout()
         self.chapter_refl_edit = QLineEdit()
-        self.chapter_refl_edit.setPlaceholderText("在此写下这段时期你对工作方式或心智转变的真实感悟...")
+        self.chapter_refl_edit.setPlaceholderText(
+            "在此写下这段时期你对工作方式或心智转变的真实感悟..."
+        )
         refl_row.addWidget(self.chapter_refl_edit, 1)
 
         self.btn_save_refl = QPushButton("💾 保存手记")

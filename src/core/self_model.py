@@ -179,9 +179,7 @@ class SelfModelManager:
             # Remains candidate; silence never auto-promotes (SPEC section 14)
             return hypothesis, None, None
 
-    def retire_insight(
-        self, insight: ConfirmedInsight, *, reason: str = ""
-    ) -> ConfirmedInsight:
+    def retire_insight(self, insight: ConfirmedInsight, *, reason: str = "") -> ConfirmedInsight:
         """User has outgrown this model; archive it into historical growth footprints."""
         return ConfirmedInsight(
             insight_id=insight.insight_id,

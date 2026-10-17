@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "project": "Coeva",
+  "pet_id": "vasu",
+  "phase": "3-core-asset-freeze",
+  "run_dir": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze",
+  "spritesheet": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\final\\spritesheet.webp",
+  "validation": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\final\\validation.json",
+  "contact_sheet": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\contact-sheet.png",
+  "contact_sheet_64px": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\contact-sheet-64px.png",
+  "previews": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\previews",
+  "review": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\review.json",
+  "production_review": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\final-production-review.md",
+  "freeze_manifest": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\hash-freeze-manifest.json",
+  "frame_manifest": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\qa\\frame-manifest.json",
+  "package": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\core",
+  "codex_package": "C:\\Users\\Admin\\.codex\\pets\\vasu",
+  "visual_qa": "pass",
+  "all_nine_rows_unchanged": true,
+  "atlas_sha256": "e4b0cc0a29421084c0e8f9cdd5ac1760e87da7575c8b6f26fae995fe40fdb4be",
+  "package_spritesheet_sha256": "e4b0cc0a29421084c0e8f9cdd5ac1760e87da7575c8b6f26fae995fe40fdb4be"
+}

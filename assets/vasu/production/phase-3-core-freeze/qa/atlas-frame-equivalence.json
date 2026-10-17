@@ -1,0 +1,402 @@
+{
+  "atlas": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-3-core-freeze\\final\\spritesheet.webp",
+  "all_used_cells_pixel_exact": true,
+  "rows": [
+    {
+      "state": "idle",
+      "row": 0,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\idle\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "row": 1,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 6,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\06.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 7,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-right\\07.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "row": 2,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 6,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\06.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 7,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running-left\\07.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "row": 3,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waving\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "row": 4,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\jumping\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "row": 5,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 6,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\06.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 7,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\failed\\07.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "row": 6,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\waiting\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "row": 7,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\running\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "row": 8,
+      "frames": [
+        {
+          "column": 0,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\00.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 1,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\01.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 2,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\02.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 3,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\03.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 4,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\04.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        },
+        {
+          "column": 5,
+          "source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\phase-2b-trial\\frames\\review\\05.png",
+          "pixel_difference_count": 0,
+          "exact": true
+        }
+      ]
+    }
+  ]
+}
