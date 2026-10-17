@@ -6,7 +6,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 2C: failed 自主小挫折动画验收
+
+### 📝 Art Production（美术制作）
+- 制作并验收 `failed` 8 帧：Vasu 自己的小意图没奏效后短暂困惑、轻微失望并恢复平静；不表达 Agent、用户或系统错误。经过失败帧局部修正与整行尺度修正，完成 64px、GIF、接触表与色键 QA。九个核心 row 现在齐备，但最终图集仍待单独批准。
+
+## [Unreleased] - Vasu Phase 2C: jumping 自主玩耍动画验收
+
+### 📝 Art Production（美术制作）
+- 制作并验收 `jumping` 5 帧：Vasu 自己的一次低幅度小跳，带准备、离地、落地和安定，不表达任务成功或 Agent 完成。使用 stable-slot 抽帧保持空中帧体量，完成 64px、GIF、接触表与色键 QA。其它行与最终图集未制作或修改。
+
+## [Unreleased] - Vasu Phase 2C: waving 朋友式回应验收
+
+### 📝 Art Production（美术制作）
+- 制作并验收 `waving` 4 帧：一次短暂、克制的单爪回应，随后回到自己的生活。使用 stable-slot 抽帧修正组件法造成的中间帧体量跳动；完成 64px、GIF、接触表与色键 QA。其它行与最终图集未制作或修改。
+
 ## [Unreleased] - Calico Theme: 移植接入 Clawd on Desk 经典三花猫并设为默认宠物
+### 🐾 Fixed & Enhanced: 彻底重构贴边停靠（Mini Mode）动效状态机
+- **引入真实人类昼夜作息大周期（`Circadian Life Schedule`, `src/core/circadian.py`）**：
+  - **彻底告别多动症式的频繁换动作**：废除 20~40 秒的高频动作切换定时器，状态基底保持长时间平静（以数分钟为单位），90% 以上时间处于温和平静的呼吸与发呆（`idle`）；
+  - **全天 24 小时自然作息对齐**：
+    - **07:30 - 09:00 晨间苏醒（`MORNING_WAKE`）**：醒来伸懒腰（`waking`）、打哈欠（`yawning`），慢节奏开启新的一天；
+    - **09:00 - 12:00 上午专注工作（`MORNING_WORK`）**：以沉稳打字（`typing`）、深思构思（`thinking`）和安静陪伴为主，不进行吵闹娱乐；
+    - **12:00 - 14:00 午间休整与午睡（`MIDDAY_SIESTA`）**：打瞌睡揉眼（`dozing`）、打哈欠、小憩；
+    - **14:00 - 18:30 下午工坊沉浸（`AFTERNOON_FOCUS`）**：工匠日常（木工 `building`、打字 `typing`、整理 `sweeping`、搬运 `carrying`），单次专注做工持续 20~30 秒，间隔 3~8 分钟才偶发一次；
+    - **18:30 - 23:00 傍晚放松娱乐（`EVENING_LEISURE`）**：下班闲暇，偶尔听音乐指挥（`conducting`）、玩耍抛球（`juggling`）、散漫发呆；
+    - **23:00 - 07:30 夜间深度睡眠（`NIGHT_SLEEP`）**：夜深人静，桌宠保持安详沉睡（`sleeping`）或打瞌睡（`dozing`）。若主人深夜写代码，它安静蜷在桌角陪伴，绝不切换吵闹动作；
+  - **互动冷却提升至 60 秒（`GREETING_COOLDOWN_MS = 60_000`）**：光标滑过不再反复挥手，保持桌面极度静谧，只有间隔一段后初次交互才挥爪致意。
+- **解决物理切片导致的半截身子截断问题**：
+  - 废弃原本生硬的窗口向屏幕边缘滑出裁切方式（`_peek_reveal_px`）；
+  - 贴边时激活专属 **Mini Mode 动效状态机**，采用 Clawd on Desk 规范的贴边姿态资产（`calico-mini-idle`、`calico-mini-peek`、`calico-mini-happy`、`calico-mini-sleep`）；
+- **精准边缘贴合与翻转（`offsetRatio` & `flipAssets`）**：
+  - 读取 Calico 主题配置 `offsetRatio = 0.4`：屏幕外隐藏 40% 身形，屏幕内露出 60% 萌趣身姿（小猫伸爪趴在屏幕边框上探出头）；
+  - 左边缘与右边缘自适应翻转（`flipAssets: true`）：右边缘停靠时水平镜像翻转（`mini-idle-flipped`），爪子与小脑袋探向屏幕中心；左边缘停靠时直接朝内探出，姿势完全符合物理直觉；
+- **多层次微互动（Hover & Poke）**：
+  - 贴边常态：播放从容趴边探头的 `mini-idle`（或打盹时的 `mini-sleep`）；
+  - 鼠标悬停（Hover）：小猫进一步往外探出（`mini-peek`）；
+  - 鼠标点击/轻戳（Poke）：播放开心的贴边互动动画 `mini-happy` 并露出粉嫩肉垫；
+  - 拖离边缘：自动解除 Mini Mode 并恢复完整站姿 `idle`。
+
 
 ### 🚀 Added（新增功能）
 - **原生 APNG 动图主题加载器（`ThemeApngLoader`, `src/body/animation.py`）**：
@@ -27,10 +65,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/connectors/settings.py`：默认 `selected_pet` 改为 `"calico"`；
   - `run_companion.py`、`main.py`、`settings_window.py` 均将 Calico 设为首选默认宠物，托盘与设置面板可无缝切换。
 
+### 🗑️ Removed（移除废弃宠物）
+- **完全删除 Tiko、Debug Duck、Wangcai 素材与引用**：
+  - 彻底删除 `assets/pets/tiko`、`assets/pets/debug-duck`、`assets/pets/wangcai` 目录；
+  - 清理 `run_companion.py`、`main.py`、`settings_window.py`、`settings.py` 中的列表与回退项；
+  - 伴生体阵容全面收敛至 Calico（三花猫，默认）与 Claw（经典小猫）。
 ---
 
 ### 📝 Art Production（美术制作）
 - 修正 Phase 2A self-work 动作语义：旧闭眼梳理草图仍不作为生产素材；`running` 现表达 Vasu 为自己的小事克制地迈步前行，而非 Agent 任务状态。完成 6 帧色键抽帧、GIF、四行接触表、64px 对照与逐行 QA；已批准行与最终图集均未改动。
+
+## [Unreleased] - Vasu Phase 2C: waving 朋友式回应验收
+
+### 📝 Art Production（美术制作）
+- 制作并验收 `waving` 4 帧：一次短暂、克制的单爪回应，随后回到自己的生活。使用 stable-slot 抽帧修正组件法造成的中间帧体量跳动；完成 64px、GIF、接触表与色键 QA。其它行与最终图集未制作或修改。
 
 ## [Unreleased] - Vasu Phase 2C-3: review 专注观察动画验收
 

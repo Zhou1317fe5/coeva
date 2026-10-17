@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageSequence
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap, QTransform
 
 # Alpha values at or below this are treated as transparent. Matches the mask
 # threshold used when trimming empty frames.
@@ -16,6 +17,16 @@ _ALPHA_THRESHOLD = 8
 
 class SpriteSheetError(RuntimeError):
     """Raised when a spritesheet cannot be loaded or sliced."""
+
+
+@dataclass(frozen=True)
+class MiniModeConfig:
+    """Theme configuration for edge docking and mini-mode peek behaviors."""
+
+    supported: bool = False
+    flip_assets: bool = False
+    offset_ratio: float = 0.4
+    peek_offset_ratio: float = 0.08
 
 
 def measure_art_padding(image: QImage, *, cols: int, rows: int) -> tuple[int, int]:
@@ -119,6 +130,19 @@ class SpriteSheet:
             sliced.append(QPixmap.fromImage(frame_image))
 
         return cls(sliced, frame_width=frame_width, frame_height=frame_height)
+    def mirrored(self, *, horizontal: bool = True, vertical: bool = False) -> SpriteSheet:
+        """Return a new SpriteSheet with all frames mirrored horizontally/vertically."""
+        if not horizontal and not vertical:
+            return self
+        transform = QTransform()
+        transform.scale(-1.0 if horizontal else 1.0, -1.0 if vertical else 1.0)
+        mirrored_frames = [f.transformed(transform) for f in self.frames]
+        return SpriteSheet(
+            mirrored_frames,
+            frame_width=self.frame_width,
+            frame_height=self.frame_height,
+            default_fps=self.default_fps,
+        )
 
     def scaled(self, factor: float) -> SpriteSheet:
         """Return a new SpriteSheet scaled to given factor."""
@@ -259,6 +283,35 @@ class ThemeApngLoader:
         return sheet
 
     @classmethod
+    def load_mini_config(cls, theme_dir: Path) -> MiniModeConfig:
+        """Load miniMode configuration from a theme directory if available."""
+        theme_json_path = theme_dir / "theme.json"
+        if not theme_json_path.is_file():
+            return MiniModeConfig()
+        try:
+            meta = json.loads(theme_json_path.read_text(encoding="utf-8"))
+            mini_cfg = meta.get("miniMode", {})
+            if not isinstance(mini_cfg, dict):
+                return MiniModeConfig()
+            supported = bool(mini_cfg.get("supported", False))
+            flip_assets = bool(mini_cfg.get("flipAssets", False))
+            offset_ratio = float(mini_cfg.get("offsetRatio", 0.4))
+            peek_cfg = mini_cfg.get("peek", {})
+            peek_ratio = (
+                float(peek_cfg.get("offsetRatio", 0.08))
+                if isinstance(peek_cfg, dict)
+                else 0.08
+            )
+            return MiniModeConfig(
+                supported=supported,
+                flip_assets=flip_assets,
+                offset_ratio=offset_ratio,
+                peek_offset_ratio=peek_ratio,
+            )
+        except Exception:
+            return MiniModeConfig()
+
+    @classmethod
     def load_theme(
         cls, theme_dir: Path, *, scale: float = 1.0
     ) -> dict[str, SpriteSheet]:
@@ -305,30 +358,33 @@ class ThemeApngLoader:
                             sheets[f"react-{r_name}"] = file_to_sheet[rfname]
 
                 # Map miniMode
-                mini_states = meta.get("miniMode", {}).get("states", {})
+                mini_cfg = meta.get("miniMode", {})
+                mini_states = mini_cfg.get("states", {})
+                flip_assets = bool(mini_cfg.get("flipAssets", False))
                 for m_name, m_list in mini_states.items():
                     if isinstance(m_list, list) and m_list:
                         mfname = str(m_list[0])
                         if mfname in file_to_sheet:
-                            sheets[m_name] = file_to_sheet[mfname]
+                            sh = file_to_sheet[mfname]
+                            sheets[m_name] = sh
+                            if flip_assets:
+                                sheets[f"{m_name}-flipped"] = sh.mirrored(horizontal=True)
             except Exception:
                 pass
 
         # 3. Ensure Core PetState standard candidates are established
         aliases = {
-            "idle": ["idle", "calico-idle", "mini-idle"],
-            "sleeping": ["sleeping", "mini-sleep", "collapsing", "dozing"],
+            "idle": ["idle", "calico-idle"],
+            "sleeping": ["sleeping", "collapsing", "dozing"],
             "thinking": ["thinking", "review"],
             "working": ["working-typing", "working", "typing", "running"],
             "happy": ["happy", "mini-happy", "waving", "notification"],
             "error": ["error", "failed"],
             "waiting": ["thinking", "waiting", "mini-idle"],
             "waving": ["happy", "notification", "mini-happy"],
-            "jump": ["happy"],
             "wave": ["happy", "notification"],
             "work": ["working-typing", "working"],
             "think": ["thinking"],
-            "rest": ["idle"],
             "sleep": ["sleeping"],
             "yawn": ["yawning"],
             "poke": ["react-poke", "react-clickLeft"],

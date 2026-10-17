@@ -69,8 +69,6 @@ class CompanionApp:
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
         if not assets_dir.is_dir():
-            assets_dir = Path("assets") / "pets" / "tiko"
-        if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "claw"
 
         self.window = PetWindow(assets_dir)
@@ -175,6 +173,8 @@ class CompanionApp:
         self.watcher.record_activity()
         if event.event_type in (AgentEventType.PRE_TOOL_USE, AgentEventType.USER_PROMPT):
             self._last_agent_active_at = datetime.now()
+            if hasattr(self.window, "notify_user_working"):
+                self.window.notify_user_working()
 
     def _is_task_in_flight(self, now: datetime | None = None) -> bool:
         """Timing Gate: true when an agent is actively executing tools or reasoning.
@@ -254,9 +254,6 @@ class CompanionApp:
         switch_menu.setStyleSheet(menu.styleSheet())
         available_pets = [
             ("Calico (默认 · 三花小猫)", "calico"),
-            ("Tiko (小机器人)", "tiko"),
-            ("Debug Duck (调试小黄鸭)", "debug-duck"),
-            ("Wangcai (布偶猫)", "wangcai"),
             ("Claw (经典小猫)", "claw"),
         ]
 
@@ -445,9 +442,6 @@ class CompanionApp:
                 self.tray.setIcon(QIcon(cur_idle.frames[0]))
             names = {
                 "calico": "Calico (三花小猫)",
-                "tiko": "Tiko (小机器人)",
-                "debug-duck": "Debug Duck (小黄鸭)",
-                "wangcai": "Wangcai (布偶猫)",
                 "claw": "Claw",
             }
             display_name = names.get(pet_id, pet_id)

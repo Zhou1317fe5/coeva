@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import random
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget
 
 from src.body.animation import (
     AnimationPlayer,
+    MiniModeConfig,
     PetdexAtlasLoader,
     SpriteSheet,
     SpriteSheetError,
@@ -28,6 +31,7 @@ from src.body.animation import (
 )
 from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
+from src.core.circadian import CircadianPhase, get_schedule_for_time
 
 CLICK_DRAG_THRESHOLD_PX = 4
 EDGE_SNAP_DISTANCE_PX = 30  # Snapping threshold set to 30px
@@ -41,12 +45,16 @@ PEEK_VISIBLE_ART_PX = 24  # artwork pixels left on screen when docked
 # enough to feel intrusive on the desktop, so the companion starts small and the
 # user can scale it up (settings panel, tray menu, or Ctrl + wheel).
 DEFAULT_SCALE = 0.5
-# DESIGN.md section 2.1: idle for a minute, then doze off. The old claw/pet.yaml
-# said 120s but nothing ever read that file, so the documented 60s wins.
-IDLE_SLEEP_AFTER_MS = 60_000
 # Persisted window position and scale. Tests point this at tmp_path so they never
 # read or overwrite the user's real file while constructing a PetWindow.
 DEFAULT_POSITION_CONFIG_PATH = Path("data") / "body_position.json"
+# Autonomous daily life routine: the pet spontaneously engages in its own
+# activities (typing, sweeping, carpentry, juggling, thinking, yawning) when idle.
+# Circadian Life Schedule: human-like calm pacing across 24 hours.
+# Idle pauses are 2 - 8 minutes long; activities last 12 - 25 seconds.
+NAP_DURATION_MS = 45_000
+# Hover greeting cooldown: 120 seconds (2 minutes) to keep interaction minimal and gentle.
+GREETING_COOLDOWN_MS = 120_000
 
 
 class PetWindow(QWidget):
@@ -108,6 +116,7 @@ class PetWindow(QWidget):
         # Edge Docking (Peek Mode) state
         self._docked_edge: str | None = None  # "right", "left", or None
         self._is_peek_expanded = False
+        self._mini_cfg = MiniModeConfig()
         self._retract_timer = QTimer(self)
         self._retract_timer.setSingleShot(True)
         self._retract_timer.timeout.connect(self._retract_to_dock)
@@ -117,26 +126,41 @@ class PetWindow(QWidget):
         self._hover_poll_timer.setInterval(150)
         self._hover_poll_timer.timeout.connect(self._check_cursor_outside_polling)
 
-        # Idle doze: DESIGN.md section 2.1 wants the pet asleep after 60s of quiet.
-        # Without this the pet only ever slept when an agent session ended, so its
-        # rhythm was dictated by the agent rather than by the user's own presence.
-        self._sleep_timer = QTimer(self)
-        self._sleep_timer.setSingleShot(True)
-        self._sleep_timer.setInterval(IDLE_SLEEP_AFTER_MS)
-        self._sleep_timer.timeout.connect(self._doze_off)
-
         # Hover greeting: the pet waves once when it peeks out (DESIGN.md 2.1). The
         # one-shot timer restores the resting state after the gesture completes.
         self._wave_timer = QTimer(self)
         self._wave_timer.setSingleShot(True)
         self._wave_timer.timeout.connect(self._finish_greeting)
         self._greeting_active = False
+        self._last_greet_timestamp = 0.0
 
+        # Ambient awareness of user working with tools/agents
+        self._is_user_working = False
+        self._user_working_timer = QTimer(self)
+        self._user_working_timer.setSingleShot(True)
+        self._user_working_timer.setInterval(120_000)  # 2 minutes of active tool working vibe
+        self._user_working_timer.timeout.connect(self._clear_user_working)
+        # Autonomous daily life routine: the pet occasionally does its own activities
+        self._autonomous_timer = QTimer(self)
+        self._autonomous_timer.setSingleShot(True)
+        self._autonomous_timer.timeout.connect(self._start_autonomous_routine)
+
+        self._autonomous_done_timer = QTimer(self)
+        self._autonomous_done_timer.setSingleShot(True)
+        self._autonomous_done_timer.timeout.connect(self._finish_autonomous_routine)
+        self._in_autonomous_routine = False
+
+        # Nap timer: a sleeping pet takes a catnap, then naturally wakes up with a stretch
+        self._nap_timer = QTimer(self)
+        self._nap_timer.setSingleShot(True)
+        self._nap_timer.timeout.connect(self._wake_up)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
         self._load_spritesheets()
         self.apply_state(PetState.IDLE, force=True)  # first paint of the sprite
         self._restore_position()
+        # Schedule natural first action according to the circadian rhythm
+        self._schedule_next_autonomous_routine(initial=True)
 
     @property
     def current_state(self) -> PetState:
@@ -189,6 +213,7 @@ class PetWindow(QWidget):
                         int(round(15 * self._scale)),
                         int(round(15 * self._scale)),
                     )
+                    self._mini_cfg = ThemeApngLoader.load_mini_config(self.pet_dir)
                     return
             except SpriteSheetError:
                 pass
@@ -301,6 +326,22 @@ class PetWindow(QWidget):
         left_pad, right_pad = self._art_padding_px
         margin = right_pad if edge == "right" else left_pad
         return margin + PEEK_VISIBLE_ART_PX
+    def _get_mini_sheet(self, state_name: str) -> SpriteSheet | None:
+        """Get the sprite sheet for a mini state, applying edge flip if needed."""
+        if self._mini_cfg.flip_assets:
+            should_flip = self._docked_edge == "right"
+        else:
+            should_flip = self._docked_edge == "left"
+        if should_flip:
+            flipped_key = f"{state_name}-flipped"
+            if flipped_key in self._loaded_sheets:
+                return self._loaded_sheets[flipped_key]
+            base = self._loaded_sheets.get(state_name)
+            if base is not None:
+                flipped = base.mirrored(horizontal=True)
+                self._loaded_sheets[flipped_key] = flipped
+                return flipped
+        return self._loaded_sheets.get(state_name)
 
     def apply_state(self, state: PetState, *, force: bool = False) -> None:
         """Switch the pet's animated state.
@@ -317,9 +358,44 @@ class PetWindow(QWidget):
         # and let a wake-up clear the doze. Sleeping is the only state that is
         # allowed to persist, so it must not re-arm its own timer.
         if state == PetState.SLEEPING:
-            self._sleep_timer.stop()
+            self._autonomous_timer.stop()
+            self._autonomous_done_timer.stop()
+            self._in_autonomous_routine = False
+            self._nap_timer.start(NAP_DURATION_MS)
         else:
-            self._sleep_timer.start()
+            self._nap_timer.stop()
+            if (
+                state == PetState.IDLE
+                and not self._in_autonomous_routine
+                and self._docked_edge is None
+            ):
+                schedule = get_schedule_for_time()
+                pause = (
+                    random.randint(3000, 8000)
+                    if schedule.is_work_phase
+                    else random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
+                )
+                self._autonomous_timer.start(pause)
+            elif state != PetState.IDLE:
+                self._autonomous_timer.stop()
+                self._autonomous_done_timer.stop()
+                self._in_autonomous_routine = False
+
+        if (
+            self._docked_edge is not None
+            and self._mini_cfg.supported
+            and "mini-idle" in self._loaded_sheets
+        ):
+            mini_map = {
+                PetState.IDLE: "mini-idle",
+                PetState.SLEEPING: "mini-sleep",
+                PetState.HAPPY: "mini-happy",
+            }
+            mini_key = mini_map.get(state, "mini-idle")
+            mini_sheet = self._get_mini_sheet(mini_key)
+            if mini_sheet is not None:
+                self._player.play(mini_sheet, loop=(state != PetState.HAPPY))
+                return
 
         state_candidates: dict[PetState, tuple[list[str], int, bool]] = {
             PetState.IDLE: (["idle"], 6, True),
@@ -400,15 +476,24 @@ class PetWindow(QWidget):
                             self._scale = saved_scale
                             self._load_spritesheets()
 
-                    min_clamped_x = geom.left() - self.width() + self._peek_reveal_px("left")
-                    max_clamped_x = geom.right() - self._peek_reveal_px("right")
+                    if self._mini_cfg.supported and "mini-idle" in self._loaded_sheets:
+                        min_clamped_x = geom.left() - int(
+                            round(self.width() * self._mini_cfg.offset_ratio)
+                        )
+                        max_clamped_x = geom.right() - int(
+                            round(self.width() * (1 - self._mini_cfg.offset_ratio))
+                        )
+                    else:
+                        min_clamped_x = geom.left() - self.width() + self._peek_reveal_px("left")
+                        max_clamped_x = geom.right() - self._peek_reveal_px("right")
                     clamped_x = max(min_clamped_x, min(saved_x, max_clamped_x))
                     clamped_y = max(geom.top(), min(saved_y, geom.bottom() - self.height()))
                     self.move(clamped_x, clamped_y)
+                    if self._docked_edge is not None:
+                        self._retract_to_dock()
                     return
                 except (json.JSONDecodeError, ValueError, OSError):
                     pass
-
             self.move(fallback_x, fallback_y)
 
     def _save_position(self) -> None:
@@ -433,43 +518,156 @@ class PetWindow(QWidget):
     # Peek Docking & Hover Animations
     # ------------------------------------------------------------------
     def _doze_off(self) -> None:
-        """Fall asleep after a minute of no activity (DESIGN.md section 2.1)."""
+        """Manually put the pet to sleep (e.g., from DND/tray menu)."""
         if self._greeting_active:
             return
         self.apply_state(PetState.SLEEPING)
 
+    def notify_user_working(self) -> None:
+        """Ambiently record that user is actively working with tools/agents."""
+        self._is_user_working = True
+        self._user_working_timer.start()
+
+    def _clear_user_working(self) -> None:
+        self._is_user_working = False
     def _wake_up(self) -> None:
         """Return to a resting, awake state after the pet had dozed off."""
         if self._current_state == PetState.SLEEPING:
-            self.apply_state(PetState.IDLE)
+            self._nap_timer.stop()
+            self._in_autonomous_routine = False
+            self._schedule_next_autonomous_routine()
+            self._current_state = PetState.IDLE
+            waking_sheet = self._loaded_sheets.get("waking")
+            if waking_sheet is not None:
+                self._player.play(waking_sheet, loop=False)
+                self._wave_timer.start(1600)
+            else:
+                self.apply_state(PetState.IDLE, force=True)
+    def _schedule_next_autonomous_routine(self, *, initial: bool = False) -> None:
+        """Schedule the next spontaneous daily life activity using the circadian model."""
+        schedule = get_schedule_for_time()
+        if initial and schedule.is_work_phase:
+            pause = random.randint(3000, 8000)
+        else:
+            pause = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
+        self._autonomous_timer.start(pause)
+    def _start_autonomous_routine(self) -> None:
+        """Spontaneously perform an independent daily life activity."""
+        if (
+            self._current_state != PetState.IDLE
+            or self._docked_edge is not None
+            or self._greeting_active
+            or self._has_moved
+            or self._in_autonomous_routine
+        ):
+            return
 
+        schedule = get_schedule_for_time()
+        # If in Night Sleep phase, companion stays peaceful
+        if schedule.phase == CircadianPhase.NIGHT_SLEEP and not self._is_user_working:
+            return
+
+        if self._is_user_working:
+            # User is in deep flow working: companion accompanies with focused craft/work
+            work_activities: list[tuple[str, int]] = [
+                ("working-typing", 25_000),
+                ("working-building", 22_000),
+                ("working-sweeping", 18_000),
+                ("thinking", 15_000),
+                ("working-carrying", 14_000),
+            ]
+            available = [
+                (act, dur) for act, dur in work_activities if act in self._loaded_sheets
+            ]
+        else:
+            # Use current circadian phase's natural human-like activities
+            available = [
+                (act, dur)
+                for act, dur in schedule.allowed_activities
+                if act in self._loaded_sheets
+            ]
+
+        if not available:
+            self._schedule_next_autonomous_routine()
+            return
+        chosen_act, dur_ms = random.choice(available)
+        sheet = self._loaded_sheets.get(chosen_act)
+        if sheet is not None:
+            self._in_autonomous_routine = True
+            self._player.play(sheet, loop=True)
+            self._autonomous_done_timer.start(dur_ms)
+
+    def _finish_autonomous_routine(self) -> None:
+        """Finish the daily life activity and settle back to resting idle."""
+        self._in_autonomous_routine = False
+        if (
+            self._current_state == PetState.IDLE
+            and not self._greeting_active
+            and not self._has_moved
+            and self._docked_edge is None
+        ):
+            idle_sheet = self._loaded_sheets.get("idle")
+            if idle_sheet is not None:
+                self._player.play(idle_sheet, loop=True)
+            schedule = get_schedule_for_time()
+            interval = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
+            self._autonomous_timer.start(interval)
     def play_poke_reaction(self) -> None:
         """Play short poke reaction if available, then return to current state."""
+        if (
+            self._docked_edge is not None
+            and self._mini_cfg.supported
+            and "mini-happy" in self._loaded_sheets
+        ):
+            poke_sheet = self._get_mini_sheet("mini-happy")
+            if poke_sheet is not None:
+                self._player.play(poke_sheet, loop=False)
+                self._wave_timer.start(1500)
+                return
         sheet = self._loaded_sheets.get("react-poke") or self._loaded_sheets.get("poke")
         if sheet is not None:
             self._player.play(sheet, loop=False)
             self._wave_timer.start(1200)
 
-    def _start_greeting(self) -> None:
-        """Wave hello once when the user's cursor reaches the pet."""
+    def _start_greeting(self, *, force: bool = False) -> None:
+        """Wave hello once when the user's cursor reaches the pet, with measured cooldown."""
         if self._greeting_active or self._current_state == PetState.SLEEPING:
             return
+        now_ms = time.monotonic() * 1000
+        if not force and (now_ms - self._last_greet_timestamp) < GREETING_COOLDOWN_MS:
+            return
+        self._last_greet_timestamp = now_ms
         self._greeting_active = True
-        if self._docked_edge is not None and "mini-peek" in self._loaded_sheets:
-            self._player.play(self._loaded_sheets["mini-peek"], loop=False)
+        if (
+            self._docked_edge is not None
+            and self._mini_cfg.supported
+            and "mini-peek" in self._loaded_sheets
+        ):
+            peek_sheet = self._get_mini_sheet("mini-peek")
+            if peek_sheet is not None:
+                self._player.play(peek_sheet, loop=False)
         else:
             self.apply_state(PetState.HAPPY)
-        # Long enough to show the wave, short enough that it never reads as a
-        # state the pet is stuck in.
         self._wave_timer.start(1400)
-
     def _finish_greeting(self) -> None:
         """End the hover wave and settle back to resting."""
         self._greeting_active = False
-        self.apply_state(PetState.IDLE)
+        if (
+            self._docked_edge is not None
+            and self._mini_cfg.supported
+            and "mini-idle" in self._loaded_sheets
+        ):
+            sheet = self._get_mini_sheet("mini-idle")
+            if sheet is not None:
+                self._player.play(sheet, loop=True)
+        else:
+            self.apply_state(PetState.IDLE)
 
     def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802
-        """Mouse hover: peek out if docked, and wave hello once."""
+        """Mouse hover: peek out if docked, wake up if sleeping, wave hello."""
+        if self._in_autonomous_routine:
+            self._autonomous_done_timer.stop()
+            self._in_autonomous_routine = False
         self._wake_up()
         if self._docked_edge is not None:
             self._retract_timer.stop()
@@ -502,10 +700,22 @@ class PetWindow(QWidget):
         if screen is None or self._docked_edge is None:
             return
         geom = screen.availableGeometry()
-        if self._docked_edge == "right":
-            self.move(geom.right() - self.width() + 1, self.y())
-        elif self._docked_edge == "left":
-            self.move(geom.left(), self.y())
+        if self._mini_cfg.supported and "mini-idle" in self._loaded_sheets:
+            peek_dist = max(25, int(round(self.width() * 0.15)))
+            if self._docked_edge == "right":
+                base_x = geom.right() - int(round(self.width() * (1 - self._mini_cfg.offset_ratio)))
+                self.move(base_x - peek_dist, self.y())
+            elif self._docked_edge == "left":
+                base_x = geom.left() - int(round(self.width() * self._mini_cfg.offset_ratio))
+                self.move(base_x + peek_dist, self.y())
+            peek_sheet = self._get_mini_sheet("mini-peek")
+            if peek_sheet is not None:
+                self._player.play(peek_sheet, loop=False)
+        else:
+            if self._docked_edge == "right":
+                self.move(geom.right() - self.width() + 1, self.y())
+            elif self._docked_edge == "left":
+                self.move(geom.left(), self.y())
         self._is_peek_expanded = True
         self._hover_poll_timer.start()
         if self._bubble.isVisible():
@@ -532,10 +742,23 @@ class PetWindow(QWidget):
         if screen is None or self._docked_edge is None:
             return
         geom = screen.availableGeometry()
-        if self._docked_edge == "right":
-            self.move(geom.right() - self._peek_reveal_px("right"), self.y())
-        elif self._docked_edge == "left":
-            self.move(geom.left() - self.width() + self._peek_reveal_px("left"), self.y())
+        if self._mini_cfg.supported and "mini-idle" in self._loaded_sheets:
+            if self._docked_edge == "right":
+                target_x = geom.right() - int(
+                    round(self.width() * (1 - self._mini_cfg.offset_ratio))
+                )
+            else:
+                target_x = geom.left() - int(round(self.width() * self._mini_cfg.offset_ratio))
+            self.move(target_x, self.y())
+            mini_state = "mini-sleep" if self._current_state == PetState.SLEEPING else "mini-idle"
+            sheet = self._get_mini_sheet(mini_state)
+            if sheet is not None:
+                self._player.play(sheet, loop=True)
+        else:
+            if self._docked_edge == "right":
+                self.move(geom.right() - self._peek_reveal_px("right"), self.y())
+            elif self._docked_edge == "left":
+                self.move(geom.left() - self.width() + self._peek_reveal_px("left"), self.y())
         self._is_peek_expanded = False
         self._hover_poll_timer.stop()
         self._save_position()
@@ -545,6 +768,9 @@ class PetWindow(QWidget):
     # ------------------------------------------------------------------
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
+            if self._in_autonomous_routine:
+                self._autonomous_done_timer.stop()
+                self._in_autonomous_routine = False
             self._wake_up()  # touching the pet is activity: it stops dozing
             self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             self._press_pos = event.globalPosition().toPoint()
@@ -569,8 +795,14 @@ class PetWindow(QWidget):
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:
                     geom = screen.availableGeometry()
-                    min_x = geom.left() - self.width() + self._peek_reveal_px("left")
-                    max_x = geom.right() - self._peek_reveal_px("right")
+                    if self._mini_cfg.supported and "mini-idle" in self._loaded_sheets:
+                        min_x = geom.left() - int(round(self.width() * self._mini_cfg.offset_ratio))
+                        max_x = geom.right() - int(
+                            round(self.width() * (1 - self._mini_cfg.offset_ratio))
+                        )
+                    else:
+                        min_x = geom.left() - self.width() + self._peek_reveal_px("left")
+                        max_x = geom.right() - self._peek_reveal_px("right")
                     clamped_x = max(min_x, min(desired_pos.x(), max_x))
                     clamped_y = max(geom.top(), min(desired_pos.y(), geom.bottom() - self.height()))
                     self.move(clamped_x, clamped_y)
@@ -628,7 +860,10 @@ class PetWindow(QWidget):
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self._hover_poll_timer.stop()
         self._retract_timer.stop()
-        self._sleep_timer.stop()
+        self._autonomous_timer.stop()
+        self._autonomous_done_timer.stop()
+        self._nap_timer.stop()
+        self._user_working_timer.stop()
         self._wave_timer.stop()
         self._bubble.close()
         self._player.stop()

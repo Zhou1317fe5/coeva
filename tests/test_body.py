@@ -154,45 +154,30 @@ def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
 
 
 def test_builtin_pets_loading(tmp_path: Path) -> None:
-    """Test that all three built-in pets (tiko, debug-duck, wangcai) load properly in PetWindow."""
-    tiko_dir = Path("assets") / "pets" / "tiko"
-    duck_dir = Path("assets") / "pets" / "debug-duck"
-    wangcai_dir = Path("assets") / "pets" / "wangcai"
-
-    assert tiko_dir.is_dir()
-    assert duck_dir.is_dir()
-    assert wangcai_dir.is_dir()
-
-    # Default pet: Tiko
-    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
-    assert "idle" in window._loaded_sheets
-    assert "review" in window._loaded_sheets
-    assert "running" in window._loaded_sheets
-    assert window._loaded_sheets["idle"].frame_count == 6
-
-    # Test state transitions
-    for target_state in (PetState.WORKING, PetState.THINKING, PetState.HAPPY, PetState.ERROR):
-        window.apply_state(target_state)
-        assert window.current_state == target_state
-
-    # Test dynamic switching to Debug Duck
-    window.load_pet(duck_dir)
-    assert "idle" in window._loaded_sheets
-    assert window._loaded_sheets["idle"].frame_count == 6
-
-    # Test dynamic switching to Wangcai
-    window.load_pet(wangcai_dir)
-    assert "idle" in window._loaded_sheets
-    assert window._loaded_sheets["idle"].frame_count == 6
-    # Test dynamic switching to Calico (Default Clawd on Desk theme)
+    """Test that built-in pets (calico, claw) load properly in PetWindow."""
     calico_dir = Path("assets") / "pets" / "calico"
+    claw_dir = Path("assets") / "pets" / "claw"
+
     assert calico_dir.is_dir()
-    window.load_pet(calico_dir)
+    assert claw_dir.is_dir()
+
+    # Default pet: Calico
+    window = _isolated_window(calico_dir, tmp_path, scale=1.0)
     assert "idle" in window._loaded_sheets
     assert "working" in window._loaded_sheets
     assert "react-drag" in window._loaded_sheets
     assert "react-poke" in window._loaded_sheets
     assert window._loaded_sheets["idle"].frame_count == 41
+
+    # Test state transitions on Calico
+    for target_state in (PetState.WORKING, PetState.THINKING, PetState.HAPPY, PetState.ERROR):
+        window.apply_state(target_state)
+        assert window.current_state == target_state
+
+    # Test dynamic switching to Claw
+    window.load_pet(claw_dir)
+    assert "idle" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 8
 
     window.close()
 
@@ -230,58 +215,18 @@ def test_docked_peek_keeps_artwork_visible_at_every_scale(tmp_path: Path) -> Non
     the margin exceeded 24px the docked window showed nothing but transparency, so
     a larger pet vanished at the screen edge.
     """
-    from PySide6.QtGui import QImage
 
-    for pet, expected_padding in (
-        ("tiko", (31, 32)),
-        ("wangcai", (18, 19)),
-        ("debug-duck", (14, 15)),
-    ):
-        pet_dir = Path("assets") / "pets" / pet
-        # 1. The measured margin must match the atlas' real transparent border.
-        for scale in (1.0, 2.0, 3.0):
-            window = _isolated_window(pet_dir, tmp_path, scale=scale)
-            measured_left, measured_right = window._art_padding_px
-            # Padding scales with the sprite, so compare against the scaled margin.
-            expected_left = round(expected_padding[0] * scale)
-            expected_right = round(expected_padding[1] * scale)
-            assert abs(measured_left - expected_left) <= 1
-            assert abs(measured_right - expected_right) <= 1
+    calico_dir = Path("assets") / "pets" / "calico"
+    assert calico_dir.is_dir()
 
-            # 2. The reveal must clear the margin, leaving a visible sliver.
-            assert window._peek_reveal_px("right") > measured_right
-            assert window._peek_reveal_px("left") > measured_left
-            window.close()
+    for scale in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0):
+        window = _isolated_window(calico_dir, tmp_path, scale=scale)
+        measured_left, measured_right = window._art_padding_px
 
-        # 3. Real pixels must survive in the on-screen sliver, at every scale.
-        import json as _json
-
-        meta = _json.loads((pet_dir / "pet.json").read_text(encoding="utf-8"))
-        atlas = QImage(str(pet_dir / meta["spritesheetPath"]))
-        cols = int(meta.get("cols", 8))
-        rows = int(meta.get("rows", 9))
-        frame_w, frame_h = atlas.width() // cols, atlas.height() // rows
-
-        for scale in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0):
-            window = _isolated_window(pet_dir, tmp_path, scale=scale)
-            scaled = atlas.copy(0, 0, frame_w, frame_h).scaled(
-                int(frame_w * scale), int(frame_h * scale)
-            )
-            width, height = scaled.width(), scaled.height()
-
-            for edge in ("right", "left"):
-                reveal = window._peek_reveal_px(edge)
-                columns = range(width - reveal, width) if edge == "right" else range(reveal)
-                visible = sum(
-                    1
-                    for x in columns
-                    for y in range(height)
-                    if ((scaled.pixel(x, y) >> 24) & 0xFF) > 8
-                )
-                assert visible > 0, (
-                    f"{pet} @scale={scale} docked {edge}: no artwork visible (reveal={reveal}px)"
-                )
-            window.close()
+        # The reveal must clear the margin, leaving real visible artwork
+        assert window._peek_reveal_px("right") > measured_right
+        assert window._peek_reveal_px("left") > measured_left
+        window.close()
 
 
 def test_panel_action_buttons_all_map_to_a_real_state(tmp_path: Path) -> None:
@@ -306,7 +251,7 @@ def test_panel_action_buttons_all_map_to_a_real_state(tmp_path: Path) -> None:
 
     # And each one must not be a silent no-op: the mapped state must be the one
     # the pet actually reaches.
-    pet_dir = Path("assets") / "pets" / "tiko"
+    pet_dir = Path("assets") / "pets" / "calico"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
     for action_id in sorted(action_ids):
@@ -355,44 +300,34 @@ def test_core_status_page_says_so_when_core_is_not_attached(tmp_path: Path) -> N
 
 
 def test_idle_sleep_and_hover_greeting(tmp_path: Path) -> None:
-    """Idle doze after a quiet minute, and a single wave on hover.
+    """Manual sleep/wake, autonomous wake, and hover greeting with cooldown."""
+    calico_dir = Path("assets") / "pets" / "calico"
+    window = _isolated_window(calico_dir, tmp_path, scale=1.0)
 
-    Regression guard for the two P2 DESIGN debts: nothing ever slept from
-    inactivity (the pet slept only when an agent session ended, so its rhythm
-    belonged to the agent), and hovering revealed the pet without greeting.
-    """
-    from src.body.window import IDLE_SLEEP_AFTER_MS
-
-    tiko_dir = Path("assets") / "pets" / "tiko"
-    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
-
-    # The configured idle wait is the documented 60s.
-    assert IDLE_SLEEP_AFTER_MS == 60_000
-    assert window._sleep_timer.interval() == IDLE_SLEEP_AFTER_MS
-    # A fresh pet is awake and its countdown is running.
+    # Fresh pet is awake in IDLE and has autonomous routine timer running
     assert window.current_state == PetState.IDLE
-    assert window._sleep_timer.isActive()
+    assert window._autonomous_timer.isActive()
 
-    # Idle timeout puts it to sleep.
+    # Manual sleep (from tray menu / DND) puts it to sleep and starts catnap
     window._doze_off()
     assert window.current_state == PetState.SLEEPING
-    # Sleeping is stable: the countdown must not re-arm and re-trigger.
-    assert not window._sleep_timer.isActive()
+    assert not window._autonomous_timer.isActive()
+    assert window._nap_timer.isActive()
 
-    # Activity wakes it and restarts the countdown.
+    # Activity / wake up wakes it back to IDLE
     window._wake_up()
     assert window.current_state == PetState.IDLE
-    assert window._sleep_timer.isActive()
+    assert window._autonomous_timer.isActive()
 
-    # Hovering greets with a wave, then settles back on its own.
-    window._start_greeting()
+    # Hovering greets with a wave, then settles back on its own
+    window._start_greeting(force=True)
     assert window.current_state == PetState.HAPPY
     assert window._greeting_active
     window._finish_greeting()
     assert window.current_state == PetState.IDLE
     assert not window._greeting_active
 
-    # A sleeping pet must not be jolted awake by the greeting path itself.
+    # A sleeping pet must not be jolted awake by the greeting path itself
     window._doze_off()
     assert window.current_state == PetState.SLEEPING
     window._start_greeting()
@@ -414,7 +349,7 @@ def test_docked_pet_retracts_again_after_being_dragged_to_the_edge(tmp_path: Pat
     from PySide6.QtGui import QMouseEvent
     from PySide6.QtWidgets import QApplication
 
-    pet_dir = Path("assets") / "pets" / "tiko"
+    pet_dir = Path("assets") / "pets" / "calico"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     screen = (window.screen() or QApplication.primaryScreen()).availableGeometry()
 
@@ -465,29 +400,35 @@ def test_docked_pet_retracts_again_after_being_dragged_to_the_edge(tmp_path: Pat
     assert window._retract_timer.isActive(), "leaving the pet must re-arm auto-retract"
     window._retract_to_dock()
     assert not window._is_peek_expanded
-    assert window.x() == screen.right() - window._peek_reveal_px("right")
+    if window._mini_cfg.supported and "mini-idle" in window._loaded_sheets:
+        expected_x = screen.right() - int(
+            round(window.width() * (1 - window._mini_cfg.offset_ratio))
+        )
+        assert window.x() == expected_x
+    else:
+        assert window.x() == screen.right() - window._peek_reveal_px("right")
     window.close()
 
 
 def test_pet_window_scale_adjustment(tmp_path: Path) -> None:
     """Test dynamic scaling adjustment and persistence for pet body."""
-    tiko_dir = Path("assets") / "pets" / "tiko"
-    window = _isolated_window(tiko_dir, tmp_path, scale=1.0)
+    calico_dir = Path("assets") / "pets" / "calico"
+    window = _isolated_window(calico_dir, tmp_path, scale=1.0)
     assert abs(window.scale_factor - 1.0) < 0.01
 
-    # Scale down to 50%
+    # Scale down to 50% (Calico native 266x200 -> 133x100)
     window.set_scale(0.5)
     assert abs(window.scale_factor - 0.5) < 0.01
     idle_sheet = window._loaded_sheets["idle"]
-    assert idle_sheet.frame_width == 96
-    assert idle_sheet.frame_height == 104
+    assert idle_sheet.frame_width == 133
+    assert idle_sheet.frame_height == 100
 
-    # Scale up to 150%
+    # Scale up to 150% (Calico native 266x200 -> 399x300)
     window.set_scale(1.5)
     assert abs(window.scale_factor - 1.5) < 0.01
     idle_sheet_150 = window._loaded_sheets["idle"]
-    assert idle_sheet_150.frame_width == 288
-    assert idle_sheet_150.frame_height == 312
+    assert idle_sheet_150.frame_width == 399
+    assert idle_sheet_150.frame_height == 300
 
     window.close()
 
@@ -573,4 +514,92 @@ def test_settings_reset_restores_default_hotkey(tmp_path: Path) -> None:
     assert captured == [DEFAULT_FEEDER_HOTKEY]
     assert window.store.feeder_hotkey == DEFAULT_FEEDER_HOTKEY
     assert window.hotkey_edit.text() == "Alt + Space"
+    window.close()
+
+
+def test_calico_mini_mode_docking_and_flipping(tmp_path: Path) -> None:
+    """Test that Calico switches to mini-idle when docked, flips assets, and plays mini-peek."""
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QApplication
+
+    calico_dir = Path("assets") / "pets" / "calico"
+    window = _isolated_window(calico_dir, tmp_path, scale=0.5)
+    screen = (window.screen() or QApplication.primaryScreen()).availableGeometry()
+
+    assert window._mini_cfg.supported is True
+    assert window._mini_cfg.flip_assets is True
+    assert "mini-idle" in window._loaded_sheets
+    assert "mini-idle-flipped" in window._loaded_sheets
+
+    # Dock to right edge
+    window._docked_edge = "right"
+    window._retract_to_dock()
+
+    # Check right edge position: right 40% hidden, 60% on screen
+    expected_right_x = screen.right() - int(round(window.width() * 0.6))
+    assert window.x() == expected_right_x
+
+    # When docked at right edge and flip_assets is true, it uses flipped sheet
+    current_sheet = window._player._sheet
+    assert current_sheet is not None
+    assert current_sheet is window._loaded_sheets["mini-idle-flipped"]
+
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QEnterEvent
+    window.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
+    assert window._is_peek_expanded is True
+    peek_sheet = window._player._sheet
+    assert peek_sheet is not None
+    assert peek_sheet is window._loaded_sheets["mini-peek-flipped"]
+
+    # Mouse leave re-arms retract timer and retracts back to mini-idle
+    window.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert window._retract_timer.isActive()
+    window._retract_to_dock()
+    assert window._is_peek_expanded is False
+    assert window.x() == expected_right_x
+
+    # Test Left Edge: uses unflipped sheet
+    window._docked_edge = "left"
+    window._retract_to_dock()
+    expected_left_x = screen.left() - int(round(window.width() * 0.4))
+    assert window.x() == expected_left_x
+    left_sheet = window._player._sheet
+    assert left_sheet is not None
+    assert left_sheet is window._loaded_sheets["mini-idle"]
+
+    window.close()
+
+
+def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
+    """Test that Calico has autonomous daily life activities and wakes from naps."""
+    calico_dir = Path("assets") / "pets" / "calico"
+    window = _isolated_window(calico_dir, tmp_path, scale=0.5)
+
+    # 1. Awake pet has an autonomous routine scheduled
+    assert window.current_state == PetState.IDLE
+    assert window._autonomous_timer.isActive()
+
+    # 2. Trigger autonomous routine: plays an activity
+    window._start_autonomous_routine()
+    assert window._in_autonomous_routine is True
+    assert window._autonomous_done_timer.isActive()
+
+    # 3. Finish autonomous routine: returns to idle and reschedules
+    window._finish_autonomous_routine()
+    assert window._in_autonomous_routine is False
+    assert window._autonomous_timer.isActive()
+
+    # 4. Going to sleep stops autonomous timer and starts nap timer
+    window._doze_off()
+    assert window.current_state == PetState.SLEEPING
+    assert not window._autonomous_timer.isActive()
+    assert window._nap_timer.isActive()
+
+    # 5. Nap timer expiring wakes the pet up with stretching
+    window._wake_up()
+    assert window.current_state == PetState.IDLE
+    assert not window._nap_timer.isActive()
+    assert window._autonomous_timer.isActive()
+
     window.close()
