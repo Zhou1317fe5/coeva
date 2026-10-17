@@ -753,13 +753,24 @@ class PetWindow(QWidget):
         else:
             if not self._trigger_hover_jump():
                 self._start_greeting()
+        if hasattr(self._feeder_bar, "show_pill") and self._feeder_bar.isVisible():
+            self._feeder_bar.show_pill()
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
-        """Mouse leave: schedule retracting back to docked peek state."""
+        """Mouse leave: schedule retracting back to docked peek state and handle bar."""
         if self._docked_edge is not None and not self._has_moved:
             if not self._retract_timer.isActive():
                 self._retract_timer.start(800)
+        if (
+            hasattr(self._feeder_bar, "current_mode")
+            and self._feeder_bar.isVisible()
+            and self._feeder_bar.current_mode == "pill"
+            and hasattr(self._feeder_bar, "is_voice_active")
+            and not self._feeder_bar.is_voice_active
+            and hasattr(self._feeder_bar, "_retract_to_handle_timer")
+        ):
+            self._feeder_bar._retract_to_handle_timer.start()
         super().leaveEvent(event)
 
     def _check_cursor_outside_polling(self) -> None:
