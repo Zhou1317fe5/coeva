@@ -75,7 +75,7 @@ def test_animation_player_logic() -> None:
 
 def test_body_controller_state_and_say(tmp_path: Path) -> None:
     """Test BodyController state transition and speech bubble invocation."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
@@ -93,7 +93,7 @@ def test_body_controller_state_and_say(tmp_path: Path) -> None:
 
 def test_pet_window_clamping_and_reset(tmp_path: Path) -> None:
     """Test emergency position reset brings pet back into screen bounds."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
 
     # Force position way outside screen
@@ -154,14 +154,12 @@ def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
 
 
 def test_builtin_pets_loading(tmp_path: Path) -> None:
-    """Test that built-in pets (vasu, calico, claw) load properly in PetWindow."""
+    """Test that built-in pets (vasu, calico) load properly in PetWindow."""
     vasu_dir = Path("assets") / "pets" / "vasu"
     calico_dir = Path("assets") / "pets" / "calico"
-    claw_dir = Path("assets") / "pets" / "claw"
 
     assert vasu_dir.is_dir()
     assert calico_dir.is_dir()
-    assert claw_dir.is_dir()
 
     # Default pet: Vasu
     window = _isolated_window(vasu_dir, tmp_path, scale=1.0)
@@ -179,11 +177,6 @@ def test_builtin_pets_loading(tmp_path: Path) -> None:
     window.load_pet(calico_dir)
     assert "idle" in window._loaded_sheets
     assert window._loaded_sheets["idle"].frame_count == 41
-
-    # Test dynamic switching to Claw
-    window.load_pet(claw_dir)
-    assert "idle" in window._loaded_sheets
-    assert window._loaded_sheets["idle"].frame_count == 8
 
     window.close()
 

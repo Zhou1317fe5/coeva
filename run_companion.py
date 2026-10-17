@@ -27,6 +27,8 @@ from src.connectors.http_server import CompanionHttpServer
 from src.connectors.settings import AgentSettingsStore
 from src.core.cold_start import ColdStartPolicy
 from src.core.intervention import InterventionPolicy
+from src.core.llm_client import CompanionAIEngine, LLMConfig
+from src.core.personality import load_personality
 from src.core.sanctuary import SanctuaryGuard
 from src.core.state_watcher import StateWatcher
 from src.feeder.contracts import RawSlice
@@ -62,6 +64,8 @@ class CompanionApp:
         self.settings_window.pet_changed.connect(self._on_pet_changed)
         self.settings_window.scale_changed.connect(self._on_scale_changed)
         self.settings_window.hotkey_changed.connect(self._on_hotkey_changed)
+        self.settings_window.llm_config_changed.connect(self._on_llm_config_changed)
+        self.settings_window.action_test_requested.connect(self._on_action_test_requested)
 
         # 1. Desktop Body (Defaults to Vasu, or saved pet preference)
         selected_pet = self.agent_settings.selected_pet
@@ -70,9 +74,10 @@ class CompanionApp:
             assets_dir = Path("assets") / "pets" / "vasu"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
-        if not assets_dir.is_dir():
-            assets_dir = Path("assets") / "pets" / "claw"
         self.window = PetWindow(assets_dir)
+        self.personality = load_personality(assets_dir)
+        self.ai_engine = CompanionAIEngine(config=self.agent_settings.llm_config)
+        self.ai_engine.reply_ready.connect(self._on_ai_reply_ready)
         self.controller = BodyController(self.window)
 
         # 2. Slice Feeder & Chronicle Store
@@ -202,7 +207,18 @@ class CompanionApp:
         nudge = self.intervention.evaluate_intervention(is_task_in_flight=in_flight)
         if nudge:
             self.controller.perform_action("rest")
-            self.controller.say(nudge, ttl_ms=4500)
+            if hasattr(self, "ai_engine") and hasattr(self, "personality"):
+                is_late = getattr(self.watcher, "is_late_night", lambda: False)()
+                cat = "state_care_late_night" if is_late else "state_care_overwork"
+                ctx = "夜深了，用户仍在电脑前操作" if is_late else "用户已连续高负荷工作超3小时"
+                self.ai_engine.request_reply(
+                    ctx,
+                    self.personality,
+                    category=cat,
+                    context_tag="state_care",
+                )
+            else:
+                self.controller.say(nudge, ttl_ms=4500)
 
     def _setup_tray(self, assets_dir: Path) -> None:
         """Create a Clawd-on-Desk inspired context menu and system tray."""
@@ -256,7 +272,6 @@ class CompanionApp:
         available_pets = [
             ("🦦 Vasu (官方默认 · 小河獭)", "vasu"),
             ("🐱 Calico (三花小猫)", "calico"),
-            ("🐾 Claw (经典小猫)", "claw"),
         ]
         def _make_switcher(pid: str) -> Callable[[], None]:
             def _switch() -> None:
@@ -298,6 +313,70 @@ class CompanionApp:
 
         menu.addSeparator()
 
+        # ── 3.5 Action Showcase / Testing Submenu ──
+        test_menu = menu.addMenu("🧪 测试伴生体动作")
+        test_menu.setStyleSheet(menu.styleSheet())
+
+        action_labels: dict[str, str] = {
+            "idle": "待机呼吸",
+            "review": "代码复盘与深思",
+            "waiting": "专注凝视等待",
+            "running": "敏捷奔跑",
+            "running-right": "向右欢快奔跑",
+            "running-left": "向左欢快奔跑",
+            "waving": "克制招手致意",
+            "jumping": "欢快跳跃庆祝",
+            "failed": "抱头受挫/沮丧",
+            "working-typing": "专注敲键盘写代码",
+            "working-building": "做木工锯木头",
+            "working-sweeping": "小扫把打扫整理",
+            "working-conducting": "挥舞指挥棒听音乐",
+            "working-juggling": "抛彩球玩耍杂耍",
+            "working-carrying": "搬运包裹箱子",
+            "thinking": "托腮沉思构想",
+            "yawning": "打个大大的哈欠",
+            "dozing": "揉眼睛打瞌睡",
+            "sleeping": "安详沉睡",
+            "waking": "伸大懒腰坐起",
+        }
+
+        clean_actions = [
+            k
+            for k in self.window._loaded_sheets
+            if not k.endswith("-flipped")
+            and not k.startswith("react-")
+            and k not in (
+                "wave", "work", "think", "sleep", "yawn", "poke", "drag", "jump", "failed"
+            )
+        ]
+        # Ensure standard actions are present if in loaded sheets
+        standard_candidates = (
+            "review", "waiting", "running", "running-right", "running-left",
+            "waving", "jumping", "failed",
+        )
+        for std in standard_candidates:
+            if std in self.window._loaded_sheets and std not in clean_actions:
+                clean_actions.append(std)
+        ordered = ["idle"] + [k for k in clean_actions if k != "idle"]
+
+        def _make_tester(act_id: str) -> Callable[[], None]:
+            def _test() -> None:
+                self.window.test_action(act_id)
+
+            return _test
+
+        for act in ordered:
+            label_text = action_labels.get(act, act)
+            sheet = self.window._loaded_sheets.get(act)
+            f_count = sheet.frame_count if sheet else 0
+            act_item = QAction(f"▶ {act} ({label_text} · {f_count}帧)", self.window)
+            act_item.triggered.connect(_make_tester(act))
+            test_menu.addAction(act_item)
+
+        test_menu.addSeparator()
+        stop_test_act = QAction("⏹ 退出测试，恢复自然节律", self.window)
+        stop_test_act.triggered.connect(self.window.stop_action_test)
+        test_menu.addAction(stop_test_act)
         # ── 4. App & Settings Group ──
         settings_action = QAction("设置…", self.window)
         settings_action.triggered.connect(self._open_settings)
@@ -312,37 +391,36 @@ class CompanionApp:
             menu.addSeparator()
             sim_menu = menu.addMenu("开发者调试")
             sim_menu.setStyleSheet(menu.styleSheet())
+            def _sim_prompt() -> None:
+                self.hermes.on_user_prompt("demo_session")
+                self.controller.say("🤔 思考中：正在分析你的问题...", ttl_ms=3000)
+
             sim_prompt = QAction("1. 用户提问 (User Prompt → 思考)", self.window)
-            sim_prompt.triggered.connect(
-                lambda: (
-                    self.hermes.on_user_prompt("demo_session"),
-                    self.controller.say("🤔 思考中：正在分析你的问题...", ttl_ms=3000),
-                )
-            )
+            sim_prompt.triggered.connect(_sim_prompt)
             sim_menu.addAction(sim_prompt)
+
+            def _sim_tool() -> None:
+                self.hermes.on_pre_tool_call("demo_session", "bash")
+                self.controller.say("⚙️ 正在执行工具: bash", ttl_ms=2500)
+
             sim_tool = QAction("2. 调工具 (PreToolUse → 工作)", self.window)
-            sim_tool.triggered.connect(
-                lambda: (
-                    self.hermes.on_pre_tool_call("demo_session", "bash"),
-                    self.controller.say("⚙️ 正在执行工具: bash", ttl_ms=2500),
-                )
-            )
+            sim_tool.triggered.connect(_sim_tool)
             sim_menu.addAction(sim_tool)
+
+            def _sim_err() -> None:
+                self.hermes.on_tool_failure("demo_session", "bash", "SyntaxError")
+                self.controller.say("⚠️ 工具报错: SyntaxError", ttl_ms=3000)
+
             sim_err = QAction("3. 工具报错 (ToolFailure → 报错)", self.window)
-            sim_err.triggered.connect(
-                lambda: (
-                    self.hermes.on_tool_failure("demo_session", "bash", "SyntaxError"),
-                    self.controller.say("⚠️ 工具报错: SyntaxError", ttl_ms=3000),
-                )
-            )
+            sim_err.triggered.connect(_sim_err)
             sim_menu.addAction(sim_err)
+
+            def _sim_done() -> None:
+                self.hermes.on_task_complete("demo_session")
+                self.controller.say("🎉 任务完成！所有检查通过！", ttl_ms=3000)
+
             sim_done = QAction("4. 任务完成 (TaskComplete → 开心)", self.window)
-            sim_done.triggered.connect(
-                lambda: (
-                    self.hermes.on_task_complete("demo_session"),
-                    self.controller.say("🎉 任务完成！所有检查通过！", ttl_ms=3000),
-                )
-            )
+            sim_done.triggered.connect(_sim_done)
             sim_menu.addAction(sim_done)
         menu.addSeparator()
 
@@ -384,14 +462,26 @@ class CompanionApp:
         self._refresh_menu_labels()
         self.context_menu.popup(pos)
 
+    def _on_ai_reply_ready(self, reply: str, tag: str) -> None:
+        """Deliver AI or fallback generated response directly to the speech bubble."""
+        if reply:
+            self.controller.say(reply, ttl_ms=3500)
+
+    def _on_llm_config_changed(self, cfg: object) -> None:
+        if isinstance(cfg, LLMConfig):
+            self.ai_engine.update_config(cfg)
+
     def _on_pet_clicked(self) -> None:
         """Left clicking the pet shows a small status acknowledgment."""
         if self.guard.is_active:
             self.controller.say("（安静地陪着你）", ttl_ms=2500)
         else:
-            display = hotkey_display(self.agent_settings.feeder_hotkey)
-            self.controller.say(f"我在呢。按 {display} 可以随手喂我想法~", ttl_ms=3000)
-
+            self.ai_engine.request_reply(
+                "用户轻戳了你的身体向你打招呼",
+                self.personality,
+                category="poke",
+                context_tag="poke",
+            )
     def _on_slice_submitted(self, text: str) -> None:
         """Handle incoming slice from overlay."""
         is_distressed = self.guard.evaluate_text(text)
@@ -413,12 +503,21 @@ class CompanionApp:
         if is_distressed:
             # AC-4: Enter Sanctuary mode with a gentle, non-preaching acknowledgment bubble
             self.controller.perform_action("rest")
-            self.controller.say("🍃 收到。先放一放，我陪着你...", ttl_ms=3500)
+            self.ai_engine.request_reply(
+                f"用户心烦受挫/死磕遇到阻力：{text}",
+                self.personality,
+                category="slice_distressed",
+                context_tag="slice_distressed",
+            )
         else:
             # AC-3: Acknowledge normal slice with gentle confirmation
             self.controller.perform_action("jump")
-            self.controller.say("✨ 记下了，存进档案库了", ttl_ms=2500)
-
+            self.ai_engine.request_reply(
+                f"用户随手记下想法或切片：{text}",
+                self.personality,
+                category="slice_normal",
+                context_tag="slice_normal",
+            )
     def _open_settings(self) -> None:
         """Open the modern multi-agent and companion settings window."""
         self.settings_window.refresh_agents()
@@ -438,13 +537,13 @@ class CompanionApp:
         pet_dir = Path("assets") / "pets" / pet_id
         if pet_dir.is_dir():
             self.window.load_pet(pet_dir)
+            self.personality = load_personality(pet_dir)
             cur_idle = self.window._loaded_sheets.get("idle")
             if cur_idle and cur_idle.frames:
                 self.tray.setIcon(QIcon(cur_idle.frames[0]))
             names = {
                 "vasu": "Vasu (小河獭)",
                 "calico": "Calico (三花小猫)",
-                "claw": "Claw",
             }
             display_name = names.get(pet_id, pet_id)
             self.controller.say(f"伴生体已切换为 {display_name}")
@@ -467,6 +566,13 @@ class CompanionApp:
         self.window.set_scale(scale)
         percent = int(round(scale * 100))
         self.controller.say(f"🔍 伴生体大小已调整为 {percent}%", ttl_ms=1800)
+
+    def _on_action_test_requested(self, act_id: str) -> None:
+        """Handle action test trigger from Settings Window."""
+        if act_id == "STOP":
+            self.window.stop_action_test()
+        else:
+            self.window.test_action(act_id)
 
     def run(self) -> int:
         self.window.show()

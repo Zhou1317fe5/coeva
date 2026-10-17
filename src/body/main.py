@@ -29,8 +29,8 @@ def main() -> int:
         app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # Default pet is Vasu, with fallback to calico, claw
-    preferred_pets = ["vasu", "calico", "claw"]
+    # Default pet is Vasu, with fallback to calico
+    preferred_pets = ["vasu", "calico"]
     assets_root: Path | None = None
     for pet_name in preferred_pets:
         cand = Path("assets") / "pets" / pet_name
@@ -95,7 +95,6 @@ def main() -> int:
     available_pets = [
         ("🦦 Vasu (默认 · 小河獭)", Path("assets") / "pets" / "vasu"),
         ("🐱 Calico (三花小猫)", Path("assets") / "pets" / "calico"),
-        ("🐾 Claw (经典小猫)", Path("assets") / "pets" / "claw"),
     ]
 
     def _make_switcher(target_dir: Path, label: str) -> Callable[[], None]:

@@ -37,7 +37,7 @@ def _isolated_window(pet_dir: Path, tmp_path: Path, *, scale: float = 1.0) -> Pe
 
 def test_ac1_independent_body_lifecycle(tmp_path: Path) -> None:
     """AC-1: Verify Desktop Body runs independently of any AI agent with idle, drag, and sleep."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
@@ -57,7 +57,7 @@ def test_ac1_independent_body_lifecycle(tmp_path: Path) -> None:
 
 def test_ac2_hermes_pi_to_pet_orchestration(tmp_path: Path) -> None:
     """AC-2: Verify Hermes/Pi events route through EventBus and drive pet states within 1s."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
@@ -81,7 +81,7 @@ def test_ac2_hermes_pi_to_pet_orchestration(tmp_path: Path) -> None:
 
 def test_ac3_slice_feeder_e2e(tmp_path: Path) -> None:
     """AC-3: Verify slice feeding persists to JSONL and triggers pet nod/say confirmation."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 
@@ -113,7 +113,7 @@ def test_ac3_slice_feeder_e2e(tmp_path: Path) -> None:
 
 def test_ac4_sanctuary_meltdown_e2e(tmp_path: Path) -> None:
     """AC-4: Verify negative venting triggers Sanctuary Guard meltdown with 100% silence."""
-    pet_dir = Path("assets") / "pets" / "claw"
+    pet_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(pet_dir, tmp_path, scale=1.0)
     controller = BodyController(window)
 

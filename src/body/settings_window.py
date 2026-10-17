@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, QSize, Qt, QThread, Signal
 from PySide6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QDoubleSpinBox,
     QFrame,
     QGridLayout,
@@ -123,6 +124,8 @@ class SettingsWindow(QWidget):
     pet_changed = Signal(str)
     scale_changed = Signal(float)
     hotkey_changed = Signal(str)
+    llm_config_changed = Signal(object)
+    action_test_requested = Signal(str)
 
     def __init__(
         self,
@@ -658,6 +661,11 @@ class SettingsWindow(QWidget):
         c_layout.setSpacing(12)
 
         self.llm_config = LLMConfig.load()
+        self.llm_enabled_cb = QCheckBox("启用伴生体 AI 自适应对话 (未开启时使用宠物预设质朴台词)")
+        self.llm_enabled_cb.setStyleSheet("font-weight: 600; font-size: 13px; color: #18181b;")
+        self.llm_enabled_cb.setChecked(self.llm_config.enabled)
+        c_layout.addWidget(self.llm_enabled_cb)
+
 
         url_lbl = QLabel("接口地址 (Base URL):")
         url_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
@@ -713,6 +721,13 @@ class SettingsWindow(QWidget):
         param_row.addLayout(tok_col)
 
         c_layout.addLayout(param_row)
+        suffix_lbl = QLabel("个性化口吻偏好 (可选，注入性格提示词末尾):")
+        suffix_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
+        c_layout.addWidget(suffix_lbl)
+        self.llm_suffix_edit = QLineEdit(self.llm_config.custom_prompt_suffix)
+        self.llm_suffix_edit.setPlaceholderText("例如: 希望它偶尔多提醒我喝水、或者语气更直接一些")
+        c_layout.addWidget(self.llm_suffix_edit)
+
         layout.addWidget(card)
 
         # Status badge & actions row
@@ -758,14 +773,18 @@ class SettingsWindow(QWidget):
 
     def _save_llm_config(self) -> None:
         cfg = LLMConfig(
+            enabled=self.llm_enabled_cb.isChecked(),
             base_url=self.llm_url_edit.text().strip(),
             api_key=self.llm_key_edit.text().strip(),
             model=self.llm_model_edit.text().strip(),
             temperature=self.llm_temp_spin.value(),
             max_tokens=self.llm_tok_spin.value(),
+            custom_prompt_suffix=self.llm_suffix_edit.text().strip(),
         )
         cfg.save()
+        self.store.set_llm_config(cfg)
         self.llm_config = cfg
+        self.llm_config_changed.emit(cfg)
         self.llm_status_badge.setText("✅ 配置已安全保存至 data/llm_config.json")
         self.llm_status_badge.setStyleSheet("color: #059669; font-weight: bold;")
 
@@ -833,11 +852,6 @@ class SettingsWindow(QWidget):
                 "🐱 Calico (独立三花猫伙伴)",
                 "来自 Clawd on Desk。拥有生动呼吸、打字、扫地、做木工、"
                 "抛球玩耍、打瞌睡与被拖拽悬空挣扎等40+动作，有自己的独立生活线。",
-            ),
-            (
-                "claw",
-                "🐾 Claw (复古经典猫咪)",
-                "Clawd 经典像素猫咪形象，极简灵活。",
             ),
         ]
 
@@ -917,6 +931,69 @@ class SettingsWindow(QWidget):
 
         scale_layout.addLayout(scale_grid)
         layout.addWidget(scale_card)
+        # 0.6 Action Showcase & Tester Card
+        test_card = QFrame()
+        test_card.setProperty("class", "cardFrame")
+        test_layout = QVBoxLayout(test_card)
+        test_layout.setSpacing(10)
+
+        test_title = QLabel("🧪 伴生体动作流畅度测试台 (ACTION SHOWCASE & TESTER)")
+        test_title.setStyleSheet(
+            "font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #8e8e93;"
+        )
+        test_desc = QLabel(
+            "直接点击下方动作按钮，主界面的伴生体会立即循环播放该动作，方便测试每套动作的帧率与视觉流畅度。"
+        )
+        test_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
+        test_desc.setWordWrap(True)
+        test_layout.addWidget(test_title)
+        test_layout.addWidget(test_desc)
+
+        actions_to_show = [
+            ("idle", "待机从容呼吸"),
+            ("review", "代码复盘/深思 (Vasu)"),
+            ("waiting", "专注凝视等待 (Vasu)"),
+            ("running", "敏捷奔跑 (Vasu)"),
+            ("running-right", "向右奔跑 (Vasu)"),
+            ("running-left", "向左奔跑 (Vasu)"),
+            ("waving", "招手致意 (Vasu)"),
+            ("jumping", "欢快跳跃 (Vasu)"),
+            ("failed", "抱头受挫 (Vasu)"),
+            ("working-typing", "敲键盘打字 (Calico)"),
+            ("working-building", "做木工锯木头 (Calico)"),
+            ("working-sweeping", "小扫把打扫 (Calico)"),
+            ("working-conducting", "指挥音乐 (Calico)"),
+            ("working-juggling", "抛彩球杂耍 (Calico)"),
+            ("thinking", "托腮构想 (Calico)"),
+            ("yawning", "打大哈欠 (Calico)"),
+            ("dozing", "揉眼打瞌睡 (Calico)"),
+            ("waking", "伸大懒腰 (Calico)"),
+        ]
+
+        act_grid = QGridLayout()
+        act_grid.setSpacing(8)
+        act_cols = 3
+        for idx, (act_id, act_label) in enumerate(actions_to_show):
+            btn = QPushButton(f"{act_id}\n({act_label})")
+            btn.setFixedHeight(42)
+            btn.setStyleSheet(
+                "font-size: 11px; line-height: 1.2; text-align: center; padding: 4px;"
+            )
+            btn.clicked.connect(lambda _c, a=act_id: self.action_test_requested.emit(a))
+            act_grid.addWidget(btn, idx // act_cols, idx % act_cols)
+
+        test_layout.addLayout(act_grid)
+
+        stop_btn = QPushButton("⏹ 退出动作测试，恢复自主生活节律")
+        stop_btn.setFixedHeight(32)
+        stop_btn.setStyleSheet(
+            "background-color: #f4f4f5; font-weight: 600; color: #18181b; "
+            "border: 1px solid #d4d4d8;"
+        )
+        stop_btn.clicked.connect(lambda: self.action_test_requested.emit("STOP"))
+        test_layout.addWidget(stop_btn)
+
+        layout.addWidget(test_card)
         # 1. Peek Docking
         peek_card = QFrame()
         peek_card.setProperty("class", "cardFrame")
