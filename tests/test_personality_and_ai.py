@@ -226,3 +226,15 @@ def test_speech_bubble_interactive_reply() -> None:
     assert len(replies) == 1
     assert replies[0] == ("还有最后一行，写完就睡。", "夜深了。剩下的明天再弄，它跑不了。")
     bubble.close()
+
+
+def test_long_term_memory_recall_in_prompt() -> None:
+    profile = load_personality("vasu")
+    memories = (
+        "[2026-10-15] 用户提到: 重构完成了核心状态机并跑通全部测试",
+        "[2026-10-16] 用户提到: 晚上去河边散步，感觉心情放松很多",
+    )
+    prompt = build_system_prompt(profile, memories=memories)
+    assert "【你与用户过往的真实经历记忆" in prompt
+    assert "重构完成了核心状态机" in prompt
+    assert "晚上去河边散步" in prompt

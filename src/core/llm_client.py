@@ -84,12 +84,34 @@ class LLMConfig:
     @classmethod
     def load(cls, path: Path | None = None) -> LLMConfig:
         """Load LLM config from disk, falling back to defaults if missing or broken."""
-        cfg_path = path or DEFAULT_LLM_CONFIG_PATH
-        if cfg_path.is_file():
+        if path is not None:
+            if path.is_file():
+                try:
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    if isinstance(data, dict):
+                        return cls.from_dict(data)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            return cls()
+
+        # Default resolution order: llm_config.json -> agent_settings.json
+        if DEFAULT_LLM_CONFIG_PATH.is_file():
             try:
-                data = json.loads(cfg_path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
+                data = json.loads(DEFAULT_LLM_CONFIG_PATH.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and data.get("api_key"):
                     return cls.from_dict(data)
+            except (json.JSONDecodeError, OSError):
+                pass
+        agent_settings_file = Path("data") / "agent_settings.json"
+        if agent_settings_file.is_file():
+            try:
+                as_data = json.loads(agent_settings_file.read_text(encoding="utf-8"))
+                if (
+                    isinstance(as_data, dict)
+                    and "llm" in as_data
+                    and isinstance(as_data["llm"], dict)
+                ):
+                    return cls.from_dict(as_data["llm"])
             except (json.JSONDecodeError, OSError):
                 pass
         return cls()
@@ -314,13 +336,16 @@ class CompanionAIEngine(QObject):
         category: str = "slice_normal",
         *,
         context_tag: str = "",
+        memories: tuple[str, ...] = (),
     ) -> None:
         """Asynchronously dispatch an LLM request or immediately provide fallback off-thread."""
         signals = _WorkerSignals()
         signals.finished.connect(self._on_worker_finished)
 
         system_prompt = build_system_prompt(
-            profile, custom_user_suffix=self.config.custom_prompt_suffix
+            profile,
+            custom_user_suffix=self.config.custom_prompt_suffix,
+            memories=memories,
         )
         task = _GenerateRunnable(
             system_prompt=system_prompt,

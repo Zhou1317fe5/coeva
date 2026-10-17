@@ -212,8 +212,13 @@ def load_personality(
     return PersonalityProfile.create_default(target_pet_id)
 
 
-def build_system_prompt(profile: PersonalityProfile, *, custom_user_suffix: str = "") -> str:
-    """Assemble the unified System Prompt blending project invariants and the pet's soul."""
+def build_system_prompt(
+    profile: PersonalityProfile,
+    *,
+    custom_user_suffix: str = "",
+    memories: tuple[str, ...] = (),
+) -> str:
+    """Assemble the unified System Prompt with project invariants, pet soul, and memories."""
     sections: list[str] = [
         f"【角色身份】：{profile.identity}",
         f"【角色原型与特质】：{profile.archetype}（特质：{'、'.join(profile.traits)}）",
@@ -237,6 +242,11 @@ def build_system_prompt(profile: PersonalityProfile, *, custom_user_suffix: str 
 
     if custom_user_suffix.strip():
         sections.append(f"【用户的个性化偏好】：{custom_user_suffix.strip()}")
+    if memories:
+        sections.append("【你与用户过往的真实经历记忆（若用户提起，可自然从容地回应，证明你记得）：】")
+        for mem in memories:
+            sections.append(f"- {mem}")
+
 
     return "\n\n".join(sections)
 
@@ -259,3 +269,12 @@ def pick_fallback(profile: PersonalityProfile, category: str) -> str:
     if not pool:
         return "记下了。你先忙你的。"
     return random.choice(pool)
+
+
+def format_memory_snippet(timestamp: str, content: str, max_chars: int = 60) -> str:
+    """Format a past slice record into a concise memory cue for LLM context."""
+    date_part = timestamp.split("T")[0] if "T" in timestamp else timestamp[:10]
+    clean_content = content.replace("\n", " ").strip()
+    if len(clean_content) > max_chars:
+        clean_content = clean_content[:max_chars].rstrip() + "..."
+    return f"[{date_part}] 用户提到: {clean_content}"
