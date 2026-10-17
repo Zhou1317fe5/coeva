@@ -9,7 +9,9 @@ from pathlib import Path
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from src.body.contracts import PetState
 from src.body.controller import BodyController
+from src.body.menu_style import get_menu_stylesheet
 from src.body.window import PetWindow
 
 
@@ -47,36 +49,35 @@ def main() -> int:
             tray.setIcon(QIcon(str(icon_path)))
         else:
             tray.setIcon(QIcon())
-    tray_menu = QMenu()
+    tray_menu = QMenu(window)
+    tray_menu.setStyleSheet(get_menu_stylesheet())
 
-    # Quick state changes
-    idle_action = QAction("💤 待机 (Idle)", window)
-    idle_action.triggered.connect(lambda: controller.perform_action("rest"))
-    tray_menu.addAction(idle_action)
+    # State Group
+    sleep_action = QAction("休眠（免打扰）", window)
 
-    work_action = QAction("💻 工作 (Working)", window)
-    work_action.triggered.connect(lambda: controller.perform_action("work"))
-    tray_menu.addAction(work_action)
+    def _toggle_sleep() -> None:
+        if window._current_state == PetState.SLEEPING:
+            controller.set_state(PetState.IDLE)
+            controller.say("我醒啦！", ttl_ms=2000)
+            sleep_action.setText("休眠（免打扰）")
+        else:
+            controller.set_state(PetState.SLEEPING)
+            controller.say("晚安，有事随时叫我...", ttl_ms=2500)
+            sleep_action.setText("唤醒伴生体")
 
-    sleep_action = QAction("🌙 睡觉 (Sleep)", window)
-    sleep_action.triggered.connect(lambda: controller.perform_action("sleep"))
+    sleep_action.triggered.connect(_toggle_sleep)
     tray_menu.addAction(sleep_action)
 
     tray_menu.addSeparator()
 
-    # Say hello demo
-    say_action = QAction("💬 打招呼 (Say)", window)
-    say_action.triggered.connect(lambda: controller.say("你好！我在桌角陪你。"))
-    tray_menu.addAction(say_action)
-
-    tray_menu.addSeparator()
-
     # Switch pet submenu
-    switch_menu = tray_menu.addMenu("🔄 切换伴生体 (Switch Pet)")
+    switch_menu = tray_menu.addMenu("切换伴生体")
+    switch_menu.setStyleSheet(tray_menu.styleSheet())
     available_pets = [
-        ("🤖 Tiko (默认 · 小机器人)", Path("assets") / "pets" / "tiko"),
-        ("🐥 Debug Duck (调试小黄鸭)", Path("assets") / "pets" / "debug-duck"),
-        ("🐱 Wangcai (布偶猫)", Path("assets") / "pets" / "wangcai"),
+        ("Tiko (默认 · 小机器人)", Path("assets") / "pets" / "tiko"),
+        ("Debug Duck (调试小黄鸭)", Path("assets") / "pets" / "debug-duck"),
+        ("Wangcai (布偶猫)", Path("assets") / "pets" / "wangcai"),
+        ("Claw (经典小猫)", Path("assets") / "pets" / "claw"),
     ]
 
     def _make_switcher(target_dir: Path, label: str) -> Callable[[], None]:
@@ -88,6 +89,7 @@ def main() -> int:
                     tray.setIcon(QIcon(cur_idle.frames[0]))
                 clean_name = label.split()[1] if len(label.split()) > 1 else label
                 controller.say(f"已切换为 {clean_name}")
+
         return _switch
 
     for label, pet_path in available_pets:
@@ -96,12 +98,37 @@ def main() -> int:
             pet_action.triggered.connect(_make_switcher(pet_path, label))
             switch_menu.addAction(pet_action)
 
-    quit_action = QAction("退出伴生体 (Quit)", window)
+    reset_pos_act = QAction("将桌宠拉回主屏", window)
+    reset_pos_act.triggered.connect(window.reset_to_default_position)
+    tray_menu.addAction(reset_pos_act)
+
+    tray_menu.addSeparator()
+
+    # Pet Visibility toggle
+    vis_action = QAction("隐藏桌宠", window)
+
+    def _toggle_visibility() -> None:
+        if window.isVisible():
+            window.hide()
+            vis_action.setText("显示桌宠")
+        else:
+            window.show()
+            window.raise_()
+            vis_action.setText("隐藏桌宠")
+    vis_action.triggered.connect(_toggle_visibility)
+    tray_menu.addAction(vis_action)
+
+    tray_menu.addSeparator()
+
+    quit_action = QAction("退出", window)
     quit_action.triggered.connect(app.quit)
     tray_menu.addAction(quit_action)
 
     tray.setContextMenu(tray_menu)
     tray.show()
+
+    # Pop up context menu when clicking pet body
+    window.context_menu_requested.connect(lambda pos: tray_menu.popup(pos))
 
     window.show()
     return app.exec()

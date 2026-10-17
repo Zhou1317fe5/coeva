@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 2C: 自主行动 running 动画验收
+
+### 📝 Art Production（美术制作）
+- 修正 Phase 2A self-work 动作语义：旧闭眼梳理草图仍不作为生产素材；`running` 现表达 Vasu 为自己的小事克制地迈步前行，而非 Agent 任务状态。完成 6 帧色键抽帧、GIF、四行接触表、64px 对照与逐行 QA；已批准行与最终图集均未改动。
+
 ## [Unreleased] - Vasu Phase 2C-3: review 专注观察动画验收
 
 ### 📝 Art Production（美术制作）

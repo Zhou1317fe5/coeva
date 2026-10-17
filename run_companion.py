@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import sys
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from src.body.chronicle_window import ChronicleViewerWindow
 from src.body.contracts import PetState
 from src.body.controller import BodyController
+from src.body.menu_style import get_menu_stylesheet
 from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
 from src.connectors.contracts import AgentEvent, AgentEventType
@@ -90,9 +92,7 @@ class CompanionApp:
             watcher=self.watcher,
         )
         # Page 3 reports these live states, so it must share the real instances.
-        self.settings_window.set_core_handles(
-            sanctuary=self.guard, cold_start=self.cold_start
-        )
+        self.settings_window.set_core_handles(sanctuary=self.guard, cold_start=self.cold_start)
         self.settings_window.chronicle = self.chronicle
 
         # 4. Connectors & Event Bus
@@ -202,7 +202,7 @@ class CompanionApp:
             self.controller.say(nudge, ttl_ms=4500)
 
     def _setup_tray(self, assets_dir: Path) -> None:
-        """Create a full-featured tray menu for manual inspection and testing."""
+        """Create a Clawd-on-Desk inspired context menu and system tray."""
         self.tray = QSystemTrayIcon(self.window)
         idle_sheet = self.window._loaded_sheets.get("idle")
         if idle_sheet and idle_sheet.frames:
@@ -213,38 +213,55 @@ class CompanionApp:
                 self.tray.setIcon(QIcon(str(icon_path)))
             else:
                 self.tray.setIcon(QIcon())
-        menu = QMenu()
 
-        # 0. Settings Window trigger (Like Clawd on Desk)
-        settings_action = QAction("⚙️ 伴生体与多 Agent 设置...", self.window)
-        settings_action.triggered.connect(self._open_settings)
-        menu.addAction(settings_action)
+        self.context_menu = self._build_context_menu()
+        self.tray.setContextMenu(self.context_menu)
+        self.tray.show()
 
-        # 0.5 Chronicle Archive Window trigger (Phase 2A Viewer)
-        archive_action = QAction("📖 记忆与切片档案库 (Chronicle)...", self.window)
-        archive_action.triggered.connect(self._open_chronicle_archive)
-        menu.addAction(archive_action)
+        # Allow right-clicking pet body directly to pop up the context menu (Clawd on Desk feature)
+        self.window.context_menu_requested.connect(self._popup_context_menu)
 
-        # 1. Feeder trigger
+    def _build_context_menu(self) -> QMenu:
+        """Construct clean context menu adhering to Clawd on Desk UI hierarchy."""
+        menu = QMenu(self.window)
+        menu.setStyleSheet(get_menu_stylesheet())
+
+        # ── 1. State Group (Clawd on Desk: 极简模式 + 休眠/唤醒) ──
+        is_sleeping = self.window._current_state == PetState.SLEEPING
+        self.sleep_action = QAction("唤醒伴生体" if is_sleeping else "休眠（免打扰）", self.window)
+        self.sleep_action.triggered.connect(self._toggle_sleep_wake)
+        menu.addAction(self.sleep_action)
+
+        menu.addSeparator()
+
+        # ── 2. Work & Memory Group (Clawd on Desk: 随手切片 + 打开足迹) ──
         self.feed_action = QAction(
-            f"🌱 随手投喂切片 ({hotkey_display(self.agent_settings.feeder_hotkey)})", self.window
+            f"随手投喂切片 ({hotkey_display(self.agent_settings.feeder_hotkey)})", self.window
         )
         self.feed_action.triggered.connect(self.overlay.toggle_or_show)
         menu.addAction(self.feed_action)
 
-        # 1.5 Switch Pet Submenu
-        switch_menu = menu.addMenu("🔄 切换伴生体 (Switch Pet)")
+        archive_action = QAction("打开足迹", self.window)
+        archive_action.triggered.connect(self._open_chronicle_archive)
+        menu.addAction(archive_action)
+
+        menu.addSeparator()
+
+        # ── 3. Companion & Display Group ──
+        switch_menu = menu.addMenu("切换伴生体")
+        switch_menu.setStyleSheet(menu.styleSheet())
         available_pets = [
-            ("🤖 Tiko (默认 · 小机器人)", "tiko"),
-            ("🐥 Debug Duck (调试小黄鸭)", "debug-duck"),
-            ("🐱 Wangcai (布偶猫)", "wangcai"),
-            ("🐾 Claw (经典小猫)", "claw"),
+            ("Tiko (默认 · 小机器人)", "tiko"),
+            ("Debug Duck (调试小黄鸭)", "debug-duck"),
+            ("Wangcai (布偶猫)", "wangcai"),
+            ("Claw (经典小猫)", "claw"),
         ]
 
         def _make_switcher(pid: str) -> Callable[[], None]:
             def _switch() -> None:
                 self.agent_settings.set_selected_pet(pid)
                 self._on_pet_changed(pid)
+
             return _switch
 
         for label, pid in available_pets:
@@ -253,91 +270,118 @@ class CompanionApp:
                 pet_action.triggered.connect(_make_switcher(pid))
                 switch_menu.addAction(pet_action)
 
-        menu.addSeparator()
-
-
-        # 1.6 Scale Submenu
-        scale_menu = menu.addMenu("🔍 伴生体大小 (Scale)")
+        scale_menu = menu.addMenu("伴生体大小")
+        scale_menu.setStyleSheet(menu.styleSheet())
         scale_presets = [
-            ("50% 极小 (Mini · 96px)", 0.5),
-            ("75% 小巧 (Compact · 144px)", 0.75),
-            ("100% 标准 (Normal · 192px)", 1.0),
-            ("125% 适中 (Medium · 240px)", 1.25),
-            ("150% 醒目 (Large · 288px)", 1.5),
+            ("50% 极小", 0.5),
+            ("75% 小巧", 0.75),
+            ("100% 标准", 1.0),
+            ("125% 适中", 1.25),
+            ("150% 醒目", 1.5),
         ]
 
         def _make_scale_changer(val: float) -> Callable[[], None]:
             def _change() -> None:
                 self._on_scale_changed(val)
+
             return _change
 
         for s_label, s_val in scale_presets:
             s_action = QAction(s_label, self.window)
             s_action.triggered.connect(_make_scale_changer(s_val))
             scale_menu.addAction(s_action)
-        # 2. Agent state simulation tests with clear visual bubble feedback
-        sim_menu = menu.addMenu("⚡ 测试: 模拟 Hermes Agent 事件")
 
-        def _sim_prompt() -> None:
-            self.hermes.on_user_prompt("demo_session")
-            self.controller.say("🤔 思考中：正在分析你的问题...", ttl_ms=3000)
-
-        prompt_act = QAction("1. 用户提问 (User Prompt → 思考)", self.window)
-        prompt_act.triggered.connect(_sim_prompt)
-        sim_menu.addAction(prompt_act)
-
-        def _sim_tool() -> None:
-            self.hermes.on_pre_tool_call("demo_session", "bash")
-            self.controller.say("⚙️ 正在执行工具: bash", ttl_ms=2500)
-
-        tool_act = QAction("2. 调工具 (PreToolUse → 工作)", self.window)
-        tool_act.triggered.connect(_sim_tool)
-        sim_menu.addAction(tool_act)
-
-        def _sim_error() -> None:
-            self.hermes.on_tool_failure("demo_session", "bash", "SyntaxError")
-            self.controller.say("⚠️ 工具报错: SyntaxError", ttl_ms=3000)
-
-        err_act = QAction("3. 工具报错 (ToolFailure → 报错)", self.window)
-        err_act.triggered.connect(_sim_error)
-        sim_menu.addAction(err_act)
-
-        def _sim_done() -> None:
-            self.hermes.on_task_complete("demo_session")
-            self.controller.say("🎉 任务完成！所有检查通过！", ttl_ms=3000)
-
-        done_act = QAction("4. 任务完成 (TaskComplete → 开心)", self.window)
-        done_act.triggered.connect(_sim_done)
-        sim_menu.addAction(done_act)
-
-        menu.addSeparator()
-
-        # 3. Direct state controls & Position Recovery
-        idle_act = QAction("💤 恢复待机 (Idle)", self.window)
-        idle_act.triggered.connect(lambda: self.controller.set_state(PetState.IDLE))
-        menu.addAction(idle_act)
-
-        sleep_act = QAction("🌙 哄它睡觉 (Sleep)", self.window)
-        sleep_act.triggered.connect(lambda: self.controller.set_state(PetState.SLEEPING))
-        menu.addAction(sleep_act)
-
-        bubble_act = QAction("💬 测试气泡 (Say)", self.window)
-        bubble_act.triggered.connect(lambda: self.controller.say("今天也是并肩作战的一天！"))
-        menu.addAction(bubble_act)
-
-        reset_pos_act = QAction("📍 唤回伴生体 (居中重置)", self.window)
+        reset_pos_act = QAction("将桌宠拉回主屏", self.window)
         reset_pos_act.triggered.connect(self.window.reset_to_default_position)
         menu.addAction(reset_pos_act)
 
         menu.addSeparator()
 
-        # 4. Quit
-        quit_act = QAction("🚪 退出伴生体", self.window)
+        # ── 4. App & Settings Group ──
+        settings_action = QAction("设置…", self.window)
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
+
+        self.vis_action = QAction("隐藏桌宠", self.window)
+        self.vis_action.triggered.connect(self._toggle_pet_visibility)
+        menu.addAction(self.vis_action)
+
+        # Optional Developer Debug Menu (Only active when COMPANION_DEBUG=1)
+        if os.environ.get("COMPANION_DEBUG") == "1":
+            menu.addSeparator()
+            sim_menu = menu.addMenu("开发者调试")
+            sim_menu.setStyleSheet(menu.styleSheet())
+            sim_prompt = QAction("1. 用户提问 (User Prompt → 思考)", self.window)
+            sim_prompt.triggered.connect(
+                lambda: (
+                    self.hermes.on_user_prompt("demo_session"),
+                    self.controller.say("🤔 思考中：正在分析你的问题...", ttl_ms=3000),
+                )
+            )
+            sim_menu.addAction(sim_prompt)
+            sim_tool = QAction("2. 调工具 (PreToolUse → 工作)", self.window)
+            sim_tool.triggered.connect(
+                lambda: (
+                    self.hermes.on_pre_tool_call("demo_session", "bash"),
+                    self.controller.say("⚙️ 正在执行工具: bash", ttl_ms=2500),
+                )
+            )
+            sim_menu.addAction(sim_tool)
+            sim_err = QAction("3. 工具报错 (ToolFailure → 报错)", self.window)
+            sim_err.triggered.connect(
+                lambda: (
+                    self.hermes.on_tool_failure("demo_session", "bash", "SyntaxError"),
+                    self.controller.say("⚠️ 工具报错: SyntaxError", ttl_ms=3000),
+                )
+            )
+            sim_menu.addAction(sim_err)
+            sim_done = QAction("4. 任务完成 (TaskComplete → 开心)", self.window)
+            sim_done.triggered.connect(
+                lambda: (
+                    self.hermes.on_task_complete("demo_session"),
+                    self.controller.say("🎉 任务完成！所有检查通过！", ttl_ms=3000),
+                )
+            )
+            sim_menu.addAction(sim_done)
+        menu.addSeparator()
+
+        # ── 5. Quit Group ──
+        quit_act = QAction("退出", self.window)
         quit_act.triggered.connect(self._on_quit)
         menu.addAction(quit_act)
 
-        self.tray.setContextMenu(menu)
-        self.tray.show()
+        return menu
+
+    def _toggle_sleep_wake(self) -> None:
+        if self.window._current_state == PetState.SLEEPING:
+            self.controller.set_state(PetState.IDLE)
+            self.controller.say("我醒啦！", ttl_ms=2000)
+        else:
+            self.controller.set_state(PetState.SLEEPING)
+            self.controller.say("晚安，有事随时叫我...", ttl_ms=2500)
+        self._refresh_menu_labels()
+
+    def _toggle_pet_visibility(self) -> None:
+        """Toggle visibility of the companion pet."""
+        if self.window.isVisible():
+            self.window.hide()
+        else:
+            self.window.show()
+            self.window.raise_()
+        self._refresh_menu_labels()
+
+    def _refresh_menu_labels(self) -> None:
+        """Keep dynamic menu labels in sync with real window/state."""
+        if hasattr(self, "sleep_action"):
+            is_sleeping = self.window._current_state == PetState.SLEEPING
+            self.sleep_action.setText("唤醒伴生体" if is_sleeping else "休眠（免打扰）")
+        if hasattr(self, "vis_action"):
+            self.vis_action.setText("显示桌宠" if self.window.isHidden() else "隐藏桌宠")
+
+    def _popup_context_menu(self, pos: QPoint) -> None:
+        """Pop up the context menu at global coordinate."""
+        self._refresh_menu_labels()
+        self.context_menu.popup(pos)
 
     def _on_pet_clicked(self) -> None:
         """Left clicking the pet shows a small status acknowledgment."""
@@ -374,7 +418,6 @@ class CompanionApp:
             self.controller.perform_action("jump")
             self.controller.say("✨ 记下了，存进档案库了", ttl_ms=2500)
 
-
     def _open_settings(self) -> None:
         """Open the modern multi-agent and companion settings window."""
         self.settings_window.refresh_agents()
@@ -405,7 +448,6 @@ class CompanionApp:
             }
             display_name = names.get(pet_id, pet_id)
             self.controller.say(f"伴生体已切换为 {display_name}")
-
 
     def _on_quit(self) -> None:
         try:
