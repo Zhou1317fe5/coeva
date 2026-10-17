@@ -109,6 +109,7 @@ class PetWindow(QWidget):
         self._label.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._label.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
         self._label.setStyleSheet("background: transparent; border: 0;")
+        self._label.setScaledContents(False)
         self._label.setMouseTracking(True)
 
         self._player = AnimationPlayer(self)
@@ -239,6 +240,9 @@ class PetWindow(QWidget):
 
     def _load_spritesheets(self) -> None:
         """Preload sprite sheets from Clawd on Desk theme, Petdex, or legacy sprites."""
+        screen = self.screen() or QApplication.primaryScreen()
+        dpr = screen.devicePixelRatio() if screen is not None else 1.0
+
         # 0. Try Clawd on Desk APNG Theme (e.g. Calico with rich autonomous behaviors)
         theme_json = self.pet_dir / "theme.json"
         is_theme_format = theme_json.is_file()
@@ -253,7 +257,7 @@ class PetWindow(QWidget):
 
         if is_theme_format:
             try:
-                sheets = ThemeApngLoader.load_theme(self.pet_dir, scale=self._scale)
+                sheets = ThemeApngLoader.load_theme(self.pet_dir, scale=self._scale, dpr=dpr)
                 if sheets:
                     self._loaded_sheets.update(sheets)
                     # For Calico themes, viewport margins are around 15px unscaled
@@ -297,6 +301,7 @@ class PetWindow(QWidget):
                     cols=cols,
                     rows=rows,
                     scale=self._scale,
+                    dpr=dpr,
                     trim_empty_frames=True,
                 )
                 self._loaded_sheets.update(sheets)
@@ -323,13 +328,11 @@ class PetWindow(QWidget):
                 try:
                     # Legacy 32px sprites scale with a 2x base multiplier
                     factor = 2.0 * self._scale
-                    factor = 2.0 * self._scale
-                    sheet = SpriteSheet.load(path, frames=frames).scaled(factor)
+                    sheet = SpriteSheet.load(path, frames=frames).scaled(factor, dpr=dpr)
                     self._loaded_sheets[state_key] = sheet
                     self._accumulate_art_padding(path, cols=frames, rows=1, factor=factor)
                 except SpriteSheetError:
                     pass
-
     def _measure_art_padding(
         self, image_path: Path, *, cols: int, rows: int, factor: float
     ) -> None:
@@ -502,8 +505,9 @@ class PetWindow(QWidget):
 
     def _on_frame_changed(self, frame: QPixmap) -> None:
         self._label.setPixmap(frame)
-        self.resize(frame.size())
-        self._label.resize(frame.size())
+        geom_size = frame.deviceIndependentSize().toSize()
+        self.resize(geom_size)
+        self._label.resize(geom_size)
         if self._bubble.isVisible():
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
         if self._feeder_bar.isVisible():
@@ -511,7 +515,6 @@ class PetWindow(QWidget):
 
     def _get_config_path(self) -> Path:
         return self._position_config_path
-
     def _restore_position(self) -> None:
         cfg = self._get_config_path()
         screen = self.screen() or QApplication.primaryScreen()

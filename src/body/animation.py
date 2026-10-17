@@ -147,30 +147,34 @@ class SpriteSheet:
             frame_durations_ms=self.frame_durations_ms,
         )
 
-    def scaled(self, factor: float) -> SpriteSheet:
-        """Return a new SpriteSheet scaled to given factor."""
-        if abs(factor - 1.0) < 0.01:
+    def scaled(self, factor: float, *, dpr: float = 1.0) -> SpriteSheet:
+        """Return a new SpriteSheet scaled using nearest-neighbor for crisp pixel art."""
+        phys_factor = factor * dpr
+        if abs(phys_factor - 1.0) < 0.01 and abs(dpr - 1.0) < 0.01:
             return self
-        new_w = max(16, int(round(self.frame_width * factor)))
-        new_h = max(16, int(round(self.frame_height * factor)))
-        mode = (
-            Qt.TransformationMode.SmoothTransformation
-            if factor < 1.0
-            else Qt.TransformationMode.FastTransformation
-        )
-        scaled_frames = [
-            f.scaled(
-                new_w,
-                new_h,
+
+        new_phys_w = max(16, int(round(self.frame_width * phys_factor)))
+        new_phys_h = max(16, int(round(self.frame_height * phys_factor)))
+
+        scaled_frames = []
+        for f in self.frames:
+            scaled_f = f.scaled(
+                new_phys_w,
+                new_phys_h,
                 aspectMode=Qt.AspectRatioMode.KeepAspectRatio,
-                mode=mode,
+                mode=Qt.TransformationMode.FastTransformation,
             )
-            for f in self.frames
-        ]
+            if dpr > 1.0:
+                scaled_f.setDevicePixelRatio(dpr)
+            scaled_frames.append(scaled_f)
+
+        logical_w = max(16, int(round(self.frame_width * factor)))
+        logical_h = max(16, int(round(self.frame_height * factor)))
+
         return SpriteSheet(
             scaled_frames,
-            frame_width=new_w,
-            frame_height=new_h,
+            frame_width=logical_w,
+            frame_height=logical_h,
             default_fps=self.default_fps,
             frame_durations_ms=self.frame_durations_ms,
         )
@@ -211,6 +215,7 @@ class PetdexAtlasLoader:
         cols: int = 8,
         rows: int = 9,
         scale: float = 1.0,
+        dpr: float = 1.0,
         trim_empty_frames: bool = True,
     ) -> dict[str, SpriteSheet]:
         """Slice a unified Petdex sprite sheet into action-specific SpriteSheets."""
@@ -254,8 +259,8 @@ class PetdexAtlasLoader:
                 frame_height=frame_h,
                 frame_durations_ms=durations,
             )
-            if abs(scale - 1.0) >= 0.01:
-                sheet = sheet.scaled(scale)
+            if abs(scale - 1.0) >= 0.01 or dpr > 1.0:
+                sheet = sheet.scaled(scale, dpr=dpr)
             sheets[action_name] = sheet
 
         return sheets
@@ -266,7 +271,7 @@ class ThemeApngLoader:
 
     @classmethod
     def load_apng_as_spritesheet(
-        cls, apng_path: Path, *, scale: float = 1.0
+        cls, apng_path: Path, *, scale: float = 1.0, dpr: float = 1.0
     ) -> SpriteSheet:
         """Decode an animated PNG into a SpriteSheet with exact frame rate."""
         if not apng_path.is_file():
@@ -300,8 +305,8 @@ class ThemeApngLoader:
             frame_height=pixmaps[0].height(),
             default_fps=fps,
         )
-        if abs(scale - 1.0) >= 0.01:
-            sheet = sheet.scaled(scale)
+        if abs(scale - 1.0) >= 0.01 or dpr > 1.0:
+            sheet = sheet.scaled(scale, dpr=dpr)
         return sheet
 
     @classmethod
@@ -335,7 +340,7 @@ class ThemeApngLoader:
 
     @classmethod
     def load_theme(
-        cls, theme_dir: Path, *, scale: float = 1.0
+        cls, theme_dir: Path, *, scale: float = 1.0, dpr: float = 1.0
     ) -> dict[str, SpriteSheet]:
         """Load all APNG animation sheets declared in a Clawd on Desk theme directory."""
         theme_json_path = theme_dir / "theme.json"
@@ -349,7 +354,7 @@ class ThemeApngLoader:
         # 1. Scan and load all apng files
         for apng_file in assets_dir.glob("*.apng"):
             try:
-                sheet = cls.load_apng_as_spritesheet(apng_file, scale=scale)
+                sheet = cls.load_apng_as_spritesheet(apng_file, scale=scale, dpr=dpr)
                 file_to_sheet[apng_file.name] = sheet
                 # Register by clean file action name, e.g. "calico-idle.apng" -> "idle"
                 clean_name = apng_file.stem
