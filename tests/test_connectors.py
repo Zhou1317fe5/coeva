@@ -87,23 +87,22 @@ def test_hermes_connector_lifecycle() -> None:
 
 
 def test_agent_settings_pet_preference(tmp_path: Path) -> None:
-    """Test that selected desktop pet preference defaults to tiko and persists correctly."""
+    """Test that selected desktop pet preference defaults to vasu and persists correctly."""
     from src.connectors.settings import AgentSettingsStore
 
     settings_file = tmp_path / "agent_settings.json"
     store = AgentSettingsStore(settings_file)
-    assert store.selected_pet == "calico"
+    assert store.selected_pet == "vasu"
 
-    store.set_selected_pet("debug-duck")
-    assert store.selected_pet == "debug-duck"
+    store.set_selected_pet("calico")
+    assert store.selected_pet == "calico"
 
     # Reload from disk
     reloaded = AgentSettingsStore(settings_file)
-    assert reloaded.selected_pet == "debug-duck"
+    assert reloaded.selected_pet == "calico"
 
-    reloaded.set_selected_pet("wangcai")
-    assert reloaded.selected_pet == "wangcai"
-
+    reloaded.set_selected_pet("vasu")
+    assert reloaded.selected_pet == "vasu"
 
 def _persisted_hotkey(settings_file: Path) -> object:
     """Read the hotkey straight off disk, bypassing the in-memory store."""
@@ -139,13 +138,13 @@ def test_feeder_hotkey_falls_back_when_stored_value_is_invalid(tmp_path: Path) -
 
     settings_file = tmp_path / "agent_settings.json"
     settings_file.write_text(
-        json.dumps({"version": 2, "selected_pet": "tiko", "feeder_hotkey": "f", "agents": {}}),
+        json.dumps({"version": 2, "selected_pet": "calico", "feeder_hotkey": "f", "agents": {}}),
         encoding="utf-8",
     )
     assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
 
     settings_file.write_text(
-        json.dumps({"version": 2, "selected_pet": "tiko", "agents": {}}), encoding="utf-8"
+        json.dumps({"version": 2, "selected_pet": "calico", "agents": {}}), encoding="utf-8"
     )
     assert AgentSettingsStore(settings_file).feeder_hotkey == DEFAULT_FEEDER_HOTKEY
 

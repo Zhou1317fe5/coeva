@@ -151,7 +151,7 @@ class AgentSettingsStore:
             except (json.JSONDecodeError, OSError):
                 raw_data = {}
 
-        self._selected_pet = str(raw_data.get("selected_pet", "calico"))
+        self._selected_pet = str(raw_data.get("selected_pet", "vasu"))
         stored_hotkey = parse_hotkey(str(raw_data.get("feeder_hotkey", "")))
         self._feeder_hotkey = (
             stored_hotkey.spec if stored_hotkey is not None else DEFAULT_FEEDER_HOTKEY
@@ -220,12 +220,12 @@ class AgentSettingsStore:
 
     @property
     def selected_pet(self) -> str:
-        """Return the ID of the selected desktop pet (e.g. 'tiko')."""
+        """Return the ID of the selected desktop pet (e.g. 'calico')."""
         return self._selected_pet
 
     def set_selected_pet(self, pet_id: str) -> None:
         """Update and persist the selected desktop pet."""
-        self._selected_pet = pet_id.strip() or "calico"
+        self._selected_pet = pet_id.strip() or "vasu"
         self.save()
 
     @property

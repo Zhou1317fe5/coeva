@@ -63,14 +63,15 @@ class CompanionApp:
         self.settings_window.scale_changed.connect(self._on_scale_changed)
         self.settings_window.hotkey_changed.connect(self._on_hotkey_changed)
 
-        # 1. Desktop Body (Defaults to Calico, or saved pet preference)
+        # 1. Desktop Body (Defaults to Vasu, or saved pet preference)
         selected_pet = self.agent_settings.selected_pet
         assets_dir = Path("assets") / "pets" / selected_pet
+        if not assets_dir.is_dir():
+            assets_dir = Path("assets") / "pets" / "vasu"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "claw"
-
         self.window = PetWindow(assets_dir)
         self.controller = BodyController(self.window)
 
@@ -253,10 +254,10 @@ class CompanionApp:
         switch_menu = menu.addMenu("切换伴生体")
         switch_menu.setStyleSheet(menu.styleSheet())
         available_pets = [
-            ("Calico (默认 · 三花小猫)", "calico"),
-            ("Claw (经典小猫)", "claw"),
+            ("🦦 Vasu (官方默认 · 小河獭)", "vasu"),
+            ("🐱 Calico (三花小猫)", "calico"),
+            ("🐾 Claw (经典小猫)", "claw"),
         ]
-
         def _make_switcher(pid: str) -> Callable[[], None]:
             def _switch() -> None:
                 self.agent_settings.set_selected_pet(pid)
@@ -441,6 +442,7 @@ class CompanionApp:
             if cur_idle and cur_idle.frames:
                 self.tray.setIcon(QIcon(cur_idle.frames[0]))
             names = {
+                "vasu": "Vasu (小河獭)",
                 "calico": "Calico (三花小猫)",
                 "claw": "Claw",
             }

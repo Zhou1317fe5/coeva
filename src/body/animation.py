@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -411,8 +412,12 @@ class AnimationPlayer(QObject):
         self._sheet: SpriteSheet | None = None
         self._current_index = 0
         self._loop = True
+        self._loop_delay_range_ms: tuple[int, int] | None = None
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._advance)
+        self._loop_delay_timer = QTimer(self)
+        self._loop_delay_timer.setSingleShot(True)
+        self._loop_delay_timer.timeout.connect(self._resume_after_delay)
 
     @property
     def current_frame(self) -> QPixmap | None:
@@ -420,12 +425,21 @@ class AnimationPlayer(QObject):
             return None
         return self._sheet.frames[self._current_index]
 
-    def play(self, sheet: SpriteSheet, *, fps: int | None = None, loop: bool = True) -> None:
+    def play(
+        self,
+        sheet: SpriteSheet,
+        *,
+        fps: int | None = None,
+        loop: bool = True,
+        loop_delay_range_ms: tuple[int, int] | None = None,
+    ) -> None:
         """Load sheet and start playback at given FPS (defaults to sheet's own fps)."""
         self._timer.stop()
+        self._loop_delay_timer.stop()
         self._sheet = sheet
         self._current_index = 0
         self._loop = loop
+        self._loop_delay_range_ms = loop_delay_range_ms
 
         if sheet.frame_count == 0:
             return
@@ -440,6 +454,13 @@ class AnimationPlayer(QObject):
 
     def stop(self) -> None:
         self._timer.stop()
+        self._loop_delay_timer.stop()
+
+    def _resume_after_delay(self) -> None:
+        if self._sheet is not None and self._loop:
+            self._current_index = 1 if self._sheet.frame_count > 1 else 0
+            self.frame_changed.emit(self._sheet.frames[self._current_index])
+            self._timer.start()
 
     def _advance(self) -> None:
         if self._sheet is None or self._sheet.frame_count == 0:
@@ -450,6 +471,13 @@ class AnimationPlayer(QObject):
         if next_index >= self._sheet.frame_count:
             if self._loop:
                 self._current_index = 0
+                self.frame_changed.emit(self._sheet.frames[0])
+                if self._loop_delay_range_ms is not None:
+                    self._timer.stop()
+                    min_d, max_d = self._loop_delay_range_ms
+                    delay = random.randint(min(min_d, max_d), max(min_d, max_d))
+                    self._loop_delay_timer.start(delay)
+                    return
             else:
                 self._timer.stop()
                 self.finished.emit()

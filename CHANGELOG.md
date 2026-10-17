@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 拖离边缘：自动解除 Mini Mode 并恢复完整站姿 `idle`。
 
 
+- **接入官方核心默认伴生体 Vasu Core v0.1（`assets/pets/vasu/`）**：
+  - 正式将完成生产冻结的 Vasu Core v0.1 部署至 `assets/pets/vasu/`（包含 `pet.json` 与标准 1536×1872 8×9 图集 `spritesheet.webp`，57 个有效动作帧无损呈现）；
+  - 设置为系统出厂唯一官方默认伙伴：`src/connectors/settings.py` 与 `run_companion.py` 默认读取 `vasu`；
+  - 桌面右键菜单与设置面板同步将 Vasu 设为置顶首选；
+  - 完整跑通 9 状态动作映射（`idle`, `running-right`, `running-left`, `waving`, `jumping`, `failed`, `waiting`, `running`, `review`），并经由单元测试验证。
+- **全面看齐 Codex 核心交互动力学与生理节律（`src/body/animation.py`, `src/body/window.py`）**：
+  - **彻底解决眨眼过快频闪问题**：`AnimationPlayer` 引入 `loop_delay_range_ms`。完成一次平静呼吸与自然闭合眨眼后，在睁眼基线帧保持 3.0~5.5 秒的深沉凝视，将眨眼频率校准为自然界真实的“数秒一次”，彻底消除一秒一次的机械频闪感；
+  - **对齐 Codex 悬停小跳（Hover Jump）**：光标滑入桌宠时，触发轻快利落的 `jumping` 动作（Row 4，5 帧，约 500ms），给予桌面触觉反馈，并配置 5 秒冷却避免连续划过抽搐；
+  - **对齐 Codex 拖拽步态方向感知（Directional Dragging）**：按住向右拖动宠物时自动流转为 `running-right`（右行步态），向左拖动自动流转为 `running-left`（左行步态），松手放开时自然定步回到 `idle`。
 ### 🚀 Added（新增功能）
 - **原生 APNG 动图主题加载器（`ThemeApngLoader`, `src/body/animation.py`）**：
   - 支持 Clawd on Desk 规范的 `theme.json` 与 `.apng` 动图主题；

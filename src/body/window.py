@@ -13,9 +13,11 @@ from PySide6.QtGui import (
     QContextMenuEvent,
     QCursor,
     QEnterEvent,
+    QHideEvent,
     QImage,
     QMouseEvent,
     QPixmap,
+    QShowEvent,
     QWheelEvent,
 )
 from PySide6.QtWidgets import QApplication, QLabel, QWidget
@@ -32,6 +34,9 @@ from src.body.animation import (
 from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
 from src.core.circadian import CircadianPhase, get_schedule_for_time
+from src.feeder.contracts import RawSlice
+from src.feeder.overlay import SliceFeederBar
+from src.feeder.storage import SliceStore
 
 CLICK_DRAG_THRESHOLD_PX = 4
 EDGE_SNAP_DISTANCE_PX = 30  # Snapping threshold set to 30px
@@ -66,6 +71,7 @@ class PetWindow(QWidget):
     position_changed = Signal(int, int)
     scale_changed = Signal(float)
     context_menu_requested = Signal(QPoint)
+    slice_fed = Signal(str)
 
     def __init__(
         self,
@@ -73,6 +79,8 @@ class PetWindow(QWidget):
         *,
         scale: float = DEFAULT_SCALE,
         position_config_path: Path | None = None,
+        slice_store: SliceStore | None = None,
+        feeder_bar: SliceFeederBar | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -107,11 +115,22 @@ class PetWindow(QWidget):
         self._player.frame_changed.connect(self._on_frame_changed)
 
         self._bubble = SpeechBubble()
-
+        self._slice_store = slice_store or SliceStore()
+        self._feeder_bar = feeder_bar or SliceFeederBar()
+        self._feeder_bar.slice_submitted.connect(self._on_slice_submitted)
+        self._feeder_bar.voice_clicked.connect(self._on_voice_clicked)
         # Drag state
         self._drag_offset: QPoint | None = None
         self._press_pos: QPoint | None = None
+        self._last_drag_x: int = 0
+        self._current_drag_dir: str | None = None
         self._has_moved = False
+
+        # Hover jump (Codex hop on cursor hover)
+        self._last_hover_jump_timestamp: float = 0.0
+        self._jump_settle_timer = QTimer(self)
+        self._jump_settle_timer.setSingleShot(True)
+        self._jump_settle_timer.timeout.connect(self._finish_hover_jump)
 
         # Edge Docking (Peek Mode) state
         self._docked_edge: str | None = None  # "right", "left", or None
@@ -168,8 +187,37 @@ class PetWindow(QWidget):
 
     @property
     def scale_factor(self) -> float:
-        """Return the current scaling factor."""
         return self._scale
+
+    @property
+    def feeder_bar(self) -> SliceFeederBar:
+        return self._feeder_bar
+
+    def open_feeder_input(self) -> None:
+        """Open and focus the feeder input bar directly beneath the pet."""
+        if self._current_state == PetState.SLEEPING:
+            self._wake_up()
+        if self._docked_edge is not None and not self._is_peek_expanded:
+            self._expand_from_dock()
+        self._feeder_bar.show()
+        self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
+        self._feeder_bar.expand_input()
+
+    def _on_slice_submitted(self, content: str) -> None:
+        slice_item = RawSlice.create(content)
+        self._slice_store.save(slice_item)
+        self.apply_state(PetState.HAPPY)
+        feedbacks = ["记下啦~", "存进成长抽屉了", "好灵感！已记录", "已沉淀到记忆库~"]
+        self.say(random.choice(feedbacks), ttl_ms=2500)
+        self.slice_fed.emit(content)
+
+    def _on_voice_clicked(self, active: bool) -> None:
+        if active:
+            self.apply_state(PetState.THINKING)
+            self.say("我在听呢...（可随手在左侧记下灵感，语音输入支持 Win+H）", ttl_ms=3500)
+        else:
+            self.apply_state(PetState.IDLE)
+            self.say("好嘞~随时叫我。", ttl_ms=2000)
 
     def set_scale(self, scale: float) -> None:
         """Dynamically adjust pet scaling factor and refresh spritesheets."""
@@ -419,7 +467,11 @@ class PetWindow(QWidget):
             sheet = self._loaded_sheets.get("idle")
 
         if sheet is not None:
-            self._player.play(sheet, fps=fps, loop=loop)
+            # For 6-frame atlas pets (like Vasu, Tiko), pause 3.0~5.5s between loops
+            # so the pet only blinks once naturally every few seconds (matching Codex).
+            is_short_idle = state == PetState.IDLE and sheet.frame_count <= 8
+            loop_delay = (3000, 5500) if is_short_idle else None
+            self._player.play(sheet, fps=fps, loop=loop, loop_delay_range_ms=loop_delay)
 
     def say(self, text: str, *, ttl_ms: int = 4000) -> None:
         """Display a speech bubble above the pet."""
@@ -445,6 +497,8 @@ class PetWindow(QWidget):
             self._save_position()
             if self._bubble.isVisible():
                 self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+            if self._feeder_bar.isVisible():
+                self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
 
     def _on_frame_changed(self, frame: QPixmap) -> None:
         self._label.setPixmap(frame)
@@ -452,6 +506,8 @@ class PetWindow(QWidget):
         self._label.resize(frame.size())
         if self._bubble.isVisible():
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+        if self._feeder_bar.isVisible():
+            self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
 
     def _get_config_path(self) -> Path:
         return self._position_config_path
@@ -629,6 +685,28 @@ class PetWindow(QWidget):
             self._player.play(sheet, loop=False)
             self._wave_timer.start(1200)
 
+    def _trigger_hover_jump(self) -> bool:
+        """Trigger a lively hop when cursor hovers over the pet (Codex behavior)."""
+        if self._current_state == PetState.SLEEPING or self._docked_edge is not None:
+            return False
+        now_ms = time.monotonic() * 1000
+        # 5 second cooldown so it doesn't jump obsessively
+        if (now_ms - self._last_hover_jump_timestamp) < 5000:
+            return False
+        jump_sheet = self._loaded_sheets.get("jumping") or self._loaded_sheets.get("jump")
+        if jump_sheet is not None:
+            self._last_hover_jump_timestamp = now_ms
+            self._player.play(jump_sheet, fps=8, loop=False)
+            dur_ms = max(400, int((jump_sheet.frame_count / 8.0) * 1000) + 80)
+            self._jump_settle_timer.start(dur_ms)
+            return True
+        return False
+
+    def _finish_hover_jump(self) -> None:
+        """Settle back into current state after hover jump finishes."""
+        if self._docked_edge is None and not self._has_moved:
+            self.apply_state(self._current_state, force=True)
+
     def _start_greeting(self, *, force: bool = False) -> None:
         """Wave hello once when the user's cursor reaches the pet, with measured cooldown."""
         if self._greeting_active or self._current_state == PetState.SLEEPING:
@@ -672,7 +750,9 @@ class PetWindow(QWidget):
         if self._docked_edge is not None:
             self._retract_timer.stop()
             self._expand_from_dock()
-        self._start_greeting()
+        else:
+            if not self._trigger_hover_jump():
+                self._start_greeting()
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
@@ -688,7 +768,11 @@ class PetWindow(QWidget):
             cursor_pos = QCursor.pos()
             in_pet = self.geometry().contains(cursor_pos)
             in_bubble = self._bubble.isVisible() and self._bubble.geometry().contains(cursor_pos)
-            if not in_pet and not in_bubble:
+            in_feeder = (
+                self._feeder_bar.isVisible()
+                and self._feeder_bar.geometry().contains(cursor_pos)
+            )
+            if not in_pet and not in_bubble and not in_feeder:
                 if not self._retract_timer.isActive():
                     self._retract_timer.start(800)  # retract after 800ms
             else:
@@ -720,6 +804,8 @@ class PetWindow(QWidget):
         self._hover_poll_timer.start()
         if self._bubble.isVisible():
             self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+        self._feeder_bar.show()
+        self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
 
     def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
         """Ctrl + Wheel: smoothly zoom in/out pet scale with instant bubble feedback."""
@@ -760,6 +846,7 @@ class PetWindow(QWidget):
             elif self._docked_edge == "left":
                 self.move(geom.left() - self.width() + self._peek_reveal_px("left"), self.y())
         self._is_peek_expanded = False
+        self._feeder_bar.hide()
         self._hover_poll_timer.stop()
         self._save_position()
 
@@ -774,6 +861,8 @@ class PetWindow(QWidget):
             self._wake_up()  # touching the pet is activity: it stops dozing
             self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             self._press_pos = event.globalPosition().toPoint()
+            self._last_drag_x = event.globalPosition().toPoint().x()
+            self._current_drag_dir = None
             self._has_moved = False
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
@@ -783,14 +872,40 @@ class PetWindow(QWidget):
             cur_pos = event.globalPosition().toPoint()
             dist = (cur_pos - self._press_pos).manhattanLength()
             if dist >= CLICK_DRAG_THRESHOLD_PX:
-                if not self._has_moved:
+                desired_pos = cur_pos - self._drag_offset
+
+                # Directional running / drag animation (Codex running-right/left behavior)
+                dx = cur_pos.x() - self._last_drag_x
+                if dx > 1 and self._current_drag_dir != "right":
+                    self._current_drag_dir = "right"
+                    right_sheet = (
+                        self._loaded_sheets.get("running-right")
+                        or self._loaded_sheets.get("react-drag")
+                        or self._loaded_sheets.get("drag")
+                    )
+                    if right_sheet is not None:
+                        self._player.play(right_sheet, fps=8, loop=True)
+                elif dx < -1 and self._current_drag_dir != "left":
+                    self._current_drag_dir = "left"
+                    left_sheet = (
+                        self._loaded_sheets.get("running-left")
+                        or self._loaded_sheets.get("react-drag")
+                        or self._loaded_sheets.get("drag")
+                    )
+                    if left_sheet is not None:
+                        self._player.play(left_sheet, fps=8, loop=True)
+                elif not self._has_moved:
                     self._has_moved = True
-                    drag_sheet = self._loaded_sheets.get("react-drag") or self._loaded_sheets.get(
-                        "drag"
+                    drag_sheet = (
+                        self._loaded_sheets.get("react-drag")
+                        or self._loaded_sheets.get("running-right")
+                        or self._loaded_sheets.get("drag")
                     )
                     if drag_sheet is not None:
                         self._player.play(drag_sheet, loop=True)
-                desired_pos = cur_pos - self._drag_offset
+
+                self._last_drag_x = cur_pos.x()
+                self._has_moved = True
 
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:
@@ -812,11 +927,14 @@ class PetWindow(QWidget):
 
                 if self._bubble.isVisible():
                     self._bubble.anchor_to_pet(self.pos(), self.width(), self.height())
+                if self._feeder_bar.isVisible():
+                    self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
             event.accept()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
+            self._current_drag_dir = None
             self._drag_offset = None
             if self._has_moved:
                 screen = self.screen() or QApplication.primaryScreen()
@@ -866,8 +984,20 @@ class PetWindow(QWidget):
         self._user_working_timer.stop()
         self._wave_timer.stop()
         self._bubble.close()
+        self._feeder_bar.close()
         self._player.stop()
         super().closeEvent(event)
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
+        super().showEvent(event)
+        if self._docked_edge is None or self._is_peek_expanded:
+            self._feeder_bar.show()
+            self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
+
+    def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802
+        self._feeder_bar.hide()
+        self._bubble.hide()
+        super().hideEvent(event)
 
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:  # noqa: N802
         self.context_menu_requested.emit(event.globalPos())

@@ -9,10 +9,16 @@ from pathlib import Path
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from src.body.chronicle_window import ChronicleViewerWindow
 from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.menu_style import get_menu_stylesheet
+from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
+from src.connectors.hook_manager import AgentHookManager
+from src.connectors.settings import AgentSettingsStore
+from src.feeder.hotkey import GlobalHotkeyListener, hotkey_display
+from src.memory.store import ChronicleStore
 
 
 def main() -> int:
@@ -23,8 +29,8 @@ def main() -> int:
         app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
-    # Default pet is Calico, with fallback to tiko, debug-duck, wangcai, or claw
-    preferred_pets = ["calico", "tiko", "debug-duck", "wangcai", "claw"]
+    # Default pet is Vasu, with fallback to calico, claw
+    preferred_pets = ["vasu", "calico", "claw"]
     assets_root: Path | None = None
     for pet_name in preferred_pets:
         cand = Path("assets") / "pets" / pet_name
@@ -33,11 +39,23 @@ def main() -> int:
             break
 
     if assets_root is None:
-        assets_root = Path("assets") / "pets" / "calico"
+        assets_root = Path("assets") / "pets" / "vasu"
+
+    settings_store = AgentSettingsStore()
+    chronicle_store = ChronicleStore()
+    hook_manager = AgentHookManager()
 
     window = PetWindow(assets_root)
     controller = BodyController(window)
 
+    # Global hotkey for feeder input
+    hotkey_spec = settings_store.feeder_hotkey
+    hotkey_listener: GlobalHotkeyListener | None = None
+    try:
+        hotkey_listener = GlobalHotkeyListener(hotkey_spec, window.open_feeder_input)
+        hotkey_listener.start()
+    except Exception:
+        hotkey_listener = None
     # System Tray
     tray = QSystemTrayIcon(window)
     idle_sheet = window._loaded_sheets.get("idle")
@@ -51,6 +69,14 @@ def main() -> int:
             tray.setIcon(QIcon())
     tray_menu = QMenu(window)
     tray_menu.setStyleSheet(get_menu_stylesheet())
+
+    # Feed Action
+    feed_label = f"🌱 随手投喂切片 ({hotkey_display(hotkey_spec)})"
+    feed_action = QAction(feed_label, window)
+    feed_action.triggered.connect(window.open_feeder_input)
+    tray_menu.addAction(feed_action)
+
+    tray_menu.addSeparator()
 
     # State Group
     sleep_action = QAction("休眠（免打扰）", window)
@@ -74,11 +100,9 @@ def main() -> int:
     switch_menu = tray_menu.addMenu("切换伴生体")
     switch_menu.setStyleSheet(tray_menu.styleSheet())
     available_pets = [
-        ("Calico (默认 · 三花小猫)", Path("assets") / "pets" / "calico"),
-        ("Tiko (小机器人)", Path("assets") / "pets" / "tiko"),
-        ("Debug Duck (调试小黄鸭)", Path("assets") / "pets" / "debug-duck"),
-        ("Wangcai (布偶猫)", Path("assets") / "pets" / "wangcai"),
-        ("Claw (经典小猫)", Path("assets") / "pets" / "claw"),
+        ("🦦 Vasu (默认 · 小河獭)", Path("assets") / "pets" / "vasu"),
+        ("🐱 Calico (三花小猫)", Path("assets") / "pets" / "calico"),
+        ("🐾 Claw (经典小猫)", Path("assets") / "pets" / "claw"),
     ]
 
     def _make_switcher(target_dir: Path, label: str) -> Callable[[], None]:
@@ -102,6 +126,47 @@ def main() -> int:
     reset_pos_act = QAction("将桌宠拉回主屏", window)
     reset_pos_act.triggered.connect(window.reset_to_default_position)
     tray_menu.addAction(reset_pos_act)
+    tray_menu.addSeparator()
+
+    # Windows & Dialogs
+    settings_dialog: SettingsWindow | None = None
+    chronicle_dialog: ChronicleViewerWindow | None = None
+
+    def _open_settings() -> None:
+        nonlocal settings_dialog
+        if settings_dialog is None:
+            settings_dialog = SettingsWindow(settings_store, hook_manager)
+            settings_dialog.hotkey_changed.connect(_on_hotkey_changed)
+        settings_dialog.show()
+        settings_dialog.raise_()
+        settings_dialog.activateWindow()
+
+    def _open_chronicle() -> None:
+        nonlocal chronicle_dialog
+        if chronicle_dialog is None:
+            chronicle_dialog = ChronicleViewerWindow(chronicle_store)
+        chronicle_dialog.show()
+        chronicle_dialog.raise_()
+        chronicle_dialog.activateWindow()
+
+    def _on_hotkey_changed(new_spec: str) -> None:
+        nonlocal hotkey_listener
+        if hotkey_listener is not None:
+            hotkey_listener.stop()
+        try:
+            hotkey_listener = GlobalHotkeyListener(new_spec, window.open_feeder_input)
+            hotkey_listener.start()
+        except Exception:
+            hotkey_listener = None
+        feed_action.setText(f"🌱 随手投喂切片 ({hotkey_display(new_spec)})")
+
+    settings_act = QAction("⚙️ 偏好设置...", window)
+    settings_act.triggered.connect(_open_settings)
+    tray_menu.addAction(settings_act)
+
+    chronicle_act = QAction("📖 成长生命档案...", window)
+    chronicle_act.triggered.connect(_open_chronicle)
+    tray_menu.addAction(chronicle_act)
 
     tray_menu.addSeparator()
 
@@ -121,8 +186,14 @@ def main() -> int:
 
     tray_menu.addSeparator()
 
+    def _on_quit() -> None:
+        if hotkey_listener is not None:
+            hotkey_listener.stop()
+        window.close()
+        app.quit()
+
     quit_action = QAction("退出", window)
-    quit_action.triggered.connect(app.quit)
+    quit_action.triggered.connect(_on_quit)
     tray_menu.addAction(quit_action)
 
     tray.setContextMenu(tray_menu)

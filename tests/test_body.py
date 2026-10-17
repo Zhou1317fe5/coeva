@@ -154,25 +154,31 @@ def test_petdex_atlas_trim_empty_frames(tmp_path: Path) -> None:
 
 
 def test_builtin_pets_loading(tmp_path: Path) -> None:
-    """Test that built-in pets (calico, claw) load properly in PetWindow."""
+    """Test that built-in pets (vasu, calico, claw) load properly in PetWindow."""
+    vasu_dir = Path("assets") / "pets" / "vasu"
     calico_dir = Path("assets") / "pets" / "calico"
     claw_dir = Path("assets") / "pets" / "claw"
 
+    assert vasu_dir.is_dir()
     assert calico_dir.is_dir()
     assert claw_dir.is_dir()
 
-    # Default pet: Calico
-    window = _isolated_window(calico_dir, tmp_path, scale=1.0)
+    # Default pet: Vasu
+    window = _isolated_window(vasu_dir, tmp_path, scale=1.0)
     assert "idle" in window._loaded_sheets
-    assert "working" in window._loaded_sheets
-    assert "react-drag" in window._loaded_sheets
-    assert "react-poke" in window._loaded_sheets
-    assert window._loaded_sheets["idle"].frame_count == 41
+    assert "review" in window._loaded_sheets
+    assert "running" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 6
 
-    # Test state transitions on Calico
+    # Test state transitions on Vasu
     for target_state in (PetState.WORKING, PetState.THINKING, PetState.HAPPY, PetState.ERROR):
         window.apply_state(target_state)
         assert window.current_state == target_state
+
+    # Test dynamic switching to Calico
+    window.load_pet(calico_dir)
+    assert "idle" in window._loaded_sheets
+    assert window._loaded_sheets["idle"].frame_count == 41
 
     # Test dynamic switching to Claw
     window.load_pet(claw_dir)
@@ -601,5 +607,75 @@ def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
     assert window.current_state == PetState.IDLE
     assert not window._nap_timer.isActive()
     assert window._autonomous_timer.isActive()
+
+
+def test_codex_aligned_vasu_interactions(tmp_path: Path) -> None:
+    """Test Codex-aligned Vasu behaviors: natural blink spacing, hover hop, directional drag."""
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    vasu_dir = Path("assets") / "pets" / "vasu"
+    window = _isolated_window(vasu_dir, tmp_path, scale=1.0)
+
+    # 1. Natural idle loop delay
+    assert window._player._loop_delay_range_ms == (3000, 5500)
+
+    # 2. Hover jump on cursor enter
+    assert "jumping" in window._loaded_sheets
+    window._last_hover_jump_timestamp = 0.0
+    jumped = window._trigger_hover_jump()
+    assert jumped is True
+    assert window._player._sheet == window._loaded_sheets["jumping"]
+
+    # 3. Directional drag away from edges
+    window.move(500, 500)
+    press_ev = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        QPointF(20, 20),
+        QPointF(520, 520),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    window.mousePressEvent(press_ev)
+
+    # Drag right -> running-right
+    move_right = QMouseEvent(
+        QMouseEvent.Type.MouseMove,
+        QPointF(60, 20),
+        QPointF(560, 520),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    window.mouseMoveEvent(move_right)
+    assert window._current_drag_dir == "right"
+    assert window._player._sheet == window._loaded_sheets["running-right"]
+
+    # Drag left -> running-left
+    move_left = QMouseEvent(
+        QMouseEvent.Type.MouseMove,
+        QPointF(40, 20),
+        QPointF(540, 520),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    window.mouseMoveEvent(move_left)
+    assert window._current_drag_dir == "left"
+    assert window._player._sheet == window._loaded_sheets["running-left"]
+
+    # Mouse release -> settle back to idle
+    release_ev = QMouseEvent(
+        QMouseEvent.Type.MouseButtonRelease,
+        QPointF(40, 20),
+        QPointF(540, 520),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    window.mouseReleaseEvent(release_ev)
+    assert window._current_drag_dir is None
+    assert window._player._sheet == window._loaded_sheets["idle"]
 
     window.close()
