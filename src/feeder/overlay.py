@@ -493,11 +493,11 @@ class SliceFeederBar(QWidget):
             self._apply_mode(MODE_HANDLE)
 
     def show_pill(self) -> None:
-        """Switch to full dual-button pill mode."""
+        """Switch to full dual-button pill mode and display."""
         self._retract_to_handle_timer.stop()
         if self._current_mode != MODE_PILL:
             self._apply_mode(MODE_PILL)
-
+        self.show()
     def expand_input(self) -> None:
         """Expand into the full input bar mode and focus."""
         self._retract_to_handle_timer.stop()

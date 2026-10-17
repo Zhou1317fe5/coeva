@@ -33,7 +33,6 @@ from src.core.sanctuary import SanctuaryGuard
 from src.core.state_watcher import StateWatcher
 from src.feeder.contracts import RawSlice
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, GlobalHotkeyListener, hotkey_display
-from src.feeder.overlay import SliceFeederOverlay
 from src.feeder.storage import SliceStore
 from src.memory.store import ChronicleStore, SliceRecord
 
@@ -85,7 +84,7 @@ class CompanionApp:
         self.chronicle = ChronicleStore()
         self.chronicle.import_slices_jsonl()
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
-        self.overlay = SliceFeederOverlay()
+        self.overlay = self.window.feeder_bar
         self.overlay.slice_submitted.connect(self._on_slice_submitted)
 
         # 3. Growth Core & Sanctuary
@@ -140,18 +139,17 @@ class CompanionApp:
         """
         spec = self.agent_settings.feeder_hotkey
         try:
-            self.hotkey = GlobalHotkeyListener(spec, self.overlay.toggle_or_show)
+            self.hotkey = GlobalHotkeyListener(spec, self.window.open_feeder_input)
             self.hotkey.start()
         except ValueError:
-            self.hotkey = GlobalHotkeyListener(DEFAULT_FEEDER_HOTKEY, self.overlay.toggle_or_show)
+            self.hotkey = GlobalHotkeyListener(DEFAULT_FEEDER_HOTKEY, self.window.open_feeder_input)
             self.hotkey.start()
 
     def _on_hotkey_changed(self, spec: str) -> None:
         """Re-register the feeder hotkey in place, so a change needs no restart."""
         self.hotkey.stop()
-        self.hotkey = GlobalHotkeyListener(spec, self.overlay.toggle_or_show)
+        self.hotkey = GlobalHotkeyListener(spec, self.window.open_feeder_input)
         self.hotkey.start()
-        self.feed_action.setText(f"🌱 随手投喂切片 ({hotkey_display(spec)})")
         self.controller.say(f"⌨️ 投喂快捷键已更新为 {hotkey_display(spec)}", ttl_ms=2500)
 
     def _setup_decay(self) -> None:
@@ -253,13 +251,7 @@ class CompanionApp:
 
         menu.addSeparator()
 
-        # ── 2. Work & Memory Group (Clawd on Desk: 随手切片 + 打开足迹) ──
-        self.feed_action = QAction(
-            f"随手投喂切片 ({hotkey_display(self.agent_settings.feeder_hotkey)})", self.window
-        )
-        self.feed_action.triggered.connect(self.overlay.toggle_or_show)
-        menu.addAction(self.feed_action)
-
+        # ── 2. Work & Memory Group (打开足迹) ──
         archive_action = QAction("打开足迹", self.window)
         archive_action.triggered.connect(self._open_chronicle_archive)
         menu.addAction(archive_action)

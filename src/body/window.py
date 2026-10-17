@@ -628,12 +628,18 @@ class PetWindow(QWidget):
 
         if self._is_user_working:
             # User is in deep flow working: companion accompanies with focused craft/work
+            # Available work activities: covers Calico theme & Vasu Petdex atlas rows
             work_activities: list[tuple[str, int]] = [
-                ("working-typing", 25_000),
-                ("working-building", 22_000),
-                ("working-sweeping", 18_000),
-                ("thinking", 15_000),
-                ("working-carrying", 14_000),
+                ("working-typing", 60_000),    # Calico
+                ("working-building", 60_000),  # Calico
+                ("review", 55_000),            # Vasu 代码复盘/审查
+                ("waiting", 40_000),           # Vasu 专注凝视
+                ("running", 35_000),           # Vasu 敏捷奔跑
+                ("running-right", 30_000),     # Vasu
+                ("running-left", 30_000),      # Vasu
+                ("working-sweeping", 45_000),  # Calico
+                ("thinking", 40_000),          # Calico
+                ("working-carrying", 35_000),  # Calico
             ]
             available = [
                 (act, dur) for act, dur in work_activities if act in self._loaded_sheets
@@ -683,11 +689,36 @@ class PetWindow(QWidget):
                 self._player.play(poke_sheet, loop=False)
                 self._wave_timer.start(1500)
                 return
-        sheet = self._loaded_sheets.get("react-poke") or self._loaded_sheets.get("poke")
+        sheet = (
+            self._loaded_sheets.get("react-poke")
+            or self._loaded_sheets.get("poke")
+            or self._loaded_sheets.get("jumping")
+            or self._loaded_sheets.get("waving")
+        )
         if sheet is not None:
             self._player.play(sheet, loop=False)
             self._wave_timer.start(1200)
 
+    def test_action(self, action_name: str) -> bool:
+        """Manually trigger and continuously play an action for smoothness testing."""
+        sheet = self._loaded_sheets.get(action_name)
+        if sheet is None:
+            return False
+        self._autonomous_timer.stop()
+        self._autonomous_done_timer.stop()
+        self._in_autonomous_routine = False
+        fps = getattr(sheet, "default_fps", 6)
+        durations = getattr(sheet, "frame_durations_ms", None)
+        dur_str = f"{durations[0]}ms/帧" if durations else f"{fps} FPS"
+        self._player.play(sheet, loop=True)
+        self.say(f"🧪 动作测试: [{action_name}] · {sheet.frame_count}帧 ({dur_str})", ttl_ms=3000)
+        return True
+
+    def stop_action_test(self) -> None:
+        """Exit action test mode and resume regular life rhythm."""
+        self.apply_state(PetState.IDLE, force=True)
+        self._schedule_next_autonomous_routine()
+        self.say("⏹ 已退出测试模式，恢复自主生活节律", ttl_ms=2000)
     def _trigger_hover_jump(self) -> bool:
         """Trigger a lively hop when cursor hovers over the pet (Codex behavior)."""
         if self._current_state == PetState.SLEEPING or self._docked_edge is not None:
@@ -756,8 +787,10 @@ class PetWindow(QWidget):
         else:
             if not self._trigger_hover_jump():
                 self._start_greeting()
-        if hasattr(self._feeder_bar, "show_pill") and self._feeder_bar.isVisible():
+        if hasattr(self._feeder_bar, "show_pill") and self._docked_edge is None:
+            self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
             self._feeder_bar.show_pill()
+            self._feeder_bar.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
