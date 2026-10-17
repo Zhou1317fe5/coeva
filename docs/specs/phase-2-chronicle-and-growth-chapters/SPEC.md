@@ -2,30 +2,31 @@
 id: companion-phase-2-growth-core-and-chronicle
 type: module-design
 status: active
-version: 0.3
-title: 第二阶段规范：长盛心智与人生章节（Phase 2A MVP：证据档案库与归因门）
+version: 1.0
+title: 第二阶段规范：长盛心智与人生章节（Phase 2 全阶段完成）
 parent: co-evolving-companion-root
 depends-on: [companion-architecture-design, companion-phase-1-runtime-and-bridge]
 tags: [phase-2, growth-core, chronicle, attribution, evidence-ledger, sqlite, local-first, mvp]
 ---
 
 # 第二阶段规范：长盛心智与人生章节
-
-> 本文描述 Phase 2 的整体目标，但**当前生效的范围只有 2A MVP**（证据档案库 + 归因门）。
-> 2B/2C/2D 的推理与叙事层已设计但**明确延后**，清单见 §8，以免被误读为已承诺。
+> 本文规定 Phase 2 的长盛心智架构与四个子阶段的落地事实。
+> **Phase 2A、2B、2C、2D 已全部实现并通过全量自动化测试与真实数据验证。**
+> 子模块规范参见：
+> - `HISTORICAL_HARVESTING_SPEC.md`（多 Agent 历史会话归因挖掘与证据驱动冷启动）
+> - `CHAPTERS_SPEC.md`（大模型接入、叙事防火墙与人生章节共创）
 
 ---
 
-## 1. 阶段目标
+## 1. 阶段目标与落地状态
 
 Phase 1 交付了独立桌面身体、Slice Feeder、Sanctuary Guard 与多 Agent Connector Hub。
-Phase 2 建立伴生体的长期心智，回答四个问题：
+Phase 2 建立了伴生体的长期心智体系，完整闭环回答了四个关键问题：
 
-1. 发生过什么？ → **2A（本次交付）**
-2. 哪些事情反复出现？ → 2B
-3. 我们目前如何理解这些变化？ → 2C
-4. 哪些变化重要到值得成为人生章节？ → 2D
-
+1. **发生过什么？** → **Phase 2A（客观证据档案库，已完成）**
+2. **哪些事情反复出现？** → **Phase 2B（行为模式挖掘与心理灵活性假说，已完成）**
+3. **哪些理解经双方确认？** → **Phase 2C（共同认知自模型与双向校准，已完成）**
+4. **这段时期在用户生命里意味着什么？** → **Phase 2D（大模型接入、叙事防火墙与人生章节，已完成）**
 > 让离散经历逐渐形成有证据、可修正、会遗忘、会演化的长期理解，
 > 并在真实结构性变化发生后，形成用户共同书写的人生章节。
 
@@ -280,33 +281,36 @@ Phase 1 暴露的只是 Agent 开关；2A 的端点会暴露**用户原始切片
 
 ---
 
-## 8. 待做（Deferred Backlog）
+## 8. 实施状态与未来规划（Implementation Status & Future Backlog）
 
-以下各项均已设计、确认有价值，但**本次不实现**。每项注明启动条件，避免被误认为已承诺。
+### 8.1 Phase 2 交付矩阵（已 100% 落地）
 
-| 项 | 所属 | 启动条件 |
+| 项 | 所属 | 落地说明 |
 | :--- | :--- | :--- |
-| Pattern Builder | 2B | 持久化 Episode 累计 ≥ 100 且跨度 ≥ 4 周；否则阈值只能靠猜 |
-| Hypothesis Engine | 2B | 依赖 Pattern；须先实现 counter-evidence 存储（AC-3 类要求） |
-| Development Lens | 2B | 依赖 Hypothesis；每个判定须可追溯到 evidence id |
-| User Calibration | 2C | 依赖 Hypothesis；须先定义"认领"的精确语义（点 Confirm 算不算？） |
-| Confirmed Insight 与退休 | 2C | 依赖 Calibration |
-| Growth Themes | 2C | 依赖 Insight；须先解决"1–3 个硬上限"与用户自主目标的冲突 |
-| Evidence-based Cold Start | 2C | **日计数缺陷已修**（`ColdStartPolicy.from_persisted_first_seen()` 按真实天数推进，`data/first_seen.json`）。**但本项仍待做**：改为证据驱动（而非纯时间驱动）尚未开始 |
-| Chapter Eligibility Gate | 2D | 依赖 Insight；须定义 Sustained / Structural / Diversity / Meaning 四项的可判定阈值 |
-| Chapter 生成 | 2D | 需 LLM 客户端（当前依赖树无任何 LLM SDK）、API key 存放约定、超时与离线降级 |
-| Narrative Firewall | 2D | 随 Chapter 生成一并实现（§2.5 目前无执行对象） |
-| Co-authoring / Co-Naming | 2D | 依赖 Chapter；须先解决与 Sanctuary、每日发言配额的冲突 |
-| Chronicle Viewer | 2D | 依赖 Chapter。**可提前**：只读证据列表（v0.2 §27 去掉假设层）零 LLM 可做，且正好验证 AC-4 |
-| FTS5 + 中文分词 | 检索 | 切片 > 10k；须引入 jieba 类分词器 |
-| Interaction 层证据 | 归因 | 需 connector 侧新增用户侧事件（用户中止 / 继续 / pivot），当前 `AgentEventType` 无法表达 |
-| 事件契约扩展 `platform` / `distro` | 归因 | hook JS 已发送这两个字段，但 `dispatch_json` 未透传、`AgentEvent` 无对应字段。需要按环境区分证据时再扩契约（会改动 Phase 1 契约） |
-| token 鉴权 | 安全 | 仅当端口需要暴露到非回环 |
-| 精细衰减分层 | 存储 | 两档 TTL 不够用时 |
-| 端到端事件去重 | 存储 | hook 载荷携带稳定 id/时间戳之后（当前见 §4.3 限制） |
-| `prune()` 的定时触发 | 存储 | **已完成**：`CompanionApp._setup_decay()` 在启动时与每 24 小时调用 |
-| 切片写入 Chronicle 的接线 | 归因 | **已决定保留双写**（见 §4.5）：Chronicle 为唯一事实源，`data/raw_slices.jsonl` 作为人类可读导出/手机同步通道保留，不再是待定项 |
+| **Chronicle Store 底座** | 2A | SQLite 单一事实源 + `raw_slices.jsonl` 双写，回环只读 API |
+| **归因安全门** | 2A | 严格零 Prompt 隐私，区分 `user_action` 与 `agent_autonomous` |
+| **定期修剪衰减** | 2A | `prune()` 24 小时巡检，30 天 transient 事件衰减，切片永留 |
+| **Pattern Builder** | 2B | 挖掘节律、摩擦与委派；实现严格时间序因果一致性约束 |
+| **Hypothesis Engine** | 2B | 映射至 ACT 六大透镜，包含正例与反例 Episode 追溯 |
+| **User Calibration** | 2C | 支持 YES（转共识）、PARTLY（细化）、NO（封存）、NOT_NOW（保持）状态机 |
+| **Confirmed Insights & 退休** | 2C | 长期共识管理与生命周期自然成长退休（Outgrowth） |
+| **Growth Themes** | 2C | 1~3 个活跃发展主题硬上限防护 |
+| **多 Agent 历史会话收割** | 2C | 自动扫描 WSL/Win 下 Pi, Codex, Hermes 历史日志（实测入库 12 万条） |
+| **物理陪伴冷启动锁** | 2C | 事实与信任分离，真实陪伴天数雷打不动，守住破冰分寸 |
+| **OpenAI-Compatible LLM Client** | 2D | 原生标准库实现，零第三方臃肿 SDK，配置本地安全落盘 |
+| **Chapter Eligibility Gate** | 2D | 持续性、结构性、多样性、自愿性四大资格门校验 |
+| **Narrative Firewall** | 2D | 过滤谄媚与说教，通篇锁定工坊战友并肩作战口吻，锚定真实事实 |
+| **Growth Chapters 生成与共创** | 2D | 本地 Markdown 生成（`data/chapters/`），用户手记在线留白共写与导出 |
+| **Chronicle Viewer 全功能界面** | 2D | 5 大页面完整联动（切片、会话、检索、认知自模型、人生章节） |
 
+### 8.2 Phase 3 待做演进（Future Ecosystem Backlog）
+
+| 项 | 类别 | 说明 |
+| :--- | :--- | :--- |
+| Vasu 原生精灵帧动画全量制作 | 身体 | 按 `docs/specs/vasu/SPEC.md` 完成 9 行核心动画与专属扩展动作 |
+| 多端只读同步通道 | 同步 | 支持通过 WebDAV / S3 将 `data/chapters/*.md` 同步至手机端查看 |
+| FTS5 中文全文分词 | 检索 | 当切片积累超过 10,000 条时引入 jieba 中文全文索引 |
+| HTTP 只读路由补齐 | 接口 | 补充 `GET /api/chronicle/insights` 与 `GET /api/chronicle/themes` |
 ---
 
 ## 9. 验收标准

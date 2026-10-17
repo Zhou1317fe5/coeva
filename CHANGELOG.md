@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Vasu Phase 2C-3: review 专注观察动画验收
+
+### 📝 Art Production（美术制作）
+- 制作并验收 `review` 6 帧：Vasu 为自己的好奇心短暂专注观察共享空间，和 `idle`、`waiting` 在 64px 下可区分。完成色键抽帧、GIF、三行接触表与逐行 QA；未制作其他行或最终图集。
+
+## [Unreleased] - Vasu Phase 2C-2: waiting 动画试产与验收
+
+### 📝 Art Production（美术制作）
+- 将 `waiting` 定义为 Vasu 暂停自己的活动、安静感知共享空间；制作并验收 6 帧，完成与 `idle` 的接触表、64px 对照、GIF 和色键抽帧 QA。前两版因身形过高及转头过大被拒，第三版与 `idle` 尺度一致并通过视觉验收。未制作其他行或最终图集。
+
+## [Unreleased] - UI: 完全参照 Clawd on Desk 复刻右键菜单与设置界面
+
+### 🎨 UI & UX Modernization（界面复刻与体验升华）
+- **右键菜单与系统托盘深度精简**：
+  - 完全参照 Clawd on Desk 的 `joinGroups` 菜单规范，将杂乱冗余的测试/调试条目（“模拟 Hermes Agent 4 步测试”、“测试气泡”、“恢复待机”等）从默认菜单中剔除；
+  - 规范化 5 大核心分组：`状态组（休眠/唤醒）`、`工作与记忆（随手投喂切片、足迹档案库）`、`伴生体与显示（切换伴生体、缩放尺寸、拉回主屏）`、`应用设置（伴生体设置、显示/隐藏）`、`退出`；
+  - 在 `PetWindow` 实现 `context_menu_requested` 与 `contextMenuEvent`，右击桌宠身体任意位置即可直接呼出菜单，与托盘操作逻辑无缝对齐；
+  - 定制现代高雅浅白 QSS 菜单样式（`#ffffff` 底色、`#f4f4f5` 悬停态、微弱浅灰边框与分割线）。
+- **现代化胶囊 Toggle Switch 控件落地**：
+  - 在 `src/body/widgets.py` 新增 `SwitchButton`，完全复刻 iOS / macOS 与 Clawd on Desk 的丝滑胶囊切换开关（38px × 20px，圆角 10px，白圆滑块平滑移动）；
+  - 彻底淘汰系统默认刺眼粗糙的纯绿色方块 `QCheckBox`。
+- **设置界面（SettingsWindow）高保真重构**：
+  - 侧边栏宽度定调为标准 200px，引入 Clawd on Desk 原生 24x24 线性 SVG 图标（纯线条矢量渲染，替代系统粗糙 emoji），消除 Windows 原生虚线焦点框；
+  - 色彩系统全面对齐 Clawd on Desk 亮白模式（Light Mode）：页面底色与内容面板 `#ffffff`、侧边栏浅灰 `#f5f5f7`（选中间底白色带细微边框）、卡片容器 `#fbfbfd`（圆角 10px，边框 `rgba(0, 0, 0, 0.08)`）、强调色采用招牌暖陶土橙 `#d97757`；
+  - 矢量 SVG 侧边栏图标与 SwitchButton 控件同步对齐浅色配色（关状态浅灰 `#d4d4d8`、开状态陶土橙、白圆滑块带边缘阴影）；
+  - 自定义细长现代深色滚动条（6px 宽，透明轨道，半透明圆角滑块）；
+  - 多 Agent 接入卡片、大模型服务、桌面身体偏好、心智避风港与关于页全面统一为新设计规范。
+
+## [Unreleased] - Vasu Phase 2C-1: running-left 镜像验收
+
+### 📝 Art Production（美术制作）
+- 审核右行姿态的脸、耳、奶油色花纹、尾巴、脚掌与光照后，逐帧水平镜像已批准的 8 帧，保留原帧序。左行通过 64px、透明度、基线、循环与左右一致性 QA；未制作其他动画行或最终图集。
+
 ## [Unreleased] - Vasu Phase 2B: idle 与 running-right 双行动画试产
 
 ### 📝 Art Production（美术制作）

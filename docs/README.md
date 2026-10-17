@@ -17,7 +17,11 @@
 - **总体目标与需求规范**：[`/SPEC.md`](../SPEC.md)（项目根规范，`co-evolving-companion-root`）
 - **总体架构设计规范**：[`specs/SPEC.md`](./specs/SPEC.md)（`companion-architecture-design`）
 - **Phase 1 规范**：[`specs/phase-1-runtime-and-bridge/SPEC.md`](./specs/phase-1-runtime-and-bridge/SPEC.md) — 独立常驻桌面 Runtime、PySide6 极简身体与单 Agent 桥接
-- **Phase 2 规范**：[`specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./specs/phase-2-chronicle-and-growth-chapters/SPEC.md) — 人生章节（Growth Chapters）与生命档案库（Chronicle）
+- **Phase 2 规范群**：
+  - [`specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./specs/phase-2-chronicle-and-growth-chapters/SPEC.md) — Phase 2 主规范（客观证据库、模式挖掘、共识自模型、人生章节）
+  - [`specs/phase-2-chronicle-and-growth-chapters/HISTORICAL_HARVESTING_SPEC.md`](./specs/phase-2-chronicle-and-growth-chapters/HISTORICAL_HARVESTING_SPEC.md) — 多 Agent 历史会话归因挖掘与证据驱动冷启动子规范
+  - [`specs/phase-2-chronicle-and-growth-chapters/CHAPTERS_SPEC.md`](./specs/phase-2-chronicle-and-growth-chapters/CHAPTERS_SPEC.md) — 大模型接入、叙事防火墙与人生章节共创子规范
+- **Vasu 原生伴生体资产生产规范**：[`specs/vasu/SPEC.md`](./specs/vasu/SPEC.md) — 标准形象权威、共处动作语言与 9 行动画行规范
 
 ---
 

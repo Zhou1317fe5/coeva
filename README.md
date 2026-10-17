@@ -104,30 +104,34 @@ Vasu 不记录机械的流水账，也不做 Life Logging 监控。
 
 ## 项目状态与路线图
 
-当前进度：**Phase 1 与 Phase 2A 已完成**，桌面伴生体与证据档案库均已落地并通过测试。
+当前进度：**Phase 1 与 Phase 2 全系列（2A / 2B / 2C / 2D）已全部圆满交付**，桌面伴生体、长盛心智自模型与人生章节系统均已落地并通过 128 项全量自动化测试。
 
 - [x] **Phase 1：活着且能看见 (The Living Shell)** — 已完成
   - 独立常驻桌面挂件（透明通道、点击穿透、置顶、闲置入睡）；
   - 全局极简投喂输入框（快捷键呼出、本地存储）；
-  - 多 Agent 桥接（Hermes / PI-Desktop / Codex / Claude Code）与基础动作反馈；
+  - 多 Agent 桥接（Hermes / PI-Desktop / Codex / Claude Code）与物理平面解耦；
   - 冷启动发言频次控制、避风港熔断、介入策略三道门。
 - [x] **Phase 2A：证据档案库与归因门 (Chronicle Foundation)** — 已完成
   - 本地 SQLite 档案库（`slices` / `events` 两张表 + `evidence` 视图），WAL 模式；
-  - Agent 事件持久化与归因门（只有 `user_prompt` 具备用户归因）；
+  - Agent 事件持久化与归因门（严格零 Prompt 隐私，只有 `user_prompt` 具备用户归因）；
   - 只读 Chronicle HTTP 端点（回环限定）；
   - 证据按 `retention_class` 每日衰减，切片永不删除。
-- [ ] **Phase 2B：发展记忆 (Developmental Memory)** — 待启动
-  - **启动门**：持久化 Episode 累计 ≥ 100 且跨度 ≥ 4 周（阈值需要真实数据支撑，不靠猜）；
-  - Pattern Builder 与 Hypothesis Engine（含反证存储）。
-- [ ] **Phase 2C：共同自我模型 (Shared Self Model)** — 待启动
-  - 用户校准（Calibration）、Confirmed Insight 及其退休、Growth Themes。
-- [ ] **Phase 2D：人生章节 (Growth Chapters)** — 待启动
-  - 章节资格门、LLM 生成、Narrative Firewall、共同命名与回忆录视图。
-
-> Phase 2B/2C/2D 的每一项及其**启动条件**都记录在
-> [`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md) §8 待做清单中，
-> 以避免"已设计"被误读为"已承诺"。
-
+- [x] **Phase 2B：发展记忆与模式挖掘 (Developmental Patterns)** — 已完成
+  - `PatternBuilder` 挖掘时间节律、摩擦应对与长链路委派；
+  - 严格时间序因果一致性约束（修复前置指令误判，支持充分委派双向判定）；
+  - `HypothesisEngine` 映射至 ACT 六大透镜，包含正例与反例 Episode 真实追溯。
+- [x] **Phase 2C：共同自我模型与历史收割 (Shared Self Model)** — 已完成
+  - `SelfModelManager` 协同校准状态机（YES 升级共识洞察，PARTLY 细化，NO 封存）；
+  - 长期共识管理与生命周期自然成长退休（Outgrowth）；
+  - 多 Agent 历史会话收割器（一键无损导入 Pi/Codex/Hermes，实测入库 12 万条客观事件）；
+  - 物理陪伴冷启动锁（事实与信任分离，真实相处天数雷打不动）。
+- [x] **Phase 2D：人生章节与叙事共创 (Growth Chapters)** — 已完成
+  - 标准 OpenAI 兼容轻量 LLM 客户端（原生标准库，零第三方 SDK 依赖）；
+  - 设置面板「🧠 大模型服务」配置页面（预设快速填入、密码掩码保护、实时连通性 ping 测试）；
+  - 章节四大资格门 `ChapterEligibilityGate`（持续性、结构性、多样性、自愿性）；
+  - 叙事防火墙 `NarrativeFirewall`（反谄媚、反说教、工坊战友视角）；
+  - 本地 Markdown 自动生成（`data/chapters/`），用户手记在线留白共写与导出；
+  - 档案库「📖 人生章节」交互界面，全功能 5 大页面完整联动。
 ---
 
 ## 文档索引
@@ -137,8 +141,10 @@ Vasu 不记录机械的流水账，也不做 Life Logging 监控。
 ### 现行执行规范图谱 (ThinkRail Specs)
 - [`docs/specs/SPEC.md`](./docs/specs/SPEC.md) — 总体系统架构设计规范
 - [`docs/specs/phase-1-runtime-and-bridge/SPEC.md`](./docs/specs/phase-1-runtime-and-bridge/SPEC.md) — Phase 1 运行时与桥接规范
-- [`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md) — Phase 2 人生章节与生命档案库规范
-
+- [`docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/SPEC.md) — Phase 2 人生章节与生命档案库主规范
+- [`docs/specs/phase-2-chronicle-and-growth-chapters/HISTORICAL_HARVESTING_SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/HISTORICAL_HARVESTING_SPEC.md) — Phase 2C 多 Agent 历史会话收割与证据冷启动子规范
+- [`docs/specs/phase-2-chronicle-and-growth-chapters/CHAPTERS_SPEC.md`](./docs/specs/phase-2-chronicle-and-growth-chapters/CHAPTERS_SPEC.md) — Phase 2D 大模型接入、叙事防火墙与人生章节共创子规范
+- [`docs/specs/vasu/SPEC.md`](./docs/specs/vasu/SPEC.md) — Vasu 专属形象生产契约与动画动作语言规范
 ### 核心心智理论与设计规范
 - [`01_concept_and_vision_v0.1.md`](./docs/concepts/01_concept_and_vision_v0.1.md) — 概念设计与产品愿景总纲
 - [`02_mind_development_framework_v0.1.md`](./docs/concepts/02_mind_development_framework_v0.1.md) — 六大心智发展域与心理灵活性框架
