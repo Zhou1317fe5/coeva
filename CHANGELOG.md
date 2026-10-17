@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **彻底解决眨眼过快频闪问题**：`AnimationPlayer` 引入 `loop_delay_range_ms`。完成一次平静呼吸与自然闭合眨眼后，在睁眼基线帧保持 3.0~5.5 秒的深沉凝视，将眨眼频率校准为自然界真实的“数秒一次”，彻底消除一秒一次的机械频闪感；
   - **对齐 Codex 悬停小跳（Hover Jump）**：光标滑入桌宠时，触发轻快利落的 `jumping` 动作（Row 4，5 帧，约 500ms），给予桌面触觉反馈，并配置 5 秒冷却避免连续划过抽搐；
   - **对齐 Codex 拖拽步态方向感知（Directional Dragging）**：按住向右拖动宠物时自动流转为 `running-right`（右行步态），向左拖动自动流转为 `running-left`（左行步态），松手放开时自然定步回到 `idle`。
+  - **根除像素艺术模糊与高分屏二次拉伸（Pixel-Art Sharpness & High-DPI DPR Mapping）**：
+    - 彻底废除 `SmoothTransformation`（双线性平滑滤波导致的边缘色散虚影），无论放大或缩小 100% 锁定为 `FastTransformation`（最近邻采样），对齐 Codex 的 `image-rendering: pixelated;`；
+    - 引入 Windows 物理显示屏像素感知（`dpr = screen.devicePixelRatio()`，如 150% 缩放下的 1.5x）；缩放直接计算物理像素并显式配置 `setDevicePixelRatio(dpr)`，彻底杜绝 Windows DWM 二次模糊拉伸；
+    - 显式锁定 `_label.setScaledContents(False)`，确保每一颗像素块像刀刻般锐利、眼珠与胡须分明。
 ### 🚀 Added（新增功能）
 - **原生 APNG 动图主题加载器（`ThemeApngLoader`, `src/body/animation.py`）**：
   - 支持 Clawd on Desk 规范的 `theme.json` 与 `.apng` 动图主题；
