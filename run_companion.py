@@ -86,7 +86,6 @@ class CompanionApp:
         self.chronicle.import_slices_jsonl()
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = self.window.feeder_bar
-        self.overlay.slice_submitted.connect(self._on_slice_submitted)
         self.window.slice_fed.connect(self._on_slice_submitted)
         self.window.user_replied_to_bubble.connect(self._on_user_reply_to_bubble)
         self._last_pet_speech: str = ""
