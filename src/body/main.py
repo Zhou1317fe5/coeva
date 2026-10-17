@@ -17,7 +17,7 @@ from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
 from src.connectors.hook_manager import AgentHookManager
 from src.connectors.settings import AgentSettingsStore
-from src.feeder.hotkey import GlobalHotkeyListener, hotkey_display
+from src.feeder.hotkey import GlobalHotkeyListener
 from src.memory.store import ChronicleStore
 
 
@@ -70,13 +70,6 @@ def main() -> int:
     tray_menu = QMenu(window)
     tray_menu.setStyleSheet(get_menu_stylesheet())
 
-    # Feed Action
-    feed_label = f"🌱 随手投喂切片 ({hotkey_display(hotkey_spec)})"
-    feed_action = QAction(feed_label, window)
-    feed_action.triggered.connect(window.open_feeder_input)
-    tray_menu.addAction(feed_action)
-
-    tray_menu.addSeparator()
 
     # State Group
     sleep_action = QAction("休眠（免打扰）", window)
@@ -158,7 +151,6 @@ def main() -> int:
             hotkey_listener.start()
         except Exception:
             hotkey_listener = None
-        feed_action.setText(f"🌱 随手投喂切片 ({hotkey_display(new_spec)})")
 
     settings_act = QAction("⚙️ 偏好设置...", window)
     settings_act.triggered.connect(_open_settings)

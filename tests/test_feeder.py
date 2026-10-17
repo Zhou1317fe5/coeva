@@ -271,3 +271,13 @@ def test_pet_window_integration_with_feeder_bar(tmp_path: Path) -> None:
 
     win.close()
     assert not win.feeder_bar.isVisible()
+
+
+def test_feeder_bar_cancel_hides() -> None:
+    """Pressing cancel or Esc completely closes and hides the feeder bar."""
+    bar = SliceFeederBar()
+    bar.expand_input()
+    assert bar.isVisible()
+    bar._on_cancel()
+    assert not bar.isVisible()
+    bar.close()

@@ -1004,9 +1004,7 @@ class PetWindow(QWidget):
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802
         super().showEvent(event)
-        if self._docked_edge is None or self._is_peek_expanded:
-            self._feeder_bar.show()
-            self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
+        # Feeder bar starts hidden and only pops up when hovering over the pet
 
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802
         self._feeder_bar.hide()

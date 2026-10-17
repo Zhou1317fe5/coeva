@@ -16,6 +16,7 @@ from PySide6.QtCore import QByteArray, QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QCloseEvent,
     QColor,
+    QFocusEvent,
     QFont,
     QKeyEvent,
     QMouseEvent,
@@ -134,6 +135,11 @@ class _FeederLineEdit(QLineEdit):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def focusOutEvent(self, event: QFocusEvent) -> None:  # noqa: N802
+        super().focusOutEvent(event)
+        if not self.text().strip():
+            self.cancel_pressed.emit()
 
 
 class _CircleIconButton(QWidget):
@@ -587,19 +593,19 @@ class SliceFeederBar(QWidget):
 
     def _on_retract_timeout(self) -> None:
         if self._current_mode == MODE_PILL and not self._btn_voice.is_active:
-            self.show_handle()
+            self.hide()
 
     def _on_submit(self) -> None:
         text = self._input.text().strip()
         if text:
             self.slice_submitted.emit(text)
         self._input.clear()
-        self.show_handle()
+        self.hide()
 
     def _on_cancel(self) -> None:
         self.cancelled.emit()
         self._input.clear()
-        self.show_handle()
+        self.hide()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self._retract_to_handle_timer.stop()
