@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - UI: 完全参照 Clawd on Desk 重构“打开足迹”记忆档案库界面
+
+### 🎨 UI & UX Modernization（足迹档案库纯白轻量化）
+- **“打开足迹”窗口（`ChronicleViewerWindow`）全面对齐 Light Mode**：
+  - 整体面板与内容区域全面转换为纯白底色（`#ffffff`），消除原本沉重突兀的暗黑大背景；
+  - 顶部 Header Bar：标题更名为沉稳克制的“伴生体生命档案库”（去除非必要的 Emoji），统计 Badge 改为浅灰精致胶囊（`#f5f5f7` + 柔和浅边框），“导入历史会话”和“刷新”按钮统一为 Clawd 现代白底轻边框扁平按钮；
+  - 侧边栏（`#chronicleNav`）：宽度统一为 200px，背景浅暖灰（`#f5f5f7`），消除 Windows 默认虚线焦点，每项配置来自 Clawd 规范的线性 SVG 矢量图标（树叶、齿轮、闪电、调色盘、书本），选中态为纯白带微弱柔边；
+  - 列表与文本视窗（`#dataList`, `QTextEdit`, `QLineEdit`）：纯白底色、细微分割线、浅灰 hover 与选中态、等宽字体用于时间戳与原文字句，消除 Windows 原生粗白滚动条，自定义 6px 宽透明轨道深色圆角细滑块；
+  - 操作按钮规范：心智假说校准与撰写章节按钮采用高保真扁平胶囊设计（翡翠绿 / 陶土暖橙），完全贴合 Clawd on Desk 视觉体系。
+
 ## [Unreleased] - Vasu Phase 2C: failed 自主小挫折动画验收
 
 ### 📝 Art Production（美术制作）

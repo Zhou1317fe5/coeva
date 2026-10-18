@@ -10,8 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -30,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.body.harvest_dialog import HarvestHistoryDialog
+from src.body.widgets import CLAWD_ICONS, svg_to_icon
 from src.core.chapters import ChapterEligibilityGate, ChapterGenerator, GrowthChapter
 from src.core.hypotheses import (
     DevelopmentHypothesis,
@@ -75,39 +75,30 @@ class ChronicleViewerWindow(QWidget):
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(12)
 
-        title_label = QLabel("📖 伴生体生命档案库")
-        title_font = QFont()
-        title_font.setPointSize(14)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #f3f4f6;")
+        title_label = QLabel("伴生体生命档案库")
+        title_label.setStyleSheet("color: #18181b; font-size: 16px; font-weight: 700;")
         header_layout.addWidget(title_label)
 
         self.stats_badge = QLabel("载入中...")
         self.stats_badge.setStyleSheet(
-            "background-color: #26262a; color: #9ca3af; "
-            "border: 1px solid #333338; border-radius: 6px; "
+            "background-color: #f5f5f7; color: #6b6b70; "
+            "border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 6px; "
             "padding: 4px 10px; font-size: 12px;"
         )
         header_layout.addWidget(self.stats_badge)
         header_layout.addStretch()
 
-        self.harvest_btn = QPushButton("📦 导入历史会话...")
-        self.harvest_btn.setFixedHeight(28)
+        self.harvest_btn = QPushButton("导入历史会话...")
+        self.harvest_btn.setFixedHeight(30)
         self.harvest_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.harvest_btn.setStyleSheet(
-            "background-color: #27272a; color: #10b981; "
-            "border: 1px solid #059669; border-radius: 6px; padding: 0 10px;"
-        )
         self.harvest_btn.clicked.connect(self._open_harvest_dialog)
         header_layout.addWidget(self.harvest_btn)
 
-        self.refresh_btn = QPushButton("🔄 刷新")
-        self.refresh_btn.setFixedHeight(28)
+        self.refresh_btn = QPushButton("刷新")
+        self.refresh_btn.setFixedHeight(30)
         self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refresh_btn.clicked.connect(self.refresh_all)
         header_layout.addWidget(self.refresh_btn)
-
         main_layout.addWidget(header_bar)
 
         # ── 2. Content Splitter: Left Sidebar Tabs, Right Details ──
@@ -117,13 +108,22 @@ class ChronicleViewerWindow(QWidget):
         # Left Nav List
         self.nav_list = QListWidget()
         self.nav_list.setObjectName("chronicleNav")
-        self.nav_list.setFixedWidth(180)
+        self.nav_list.setFixedWidth(200)
         self.nav_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.nav_list.addItem("🌱 投喂切片 (Slices)")
-        self.nav_list.addItem("🧭 经历会话 (Episodes)")
-        self.nav_list.addItem("🔍 记忆检索 (Search)")
-        self.nav_list.addItem("🌿 共同认知 (Self Model)")
-        self.nav_list.addItem("📖 人生章节 (Chapters)")
+        self.nav_list.setIconSize(QSize(18, 18))
+
+        tabs = [
+            ("投喂切片 (Slices)", "core"),
+            ("经历会话 (Episodes)", "general"),
+            ("记忆检索 (Search)", "agents"),
+            ("共同认知 (Self Model)", "theme"),
+            ("人生章节 (Chapters)", "about"),
+        ]
+        for title, icon_key in tabs:
+            item = QListWidgetItem(title)
+            svg_str = CLAWD_ICONS.get(icon_key, CLAWD_ICONS["about"])
+            item.setIcon(svg_to_icon(svg_str, size=18, color_hex="#6b6b70"))
+            self.nav_list.addItem(item)
         self.nav_list.currentRowChanged.connect(self._on_tab_changed)
         splitter.addWidget(self.nav_list)
 
@@ -149,7 +149,7 @@ class ChronicleViewerWindow(QWidget):
         layout.setSpacing(10)
 
         tip = QLabel("记录用户通过随手投喂（Alt+Space）写下的真实思考与状态切片：")
-        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        tip.setStyleSheet("color: #6b6b70; font-size: 12px;")
         layout.addWidget(tip)
 
         self.slices_list = QListWidget()
@@ -173,7 +173,7 @@ class ChronicleViewerWindow(QWidget):
         layout.setSpacing(10)
 
         tip = QLabel("按工作会话（Session）天然聚合的经历序列，记录伴生体陪伴的客观痕迹：")
-        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        tip.setStyleSheet("color: #6b6b70; font-size: 12px;")
         layout.addWidget(tip)
 
         self.episodes_list = QListWidget()
@@ -233,13 +233,13 @@ class ChronicleViewerWindow(QWidget):
         layout.setSpacing(10)
 
         tip = QLabel("伴生体基于真实经历谨慎提取的候选心智理解（需用户校准，绝不自封真理）：")
-        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        tip.setStyleSheet("color: #6b6b70; font-size: 12px;")
         layout.addWidget(tip)
 
         # Hypotheses Section Header with Re-mine Button
         hyp_header = QHBoxLayout()
         hyp_title = QLabel("🌿 待校准心智假说 (Candidate Hypotheses)")
-        hyp_title.setStyleSheet("font-weight: 600; color: #60a5fa; font-size: 13px;")
+        hyp_title.setStyleSheet("font-weight: 700; color: #18181b; font-size: 13px;")
         hyp_header.addWidget(hyp_title)
         hyp_header.addStretch()
 
@@ -258,17 +258,29 @@ class ChronicleViewerWindow(QWidget):
         hyp_btn_row = QHBoxLayout()
         hyp_btn_row.setSpacing(8)
 
-        self.btn_hyp_yes = QPushButton("✨ 认同该理解 (Yes)")
+        self.btn_hyp_yes = QPushButton("认同该理解 (Yes)")
+        self.btn_hyp_yes.setStyleSheet(
+            "background-color: #10b981; color: #ffffff; font-weight: 500; "
+            "border: none; border-radius: 6px; padding: 4px 12px;"
+        )
         self.btn_hyp_yes.clicked.connect(lambda: self._trigger_calibration(CalibrationResponse.YES))
         hyp_btn_row.addWidget(self.btn_hyp_yes)
 
-        self.btn_hyp_partly = QPushButton("✏️ 补充校准 (Partly)")
+        self.btn_hyp_partly = QPushButton("补充校准 (Partly)")
+        self.btn_hyp_partly.setStyleSheet(
+            "background-color: #ffffff; color: #18181b; "
+            "border: 1px solid #d4d4d8; border-radius: 6px; padding: 4px 12px;"
+        )
         self.btn_hyp_partly.clicked.connect(
             lambda: self._trigger_calibration(CalibrationResponse.PARTLY)
         )
         hyp_btn_row.addWidget(self.btn_hyp_partly)
 
-        self.btn_hyp_no = QPushButton("❌ 否定此判断 (No)")
+        self.btn_hyp_no = QPushButton("否定此判断 (No)")
+        self.btn_hyp_no.setStyleSheet(
+            "background-color: #ffffff; color: #dc2626; "
+            "border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 12px;"
+        )
         self.btn_hyp_no.clicked.connect(lambda: self._trigger_calibration(CalibrationResponse.NO))
         hyp_btn_row.addWidget(self.btn_hyp_no)
 
@@ -277,7 +289,7 @@ class ChronicleViewerWindow(QWidget):
         # Confirmed Insights Section
         ins_title = QLabel("🤝 双方已确认共识 (Confirmed Insights)")
         ins_title.setStyleSheet(
-            "font-weight: 600; color: #34d399; font-size: 13px; margin-top: 6px;"
+            "font-weight: 700; color: #18181b; font-size: 13px; margin-top: 6px;"
         )
         layout.addWidget(ins_title)
 
@@ -291,69 +303,115 @@ class ChronicleViewerWindow(QWidget):
     def _apply_styling(self) -> None:
         self.setStyleSheet("""
             QWidget {
-                background-color: #1a1a1e;
-                color: #e5e7eb;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background-color: #ffffff;
+                color: #18181b;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
                 font-size: 13px;
             }
             QListWidget#chronicleNav {
-                background-color: #141416;
+                background-color: #f5f5f7;
                 border: none;
-                border-right: 1px solid #28282c;
-                padding-top: 8px;
+                border-right: 1px solid rgba(0, 0, 0, 0.08);
+                padding-top: 10px;
+                padding-bottom: 10px;
+                outline: none;
             }
             QListWidget#chronicleNav::item {
-                height: 36px;
+                height: 38px;
                 padding-left: 12px;
-                margin: 2px 6px;
-                border-radius: 6px;
-                color: #9ca3af;
+                margin: 2px 8px;
+                border-radius: 7px;
+                color: #6b6b70;
                 font-weight: 500;
+            }
+            QListWidget#chronicleNav::item:hover:!selected {
+                background-color: rgba(0, 0, 0, 0.05);
+                color: #18181b;
             }
             QListWidget#chronicleNav::item:selected {
-                background-color: #27272b;
-                color: #60a5fa;
+                background-color: #ffffff;
+                color: #0a0a0c;
                 font-weight: 600;
+                border: 1px solid rgba(0, 0, 0, 0.06);
             }
             QListWidget#dataList {
-                background-color: #202024;
-                border: 1px solid #2e2e34;
+                background-color: #ffffff;
+                border: 1px solid rgba(0, 0, 0, 0.08);
                 border-radius: 8px;
                 padding: 6px;
+                outline: none;
             }
             QListWidget#dataList::item {
-                border-bottom: 1px solid #2b2b30;
-                padding: 8px 6px;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                padding: 8px 10px;
                 border-radius: 4px;
+                color: #18181b;
             }
             QListWidget#dataList::item:hover {
-                background-color: #292930;
+                background-color: #f5f5f7;
             }
             QListWidget#dataList::item:selected {
-                background-color: #2d3748;
-                color: #f3f4f6;
-            }
-            QLineEdit, QTextEdit {
-                background-color: #202024;
-                border: 1px solid #2e2e34;
-                border-radius: 6px;
-                color: #f3f4f6;
-                padding: 6px;
-            }
-            QLineEdit:focus, QTextEdit:focus {
-                border: 1px solid #3b82f6;
-            }
-            QPushButton {
-                background-color: #2e2e34;
-                border: 1px solid #3b3b42;
-                border-radius: 6px;
-                color: #e5e7eb;
-                padding: 4px 12px;
+                background-color: #ececef;
+                color: #0a0a0c;
                 font-weight: 500;
             }
+            QLineEdit, QTextEdit {
+                background-color: #ffffff;
+                border: 1px solid #d4d4d8;
+                border-radius: 6px;
+                color: #18181b;
+                padding: 6px;
+                font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+                font-size: 12px;
+                selection-background-color: #d97757;
+                selection-color: #ffffff;
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                border: 1px solid #d97757;
+            }
+            QPushButton {
+                background-color: #ffffff;
+                border: 1px solid #d4d4d8;
+                border-radius: 6px;
+                color: #18181b;
+                padding: 5px 14px;
+                font-weight: 500;
+                font-size: 12px;
+            }
             QPushButton:hover {
-                background-color: #3b3b44;
-                color: #ffffff;
+                background-color: #f4f4f5;
+                border-color: #a1a1aa;
+            }
+            QPushButton:pressed {
+                background-color: #e4e4e7;
+            }
+            QScrollBar:vertical {
+                width: 6px;
+                background: transparent;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(0, 0, 0, 0.15);
+                min-height: 24px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(0, 0, 0, 0.28);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: transparent;
+                height: 0px;
+            }
+            QSplitter::handle {
+                background-color: rgba(0, 0, 0, 0.08);
+            }
+            .sectionTitle {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                color: #8e8e93;
             }
         """)
 
@@ -632,14 +690,14 @@ class ChronicleViewerWindow(QWidget):
         # Header: Title + Create Chapter Button
         top_row = QHBoxLayout()
         tip = QLabel("📖 人生章节：与伴生体共同经历凝练的成长纪实（由大模型与叙事防火墙共创）")
-        tip.setStyleSheet("color: #9ca3af; font-size: 12px;")
+        tip.setStyleSheet("color: #6b6b70; font-size: 12px;")
         top_row.addWidget(tip)
         top_row.addStretch()
 
-        self.btn_gen_chapter = QPushButton("✨ 共同撰写新章节...")
+        self.btn_gen_chapter = QPushButton("共同撰写新章节...")
         self.btn_gen_chapter.setStyleSheet(
-            "background-color: #059669; color: #ffffff; font-weight: bold; "
-            "border-radius: 6px; padding: 4px 12px;"
+            "background-color: #d97757; color: #ffffff; font-weight: bold; "
+            "border: none; border-radius: 6px; padding: 4px 14px;"
         )
         self.btn_gen_chapter.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_gen_chapter.clicked.connect(self._generate_new_chapter)
@@ -657,7 +715,7 @@ class ChronicleViewerWindow(QWidget):
         l_layout.setSpacing(6)
 
         c_list_title = QLabel("📚 历史章节列表")
-        c_list_title.setStyleSheet("font-size: 12px; font-weight: 600; color: #60a5fa;")
+        c_list_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #18181b;")
         l_layout.addWidget(c_list_title)
 
         self.chapter_list = QListWidget()
@@ -676,7 +734,7 @@ class ChronicleViewerWindow(QWidget):
         r_top = QHBoxLayout()
         self.chapter_title_label = QLabel("选择左侧章节查看正文")
         self.chapter_title_label.setStyleSheet(
-            "font-size: 14px; font-weight: bold; color: #f3f4f6;"
+            "font-size: 15px; font-weight: bold; color: #18181b;"
         )
         r_top.addWidget(self.chapter_title_label)
         r_top.addStretch()
@@ -693,7 +751,7 @@ class ChronicleViewerWindow(QWidget):
 
         # Human Reflection Editor
         refl_title = QLabel("✍️ 用户手记与共同反思（双人共写留白 · 自动沉淀入章节）：")
-        refl_title.setStyleSheet("font-size: 12px; color: #34d399; font-weight: 600;")
+        refl_title.setStyleSheet("font-size: 12px; color: #6b6b70; font-weight: 600;")
         r_layout.addWidget(refl_title)
 
         refl_row = QHBoxLayout()
