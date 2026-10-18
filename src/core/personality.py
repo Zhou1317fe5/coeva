@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -243,7 +244,12 @@ def build_system_prompt(
     if custom_user_suffix.strip():
         sections.append(f"【用户的个性化偏好】：{custom_user_suffix.strip()}")
     if memories:
-        sections.append("【你与用户过往的真实经历记忆（若用户提起，可自然从容地回应，证明你记得）：】")
+        current_date_str = datetime.now().strftime("%Y-%m-%d")
+        sections.append(
+            f"【你与用户的过往真实经历记忆（当前日期：{current_date_str}）】：\\n"
+            "请注意：上面标注日期的经历是你和用户真实聊过/发生过的事。"
+            "当用户问起'昨天聊了什么'、'还记得什么'或相关往事时，请自然从中调取并简短作答，证明你确实记得。"
+        )
         for mem in memories:
             sections.append(f"- {mem}")
 

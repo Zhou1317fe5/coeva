@@ -365,29 +365,14 @@ class CompanionHttpServer:
         """Executed safely on the Qt GUI main loop.
 
         Data Plane & Control Plane separation (AGENTS.md section 4):
-        Agent telemetry (tool calls, prompt turns, session changes) is purely
-        read-only background evidence. It is dispatched to the event bus and
-        persisted into Chronicle for growth chapters, but it STRICTLY NEVER
-        drives or overrides the pet's physical body posture directly.
-        This prevents rapid state thrashing (running -> idle -> running in 50ms)
-        and multi-agent posture collisions. The pet's body posture is owned
-        purely by human interaction and natural desk rhythm.
+        Agent telemetry (tool calls, prompt turns, session changes, tool failures)
+        is purely read-only background evidence. It is dispatched to the event bus
+        and persisted into Chronicle for growth chapters, but it STRICTLY NEVER
+        drives or overrides the pet's body posture or speech bubble directly.
+        The companion's voice belongs only to the companion itself, never mirroring
+        raw terminal errors like '⚠️ 工具报错: Bash'.
         """
         self.bus.dispatch_json(data)
-        if self.controller is None:
-            return
-
-        msg = data.get("message")
-        if not msg or not data.get("_allow_bubble", True):
-            return
-
-        event_type = str(data.get("event_type", ""))
-        if self.intervention is not None and not self.intervention.allow_agent_bubble(event_type):
-            return
-
-        ttl_ms = int(data.get("ttl_ms", 3000))
-        self.controller.say(str(msg), ttl_ms=ttl_ms)
-
     def start(self) -> bool:
         """Start listening on the background thread."""
         handler_class = type(

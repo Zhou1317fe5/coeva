@@ -28,12 +28,13 @@ from src.connectors.settings import AgentSettingsStore
 from src.core.cold_start import ColdStartPolicy
 from src.core.intervention import InterventionPolicy
 from src.core.llm_client import CompanionAIEngine, LLMConfig
-from src.core.personality import format_memory_snippet, load_personality
+from src.core.personality import load_personality
 from src.core.sanctuary import SanctuaryGuard
 from src.core.state_watcher import StateWatcher
 from src.feeder.contracts import RawSlice
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, GlobalHotkeyListener, hotkey_display
 from src.feeder.storage import SliceStore
+from src.memory.retriever import MemoryRetriever
 from src.memory.store import ChronicleStore, SliceRecord
 
 # Evidence decay runs at startup and once a day thereafter.
@@ -84,6 +85,7 @@ class CompanionApp:
         self.store = SliceStore(Path("data") / "raw_slices.jsonl")
         self.chronicle = ChronicleStore()
         self.chronicle.import_slices_jsonl()
+        self.retriever = MemoryRetriever(self.chronicle)
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = self.window.feeder_bar
         self.window.slice_fed.connect(self._on_slice_submitted)
@@ -463,43 +465,17 @@ class CompanionApp:
             self._last_pet_speech = reply
             self.controller.say(reply, ttl_ms=4000)
 
-    def _recall_memories(self, text: str, *, limit: int = 2) -> tuple[str, ...]:
-        """Extract 1-2 relevant past memory snippets from ChronicleStore."""
-        if not text.strip():
-            return ()
-        # Filter out common stop words and small particles to extract meaningful search keywords
-        stop_words = {
-            "你", "我", "他", "她", "它", "的", "了", "吗", "呢", "吧", "啊",
-            "在", "有", "是", "和", "就", "还", "这", "那", "个", "说", "想",
-            "做", "去", "吃", "什么", "怎么", "记得", "之前", "前天", "昨天",
-        }
-        norm_text = text.replace("，", " ").replace("。", " ").replace("？", " ")
-        raw_tokens = [tok.strip() for tok in norm_text.split()]
-        keywords: list[str] = []
-        for t in raw_tokens:
-            if t and t not in stop_words and len(t) >= 2:
-                keywords.append(t)
-
-        # If no multi-char word is found, take first 2+ char substring of text
-        if not keywords and len(text.strip()) >= 2:
-            clean_t = "".join(ch for ch in text if ch not in stop_words and ch.isalnum())
-            if len(clean_t) >= 2:
-                keywords.append(clean_t[:4])
-
-        recalled: list[str] = []
-        seen_ids: set[str] = set()
-        for kw in keywords[:2]:
-            matches = self.chronicle.search_slices(kw, limit=limit)
-            for m in matches:
-                # Don't recall the exact same slice currently being submitted
-                if m.id not in seen_ids and m.content.strip() != text.strip():
-                    seen_ids.add(m.id)
-                    recalled.append(format_memory_snippet(m.timestamp, m.content))
-                    if len(recalled) >= limit:
-                        break
-            if len(recalled) >= limit:
-                break
-        return tuple(recalled)
+    def _recall_memories(
+        self,
+        text: str,
+        *,
+        limit: int = 3,
+        exclude_ids: set[str] | None = None,
+    ) -> tuple[str, ...]:
+        """Extract relevant past memory snippets from ChronicleStore using MemoryRetriever."""
+        if not hasattr(self, "retriever") or self.retriever is None:
+            self.retriever = MemoryRetriever(self.chronicle)
+        return self.retriever.recall(text, limit=limit, exclude_ids=exclude_ids)
 
     def _on_user_reply_to_bubble(self, reply_text: str, orig_pet_speech: str) -> None:
         """Handle user's direct reply to a message the pet said."""
@@ -519,7 +495,9 @@ class CompanionApp:
         )
 
         # 2. Asynchronous reply with full two-way dialogue context
-        memories = self._recall_memories(reply_text)
+        memories = self._recall_memories(
+            reply_text, limit=3, exclude_ids={slice_item.id}
+        )
         if is_distressed:
             self.controller.perform_action("rest")
             prompt_ctx = (
@@ -580,7 +558,9 @@ class CompanionApp:
         )
 
         # 2. Check Sanctuary mode
-        memories = self._recall_memories(text)
+        memories = self._recall_memories(
+            text, limit=3, exclude_ids={slice_item.id}
+        )
         if is_distressed:
             # AC-4: Enter Sanctuary mode with a gentle, non-preaching acknowledgment bubble
             self.controller.perform_action("rest")

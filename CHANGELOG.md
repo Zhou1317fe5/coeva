@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - Calico Theme: 移植接入 Clawd on Desk 经典三花猫并设为默认宠物
 ### 🐾 Fixed & Enhanced: 彻底重构贴边停靠（Mini Mode）动效状态机
+- **彻底切断 Agent 遥测直接冒泡气泡的遗留链路（`Data/Control Planes Strict Decoupling`）**：
+  - **根因分析**：此前版本虽然在 `run_companion.py` 阻止了 Agent 动作控制，但 `src/connectors/http_server.py` 的 `_handle_event_on_main_thread` 依然保留了历史代码，将外部 Agent 上报的 `tool_failure` 事件（如 `⚠️ 工具报错: Bash`）直接转发给桌宠的 `controller.say()`，导致终端工具运行报错时桌宠被动沦为“命令行报错告示牌”；
+  - **全面切断**：完全移除 `_handle_event_on_main_thread` 中向 UI 气泡转发现场消息的旧逻辑。外部 Agent 事件（命令失败、工具调用、思考）100% 仅作为客观背景数据流（Evidence）静默记录到本地 Chronicle 数据库，绝不触发伴生体气泡或动作。
+
 - **引入真实人类昼夜作息大周期（`Circadian Life Schedule`, `src/core/circadian.py`）**：
   - **彻底告别多动症式的频繁换动作**：废除 20~40 秒的高频动作切换定时器，状态基底保持长时间平静（以数分钟为单位），90% 以上时间处于温和平静的呼吸与发呆（`idle`）；
   - **全天 24 小时自然作息对齐**：

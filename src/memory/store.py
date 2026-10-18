@@ -299,6 +299,27 @@ class ChronicleStore:
             )
         ]
 
+    def get_slices_in_timerange(
+        self, start_iso: str, end_iso: str, *, limit: int = 50
+    ) -> list[SliceRecord]:
+        """Return slices within an ISO timestamp range [start_iso, end_iso], newest-first."""
+        rows = self._conn.execute(
+            "SELECT * FROM slices WHERE timestamp >= ? AND timestamp <= ? "
+            "ORDER BY timestamp DESC LIMIT ?",
+            (start_iso, end_iso, limit),
+        ).fetchall()
+        return [
+            SliceRecord(
+                id=row["id"],
+                timestamp=row["timestamp"],
+                content=row["content"],
+                mood_flag=row["mood_flag"],
+                actor=row["actor"],
+                source=row["source"],
+            )
+            for row in rows
+        ]
+
     def search_events(self, keyword: str, *, limit: int = 50) -> list[dict[str, Any]]:
         """Search historical events by session_id, tool_name, error_message, or agent_id."""
         pattern = f"%{keyword}%"
