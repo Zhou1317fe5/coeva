@@ -260,6 +260,12 @@ class _PillControlsWidget(QWidget):
             self._bar_heights = [4.0, 12.0, 8.0, 3.5]
         self.update()
 
+    def set_clip_bounds(self, w: float, h: float) -> None:
+        """Set dynamic bounds of the outer morphing pill to clip overflow cleanly."""
+        self._clip_w = w
+        self._clip_h = h
+        self.update()
+
     def toggle_voice_mode(self) -> None:
         new_state = not self._is_voice_active
         self.set_active(new_state)
@@ -318,10 +324,18 @@ class _PillControlsWidget(QWidget):
             return
 
         painter.save()
+        # Clip to dynamic pill container shape so icons never bleed outside
+        if hasattr(self, "_clip_w") and hasattr(self, "_clip_h"):
+            clip_path = QPainterPath()
+            rx = cx - self._clip_w / 2.0
+            ry = cy - self._clip_h / 2.0
+            clip_rad = self._clip_h / 2.0
+            clip_path.addRoundedRect(QRectF(rx, ry, self._clip_w, self._clip_h), clip_rad, clip_rad)
+            painter.setClipPath(clip_path)
+
         painter.translate(cx, cy)
         painter.scale(self._scale, self._scale)
         painter.translate(-cx, -cy)
-
         # 1. Hover rounded background
         if self._scale > 0.85 and self._hover_btn:
             painter.setBrush(QColor(241, 245, 249, int(alpha * 0.9)))
@@ -593,17 +607,28 @@ class SliceFeederBar(QWidget):
         if self._current_mode == MODE_PILL:
             self._input_widget.hide()
             self._handle_widget.hide()
-            self._pill_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, PILL_WIDTH, PILL_HEIGHT)
+            inner_w = float(cur_w - SHADOW_MARGIN * 2)
+            inner_h = float(cur_h - SHADOW_MARGIN * 2)
+            px = int(round(SHADOW_MARGIN + (inner_w - PILL_WIDTH) / 2.0))
+            py = int(round(SHADOW_MARGIN + (inner_h - PILL_HEIGHT) / 2.0))
+            self._pill_widget.setGeometry(px, py, PILL_WIDTH, PILL_HEIGHT)
             self._pill_widget.show()
             # Synchronous scale and fade: icons scale from 0.25x to 1.0x smoothly
             scale = 0.25 + 0.75 * val
             opacity = max(0.0, min(1.0, val * 1.3))
+            self._pill_controls.set_clip_bounds(inner_w, inner_h)
             self._pill_controls.set_morph(scale, opacity)
         elif self._current_mode == MODE_HANDLE:
             self._input_widget.hide()
+            inner_w = float(cur_w - SHADOW_MARGIN * 2)
+            inner_h = float(cur_h - SHADOW_MARGIN * 2)
+            px = int(round(SHADOW_MARGIN + (inner_w - PILL_WIDTH) / 2.0))
+            py = int(round(SHADOW_MARGIN + (inner_h - PILL_HEIGHT) / 2.0))
+            self._pill_widget.setGeometry(px, py, PILL_WIDTH, PILL_HEIGHT)
             # Synchronous scale down: icons shrink from 1.0x to 0.25x smoothly
             scale = 0.25 + 0.75 * (1.0 - val)
             opacity = max(0.0, min(1.0, (1.0 - val) * 1.3))
+            self._pill_controls.set_clip_bounds(inner_w, inner_h)
             self._pill_controls.set_morph(scale, opacity)
         elif self._current_mode == MODE_INPUT:
             self._pill_widget.hide()
