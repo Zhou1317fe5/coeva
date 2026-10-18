@@ -41,6 +41,10 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = [
+    "recovery/**",
+    "assets/vasu/production/v2-a2r-layered-native-idle/**",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N"]

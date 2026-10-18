@@ -1,0 +1,43 @@
+{
+  "canvas": {
+    "width": 1024,
+    "height": 1024
+  },
+  "layers": {
+    "body": "layers/body.png",
+    "head_base": "layers/head-base.png",
+    "eyes_open": "layers/eyes-open.png",
+    "eyes_closed": "layers/eyes-closed.png"
+  },
+  "identity_source": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\reference\\vasu-native-canonical-hires.png",
+  "accepted_blink_source": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2-native-idle\\candidate-02-clean\\frames\\02.png",
+  "targeted_blink_repair_source": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\blink-edit-normalized.png",
+  "head_body_overlap": {
+    "body_start_y": 420,
+    "head_end_y": 560,
+    "overlap_px": 140,
+    "visible_overlap_masked": true
+  },
+  "eye_boxes": {
+    "left": [
+      360,
+      385,
+      415,
+      438
+    ],
+    "right": [
+      497,
+      406,
+      560,
+      464
+    ]
+  },
+  "alternative_structure_reason": "eye-only raster repair created visible texture seams; the smallest safe alternative is a texture-consistent head-region replacement used only during blink. Neutral still uses head-base plus exact eyes-open pixels.",
+  "closed_head_overlay_box": [
+    251,
+    232,
+    866,
+    560
+  ],
+  "neutral_reconstruction": "neutral-reconstruction.png"
+}

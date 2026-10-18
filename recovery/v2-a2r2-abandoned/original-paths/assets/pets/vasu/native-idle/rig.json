@@ -1,0 +1,55 @@
+{
+  "canvas": {
+    "width": 1024,
+    "height": 1024
+  },
+  "layers": {
+    "body": "layers/body.png",
+    "head_base": "layers/head-base.png",
+    "eyes_open": "layers/eyes-open.png",
+    "eyes_closed": "layers/eyes-closed.png"
+  },
+  "identity_source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\reference\\vasu-native-canonical-hires.png",
+  "accepted_blink_source": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2-native-idle\\candidate-02-clean\\frames\\02.png",
+  "targeted_blink_repair_source": "D:\\CodeProjects\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\blink-canonical-edit-scaled.png",
+  "head_body_overlap": {
+    "body_start_y": 420,
+    "head_end_y": 560,
+    "overlap_px": 140,
+    "visible_overlap_masked": true
+  },
+  "eye_boxes": {
+    "left": [
+      360,
+      385,
+      415,
+      438
+    ],
+    "right": [
+      497,
+      406,
+      560,
+      464
+    ]
+  },
+  "alternative_structure_reason": "the regenerated closed-head edit was horizontally shifted and overlapped the body. The runtime now uses only two soft, canonical-position eye patches from the aligned edit; all other head and body pixels remain from the canonical backdrop.",
+  "closed_head_overlay_box": null,
+  "closed_eye_patch_boxes": {
+    "left": [
+      350,
+      380,
+      425,
+      445
+    ],
+    "right": [
+      487,
+      400,
+      570,
+      470
+    ]
+  },
+  "neutral_reconstruction": "neutral-reconstruction.png",
+  "runtime": {
+    "display_size": 360
+  }
+}

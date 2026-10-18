@@ -1,0 +1,6 @@
+{"wall_time_s": 227781.468, "elapsed_s": 0.35899999999674037, "blink_closed": false, "breathing_scale_y": 1.0009178767283835, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227782.484, "elapsed_s": 1.375, "blink_closed": false, "breathing_scale_y": 1.0024786121534346, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 227783.484, "elapsed_s": 2.375, "blink_closed": false, "breathing_scale_y": 1.0015219035725218, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227784.5, "elapsed_s": 3.3910000000032596, "blink_closed": false, "breathing_scale_y": 0.9990047281422545, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227785.5, "elapsed_s": 4.39100000000326, "blink_closed": false, "breathing_scale_y": 0.9975162685429905, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 5.01600000000326, "duration_s": 0.14}

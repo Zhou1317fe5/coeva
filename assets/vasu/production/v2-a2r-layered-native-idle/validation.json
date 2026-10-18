@@ -1,0 +1,111 @@
+{
+  "phase": "V2-A2R",
+  "native_master": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\reference\\vasu-native-canonical-hires.png",
+  "layer_structure": {
+    "body": {
+      "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\layers\\body.png",
+      "sha256": "75e6f03cacb5afe93a1f835e34832d99dce7a7d60b06a336bab724e841ce41e4",
+      "size": [
+        1024,
+        1024
+      ],
+      "bbox": [
+        157,
+        560,
+        858,
+        952
+      ],
+      "transparent_rgb_residue": 0,
+      "nontransparent_pixels": 141082
+    },
+    "eyes-closed": {
+      "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\layers\\eyes-closed.png",
+      "sha256": "ae25b0fbb2a528dfe2477e96891b2d81c16aa23f8829d0cc532534829fd3aa14",
+      "size": [
+        1024,
+        1024
+      ],
+      "bbox": [
+        305,
+        232,
+        849,
+        560
+      ],
+      "transparent_rgb_residue": 0,
+      "nontransparent_pixels": 55056
+    },
+    "eyes-open": {
+      "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\layers\\eyes-open.png",
+      "sha256": "b45ac05a54292b99644c040ed40e63b43d72195403f7a398df18c1a49a5fa885",
+      "size": [
+        1024,
+        1024
+      ],
+      "bbox": [
+        360,
+        385,
+        560,
+        464
+      ],
+      "transparent_rgb_residue": 0,
+      "nontransparent_pixels": 6569
+    },
+    "head-base": {
+      "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\layers\\head-base.png",
+      "sha256": "3da19f8579128114356438f3cbaadfa87cdfcce1525578b65b63f1a42bde4a15",
+      "size": [
+        1024,
+        1024
+      ],
+      "bbox": [
+        251,
+        232,
+        866,
+        560
+      ],
+      "transparent_rgb_residue": 0,
+      "nontransparent_pixels": 65938
+    }
+  },
+  "neutral_reconstruction": {
+    "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\neutral-reconstruction.png",
+    "visible_diff_native": {
+      "changed_visible_pixels": 185272,
+      "visible_pixels": 207023,
+      "max_rgb_delta_sum": 6,
+      "mean_rgb_abs_sum": 1.6530916854649,
+      "pixels_rgb_delta_sum_gt15": 0
+    },
+    "visible_diff_desktop_300px": {
+      "changed_visible_pixels": 15681,
+      "visible_pixels": 18274,
+      "max_rgb_delta_sum": 128,
+      "mean_rgb_abs_sum": 1.631224690817555,
+      "pixels_rgb_delta_sum_gt15": 9
+    }
+  },
+  "blink_reconstruction": {
+    "path": "C:\\Users\\Admin\\.codex\\worktrees\\6e8f\\co-evolving-companion\\assets\\vasu\\production\\v2-a2r-layered-native-idle\\closed-reconstruction.png",
+    "visible_diff_against_open_native": {
+      "changed_visible_pixels": 192772,
+      "visible_pixels": 208427,
+      "max_rgb_delta_sum": 765,
+      "mean_rgb_abs_sum": 57.32978452887582,
+      "pixels_rgb_delta_sum_gt15": 54924
+    }
+  },
+  "desktop_target": {
+    "preview_canvas_px": 300,
+    "visible_height_range_px": [
+      186,
+      221
+    ]
+  },
+  "checks": {
+    "neutral_effectively_indistinguishable_at_desktop": true,
+    "layer_transparent_rgb_clean": true,
+    "neutral_reconstruction_present": true,
+    "blink_reconstruction_present": true,
+    "pass": true
+  }
+}

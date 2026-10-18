@@ -1,0 +1,9 @@
+{"wall_time_s": 229435.078, "elapsed_s": 0.8910000000032596, "blink_closed": false, "breathing_scale_y": 1.0032137656004567, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 229436.078, "elapsed_s": 1.875, "blink_closed": false, "breathing_scale_y": 1.003695518130045, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 229437.125, "elapsed_s": 2.937999999994645, "blink_closed": false, "breathing_scale_y": 1.0002595225703355, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 229438.125, "elapsed_s": 3.937999999994645, "blink_closed": false, "breathing_scale_y": 0.9966729584231846, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 229439.125, "elapsed_s": 4.937999999994645, "blink_closed": false, "breathing_scale_y": 0.9964134358528491, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 229440.156, "elapsed_s": 5.9689999999827705, "blink_closed": false, "breathing_scale_y": 0.9998701703099824, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 229441.156, "elapsed_s": 6.9689999999827705, "blink_closed": false, "breathing_scale_y": 1.0033973616010152, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 229442.156, "elapsed_s": 7.9689999999827705, "blink_closed": false, "breathing_scale_y": 1.0035271912910328, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 8.030999999988126, "duration_s": 0.14}

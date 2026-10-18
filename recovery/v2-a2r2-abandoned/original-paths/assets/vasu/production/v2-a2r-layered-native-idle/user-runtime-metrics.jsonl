@@ -1,0 +1,34 @@
+{"wall_time_s": 228069.781, "elapsed_s": 0.4379999999946449, "blink_closed": false, "breathing_scale_y": 1.0011068955775846, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228070.781, "elapsed_s": 1.437999999994645, "blink_closed": false, "breathing_scale_y": 1.0024947325786269, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 228071.781, "elapsed_s": 2.437999999994645, "blink_closed": false, "breathing_scale_y": 1.001387837001042, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228072.781, "elapsed_s": 3.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9988931044224153, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228073.781, "elapsed_s": 4.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9975052674213732, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 228074.781, "elapsed_s": 5.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9986121629989579, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228075.781, "elapsed_s": 6.437999999994645, "blink_closed": false, "breathing_scale_y": 1.0011068955775846, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 7.437999999994645, "duration_s": 0.14}
+{"wall_time_s": 228076.781, "elapsed_s": 7.437999999994645, "blink_closed": true, "breathing_scale_y": 1.0024947325786269, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 228077.781, "elapsed_s": 8.437999999994645, "blink_closed": false, "breathing_scale_y": 1.001387837001042, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228078.781, "elapsed_s": 9.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9988931044224153, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228079.781, "elapsed_s": 10.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9975052674213732, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 228080.781, "elapsed_s": 11.437999999994645, "blink_closed": false, "breathing_scale_y": 0.9986121629989578, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228081.796, "elapsed_s": 12.453000000008615, "blink_closed": false, "breathing_scale_y": 1.0011419685858558, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228082.796, "elapsed_s": 13.453000000008615, "blink_closed": false, "breathing_scale_y": 1.0024969725617625, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 228083.796, "elapsed_s": 14.453000000008615, "blink_closed": false, "breathing_scale_y": 1.0013550039759067, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 14.89100000000326, "duration_s": 0.14}
+{"wall_time_s": 228084.796, "elapsed_s": 15.453000000008615, "blink_closed": false, "breathing_scale_y": 0.9988580314141442, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228085.796, "elapsed_s": 16.453000000008615, "blink_closed": false, "breathing_scale_y": 0.9975030274382374, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 228086.796, "elapsed_s": 17.453000000008615, "blink_closed": false, "breathing_scale_y": 0.9986449960240932, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228087.796, "elapsed_s": 18.453000000008615, "blink_closed": false, "breathing_scale_y": 1.0011419685858558, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228088.796, "elapsed_s": 19.453000000008615, "blink_closed": false, "breathing_scale_y": 1.0024969725617625, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 20.453000000008615, "duration_s": 0.14}
+{"wall_time_s": 228089.796, "elapsed_s": 20.453000000008615, "blink_closed": true, "breathing_scale_y": 1.0013550039759067, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228090.796, "elapsed_s": 21.453000000008615, "blink_closed": false, "breathing_scale_y": 0.9988580314141442, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228091.796, "elapsed_s": 22.453000000008615, "blink_closed": false, "breathing_scale_y": 0.9975030274382374, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 228092.812, "elapsed_s": 23.469000000011874, "blink_closed": false, "breathing_scale_y": 0.9986803862201638, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228093.812, "elapsed_s": 24.469000000011874, "blink_closed": false, "breathing_scale_y": 1.0011790690178173, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"event": "blink_start", "elapsed_s": 25.28200000000652, "duration_s": 0.14}
+{"wall_time_s": 228094.812, "elapsed_s": 25.469000000011874, "blink_closed": false, "breathing_scale_y": 1.0024986827976536, "bbox": [98, 114, 299, 319], "visible_height": 205, "baseline_y": 319}
+{"wall_time_s": 228095.812, "elapsed_s": 26.469000000011874, "blink_closed": false, "breathing_scale_y": 1.0013196137798364, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228096.812, "elapsed_s": 27.469000000011874, "blink_closed": false, "breathing_scale_y": 0.9988209309821827, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 228097.812, "elapsed_s": 28.469000000011874, "blink_closed": false, "breathing_scale_y": 0.9975013172023465, "bbox": [98, 116, 299, 319], "visible_height": 203, "baseline_y": 319}
+{"wall_time_s": 228098.812, "elapsed_s": 29.469000000011874, "blink_closed": false, "breathing_scale_y": 0.9986803862201638, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}

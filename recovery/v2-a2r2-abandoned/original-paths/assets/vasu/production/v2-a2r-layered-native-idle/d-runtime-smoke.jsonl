@@ -1,0 +1,5 @@
+{"wall_time_s": 227139.906, "elapsed_s": 1.0159999999741558, "blink_closed": false, "breathing_scale_y": 1.0021857025826237, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227140.953, "elapsed_s": 2.062999999994645, "blink_closed": false, "breathing_scale_y": 1.002077946506123, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227141.953, "elapsed_s": 3.062999999994645, "blink_closed": false, "breathing_scale_y": 0.9998351860051355, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227142.953, "elapsed_s": 4.062999999994645, "blink_closed": false, "breathing_scale_y": 0.9977572394990127, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}
+{"wall_time_s": 227143.953, "elapsed_s": 5.062999999994645, "blink_closed": false, "breathing_scale_y": 0.9979220534938772, "bbox": [98, 115, 299, 319], "visible_height": 204, "baseline_y": 319}

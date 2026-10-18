@@ -1,0 +1,28 @@
+{
+  "duration_s": 14.0,
+  "fps": 12,
+  "config": {
+    "breathing_period_s": 6.0,
+    "breathing_amplitude": 0.004,
+    "blink_min_interval_s": 4.5,
+    "blink_max_interval_s": 8.5,
+    "blink_duration_s": 0.14,
+    "seed": 20261017
+  },
+  "blink_events": [
+    {
+      "start_s": 5.62196919412413,
+      "end_s": 5.76196919412413
+    },
+    {
+      "start_s": 11.873377359302673,
+      "end_s": 12.013377359302673
+    }
+  ],
+  "blink_phases": [
+    0.936994865687355,
+    0.9788962265504454
+  ],
+  "render_seconds": 3.2195344000065234,
+  "render_ms_per_frame": 19.163895238134067
+}
