@@ -415,10 +415,10 @@ class SliceFeederBar(QWidget):
 
         # Smooth Morphing Animation (spring-like fluid transition matching Codex)
         self._morph_anim = QVariantAnimation(self)
-        self._morph_anim.setDuration(240)
+        self._morph_anim.setDuration(280)
         self._morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._morph_anim.valueChanged.connect(self._on_morph_step)
         self._morph_anim.finished.connect(self._on_morph_finished)
-
         self._pill_opacity = QGraphicsOpacityEffect(self._pill_widget)
         self._pill_widget.setGraphicsEffect(self._pill_opacity)
         self._input_opacity = QGraphicsOpacityEffect(self._input_widget)
@@ -551,12 +551,18 @@ class SliceFeederBar(QWidget):
     def _apply_mode(self, mode: str, *, animate: bool = True) -> None:
         self._current_mode = mode
 
-        if mode == MODE_HANDLE:
-            pill_w, pill_h = HANDLE_PILL_WIDTH, HANDLE_PILL_HEIGHT
-        elif mode == MODE_PILL:
-            pill_w, pill_h = PILL_WIDTH, PILL_HEIGHT
-        else:  # MODE_INPUT
+        # Strict container isolation to completely prevent widget overlapping
+        if mode == MODE_INPUT:
+            self._pill_widget.hide()
+            self._handle_widget.hide()
             pill_w, pill_h = INPUT_WIDTH, INPUT_HEIGHT
+        elif mode == MODE_PILL:
+            self._input_widget.hide()
+            self._handle_widget.hide()
+            pill_w, pill_h = PILL_WIDTH, PILL_HEIGHT
+        else:  # MODE_HANDLE
+            self._input_widget.hide()
+            pill_w, pill_h = HANDLE_PILL_WIDTH, HANDLE_PILL_HEIGHT
 
         target_w = pill_w + SHADOW_MARGIN * 2
         target_h = pill_h + SHADOW_MARGIN * 2
@@ -585,29 +591,26 @@ class SliceFeederBar(QWidget):
         self._re_anchor()
 
         if self._current_mode == MODE_PILL:
-            self._handle_widget.hide()
             self._input_widget.hide()
+            self._handle_widget.hide()
             self._pill_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, PILL_WIDTH, PILL_HEIGHT)
             self._pill_widget.show()
-            # Synchronous scale and fade: content grows from 0.35x to 1.0x with OutCubic!
-            scale = 0.35 + 0.65 * val
-            opacity = max(0.0, min(1.0, val * 1.2))
+            # Synchronous scale and fade: icons scale from 0.25x to 1.0x smoothly
+            scale = 0.25 + 0.75 * val
+            opacity = max(0.0, min(1.0, val * 1.3))
             self._pill_controls.set_morph(scale, opacity)
         elif self._current_mode == MODE_HANDLE:
-            # Synchronous scale down: content shrinks from 1.0x to 0.35x!
-            scale = 0.35 + 0.65 * (1.0 - val)
-            opacity = max(0.0, min(1.0, (1.0 - val) * 1.2))
+            self._input_widget.hide()
+            # Synchronous scale down: icons shrink from 1.0x to 0.25x smoothly
+            scale = 0.25 + 0.75 * (1.0 - val)
+            opacity = max(0.0, min(1.0, (1.0 - val) * 1.3))
             self._pill_controls.set_morph(scale, opacity)
-            self._input_opacity.setOpacity(max(0.0, min(1.0, (1.0 - val) / 0.85)))
         elif self._current_mode == MODE_INPUT:
+            self._pill_widget.hide()
             self._handle_widget.hide()
             self._input_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT)
             self._input_widget.show()
             self._input_opacity.setOpacity(max(0.0, min(1.0, (val - 0.2) / 0.8)))
-            self._pill_opacity.setOpacity(max(0.0, min(1.0, 1.0 - val * 2.0)))
-        elif self._current_mode == MODE_HANDLE:
-            self._pill_opacity.setOpacity(max(0.0, min(1.0, (1.0 - val) / 0.85)))
-            self._input_opacity.setOpacity(max(0.0, min(1.0, (1.0 - val) / 0.85)))
 
         self.update()
 
@@ -630,12 +633,12 @@ class SliceFeederBar(QWidget):
             )
             self._pill_widget.show()
             self._pill_controls.set_morph(1.0, 1.0)
+        else:  # MODE_INPUT
             self._input_widget.setGeometry(
                 SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
             )
             self._input_widget.show()
             self._input_opacity.setOpacity(1.0)
-
         self.setFixedSize(total_w, total_h)
         self._re_anchor()
         self.update()
