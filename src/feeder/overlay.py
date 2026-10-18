@@ -1,9 +1,9 @@
 """Codex-style docked interaction pill bar for instant slice feeding and voice interaction.
 
-1:1 reproduction of the Codex companion interaction pill docked directly beneath the pet body:
-- Handle mode: A subtle, tiny white pill handle beneath the pet feet.
-- Pill mode: Expands on hover into [ Edit / SquarePen | Divider | Voice Waveform ılı ].
-- Input mode: Expands on click into [ + ] [ 开始新聊天 ] [ ↑ ].
+Official Codex companion interaction pill docked directly beneath the pet body:
+- Handle mode (default idle): A subtle, tiny white pill handle beneath the pet's feet.
+- Hovered / Pill mode: Smoothly expands into dual-button pill [ Edit | Divider | Waveform ].
+- Input mode: Expands into the Codex input bar with [ + ] [ 开始新聊天 ] [ ↑ ].
 - Voice mode: Animated pulsing waveform lines with listening feedback.
 """
 
@@ -41,7 +41,6 @@ from PySide6.QtGui import (
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication,
-    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLineEdit,
     QWidget,
@@ -52,7 +51,8 @@ MODE_HANDLE = "handle"
 MODE_PILL = "pill"
 MODE_INPUT = "input"
 
-# Exact Dimensions matching Codex
+# Exact Dimensions matching official Codex parameters
+# (compactControlWidth: 17*2 - 10.5 gap = 23.5px, compactControlHeight: 6)
 HANDLE_PILL_WIDTH = 28
 HANDLE_PILL_HEIGHT = 6
 
@@ -63,6 +63,11 @@ INPUT_WIDTH = 260
 INPUT_HEIGHT = 34
 
 SHADOW_MARGIN = 6
+
+# Official Codex timing & spring parameters
+MORPH_DURATION_MS = 220
+DISMISS_DELAY_MS = 300
+CONTENT_HIDDEN_SCALE = 0.75  # Codex: contentHiddenScale: .75
 
 # SVG definitions matching Codex icons
 _EDIT_ICON_SVG = (
@@ -217,186 +222,19 @@ class _CircleIconButton(QWidget):
         self._renderer.render(painter, QRectF(cx, cy, self._icon_size, self._icon_size))
 
 
-class _PillControlsWidget(QWidget):
-    """Integrated pill controls matching Codex's synchronous scaling and hover effect."""
-
-    clicked = Signal()
-    edit_clicked = Signal()
-    voice_clicked = Signal(bool)
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(76, 28)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMouseTracking(True)
-        self._edit_renderer = QSvgRenderer(QByteArray(_EDIT_ICON_SVG.encode("utf-8")), self)
-        self._scale: float = 1.0
-        self._opacity: float = 1.0
-        self._hover_btn: str | None = None
-        self._is_voice_active: bool = False
-        self._bar_heights: list[float] = [4.0, 12.0, 8.0, 3.5]
-        self._anim_step = 0
-
-        self._anim_timer = QTimer(self)
-        self._anim_timer.setInterval(110)
-        self._anim_timer.timeout.connect(self._on_anim_tick)
-
-    @property
-    def is_active(self) -> bool:
-        return self._is_voice_active
-
-    @property
-    def is_voice_active(self) -> bool:
-        return self._is_voice_active
-
-    def set_active(self, active: bool) -> None:
-        if self._is_voice_active == active:
-            return
-        self._is_voice_active = active
-        if active:
-            self._anim_timer.start()
-        else:
-            self._anim_timer.stop()
-            self._bar_heights = [4.0, 12.0, 8.0, 3.5]
-        self.update()
-
-    def set_clip_bounds(self, w: float, h: float) -> None:
-        """Set dynamic bounds of the outer morphing pill to clip overflow cleanly."""
-        self._clip_w = w
-        self._clip_h = h
-        self.update()
-
-    def toggle_voice_mode(self) -> None:
-        new_state = not self._is_voice_active
-        self.set_active(new_state)
-        self.voice_clicked.emit(new_state)
-
-    def _on_anim_tick(self) -> None:
-        patterns = [
-            [4.0, 12.0, 8.0, 3.5],
-            [7.0, 8.0, 13.0, 6.0],
-            [10.0, 5.0, 10.0, 9.0],
-            [6.0, 13.0, 6.0, 11.0],
-            [9.0, 10.0, 12.0, 5.0],
-            [5.0, 7.0, 9.0, 3.5],
-        ]
-        self._anim_step = (self._anim_step + 1) % len(patterns)
-        self._bar_heights = patterns[self._anim_step]
-        self.update()
-
-    def set_morph(self, scale: float, opacity: float) -> None:
-        self._scale = max(0.0, min(1.0, scale))
-        self._opacity = max(0.0, min(1.0, opacity))
-        self.update()
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        cx = self.width() / 2.0
-        new_hover = "edit" if event.position().x() < cx else "voice"
-        if new_hover != self._hover_btn:
-            self._hover_btn = new_hover
-            self.update()
-
-    def leaveEvent(self, event: object) -> None:  # noqa: N802
-        self._hover_btn = None
-        self.update()
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton:
-            cx = self.width() / 2.0
-            if event.position().x() < cx:
-                self.edit_clicked.emit()
-                self.clicked.emit()
-            else:
-                self.toggle_voice_mode()
-
-    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
-        self._anim_timer.stop()
-        super().closeEvent(event)
-
-    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        cx = self.width() / 2.0
-        cy = self.height() / 2.0
-
-        alpha = int(255 * self._opacity)
-        if alpha <= 0 or self._scale <= 0.05:
-            return
-
-        painter.save()
-        # Clip to dynamic pill container shape so icons never bleed outside
-        if hasattr(self, "_clip_w") and hasattr(self, "_clip_h"):
-            clip_path = QPainterPath()
-            rx = cx - self._clip_w / 2.0
-            ry = cy - self._clip_h / 2.0
-            clip_rad = self._clip_h / 2.0
-            clip_path.addRoundedRect(QRectF(rx, ry, self._clip_w, self._clip_h), clip_rad, clip_rad)
-            painter.setClipPath(clip_path)
-
-        painter.translate(cx, cy)
-        painter.scale(self._scale, self._scale)
-        painter.translate(-cx, -cy)
-        # 1. Hover rounded background
-        if self._scale > 0.85 and self._hover_btn:
-            painter.setBrush(QColor(241, 245, 249, int(alpha * 0.9)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            if self._hover_btn == "edit":
-                painter.drawRoundedRect(QRectF(cx - 36, cy - 12, 34, 24), 10, 10)
-            elif self._hover_btn == "voice":
-                painter.drawRoundedRect(QRectF(cx + 2, cy - 12, 34, 24), 10, 10)
-
-        # 2. Left Icon (SquarePen)
-        target_rect = QRectF(cx - 19 - 7.5, cy - 7.5, 15, 15)
-        self._edit_renderer.render(painter, target_rect)
-
-        # 3. Middle Divider
-        painter.setPen(QPen(QColor(229, 231, 235, alpha), 1.0))
-        painter.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
-
-        # 4. Right Waveform
-        color = (
-            QColor(37, 99, 235, alpha) if self._is_voice_active else QColor(51, 65, 85, alpha)
-        )
-        pen = QPen(color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-
-        vx = cx + 19.0
-        spacing = 3.2
-        xs = [vx - 1.5 * spacing, vx - 0.5 * spacing, vx + 0.5 * spacing, vx + 1.5 * spacing]
-        for x, h in zip(xs, self._bar_heights, strict=False):
-            painter.drawLine(
-                int(round(x)),
-                int(round(cy - h / 2.0)),
-                int(round(x)),
-                int(round(cy + h / 2.0)),
-            )
-
-        painter.restore()
-
-
-class _EditIconButton(QWidget):
-    clicked = Signal()
-
-
-class _DividerWidget(QWidget):
-    pass
-
-
-class _WaveformIconButton(QWidget):
-    clicked = Signal()
-
 class SliceFeederBar(QWidget):
     """1:1 Codex-style docked interaction pill bar positioned directly beneath the pet.
 
-    - Handle mode (idle): Small white pill handle beneath the pet feet.
-    - Pill mode (hover): Expands into [ Edit | Divider | Waveform ].
-    - Input mode (clicked): Expands into [ + ] [ 开始新聊天 ] [ ↑ ].
+    Uses single-painter unified architecture matching Codex:
+    - Handle mode: 28x6px white pill handle beneath the pet feet.
+    - Pill mode: Expands into [ Edit | Divider | Waveform ] with synchronous concentric scaling.
+    - Input mode: Expands horizontally into [ + ] [ 开始新聊天 ] [ ↑ ].
     """
 
     slice_submitted = Signal(str)
     cancelled = Signal()
-    voice_clicked = Signal(bool)  # True = listening started, False = listening stopped
-    mode_changed = Signal(bool)  # True = expanded (input), False = collapsed (handle/pill)
+    voice_clicked = Signal(bool)
+    mode_changed = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -408,61 +246,62 @@ class SliceFeederBar(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setMouseTracking(True)
+
         self._current_mode = MODE_HANDLE
         self._last_pet_pos: QPoint | None = None
         self._last_pet_size: tuple[int, int] | None = None
         self._drag_offset: QPoint | None = None
 
-        # Container widgets for different modes
-        self._handle_widget = QWidget(self)
-        self._pill_widget = QWidget(self)
-        self._input_widget = QWidget(self)
+        # Content state for pill controls
+        self._edit_renderer = QSvgRenderer(QByteArray(_EDIT_ICON_SVG.encode("utf-8")), self)
+        self._hover_btn: str | None = None
+        self._is_voice_active = False
+        self._bar_heights: list[float] = [4.0, 12.0, 8.0, 3.5]
+        self._anim_step = 0
 
-        self._setup_pill_ui()
-        self._setup_input_ui()
+        # Voice pulse animation timer
+        self._voice_timer = QTimer(self)
+        self._voice_timer.setInterval(110)
+        self._voice_timer.timeout.connect(self._on_voice_tick)
 
-        # Retract debouncer timer (300ms matching Codex compactDismissDelayMs)
+        # Retract timer (300ms matching Codex compactDismissDelayMs)
         self._retract_timer = QTimer(self)
         self._retract_timer.setSingleShot(True)
-        self._retract_timer.setInterval(300)
+        self._retract_timer.setInterval(DISMISS_DELAY_MS)
         self._retract_timer.timeout.connect(self._on_retract_timeout)
 
-        # Smooth Morphing Animation (spring-like fluid transition matching Codex)
+        # Smooth morphing animation
         self._morph_anim = QVariantAnimation(self)
-        self._morph_anim.setDuration(280)
+        self._morph_anim.setDuration(MORPH_DURATION_MS)
         self._morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._morph_anim.valueChanged.connect(self._on_morph_step)
         self._morph_anim.finished.connect(self._on_morph_finished)
-        self._pill_opacity = QGraphicsOpacityEffect(self._pill_widget)
-        self._pill_widget.setGraphicsEffect(self._pill_opacity)
-        self._input_opacity = QGraphicsOpacityEffect(self._input_widget)
-        self._input_widget.setGraphicsEffect(self._input_opacity)
 
+        self._morph_val: float = 0.0  # 0.0 = handle, 1.0 = pill
         self._from_w: int = HANDLE_PILL_WIDTH + SHADOW_MARGIN * 2
         self._from_h: int = HANDLE_PILL_HEIGHT + SHADOW_MARGIN * 2
         self._to_w: int = self._from_w
         self._to_h: int = self._from_h
 
-        # Start in handle mode (compact 28x6px white handle)
-        self._apply_mode(MODE_HANDLE, animate=False)
-    def _setup_pill_ui(self) -> None:
-        layout = QHBoxLayout(self._pill_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        # Input container widget (only visible during MODE_INPUT)
+        self._input_widget = QWidget(self)
+        self._setup_input_ui()
+        self._input_widget.hide()
 
-        self._pill_controls = _PillControlsWidget(self._pill_widget)
-        self._pill_controls.edit_clicked.connect(self.expand_input)
-        self._pill_controls.voice_clicked.connect(self.voice_clicked.emit)
-        self._btn_edit = self._pill_controls
-        self._btn_voice = self._pill_controls
-        layout.addWidget(self._pill_controls)
+        # Dummy button aliases for backward compatibility with older tests
+        self._btn_edit = self
+        self._btn_voice = self
+
+        # Initialize in handle mode
+        self._apply_mode(MODE_HANDLE, animate=False)
 
     def _setup_input_ui(self) -> None:
         layout = QHBoxLayout(self._input_widget)
         layout.setContentsMargins(6, 3, 6, 3)
         layout.setSpacing(6)
 
-        # Left Plus Button (circular button with +)
+        # Left Plus Button
         self._btn_plus = _CircleIconButton(
             size=22,
             bg_color="#F1F5F9",
@@ -482,7 +321,7 @@ class SliceFeederBar(QWidget):
         self._input.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._input, 1)
 
-        # Right Send Button (circular blue button with white up-arrow)
+        # Right Send Button
         self._btn_submit = _CircleIconButton(
             size=24,
             bg_color="#93C5FD",
@@ -496,7 +335,6 @@ class SliceFeederBar(QWidget):
         layout.addWidget(self._btn_submit)
 
     def _on_text_changed(self, text: str) -> None:
-        """Update submit button color dynamically when text is entered."""
         if text.strip():
             self._btn_submit.set_bg_color("#3B82F6")
             self._btn_submit.set_hover_bg("#2563EB")
@@ -508,6 +346,52 @@ class SliceFeederBar(QWidget):
         self._input.clear()
         self._input.setFocus()
 
+    # ------------------------------------------------------------------
+    # Voice state
+    # ------------------------------------------------------------------
+    @property
+    def is_active(self) -> bool:
+        return self._is_voice_active
+
+    @property
+    def is_voice_active(self) -> bool:
+        return self._is_voice_active
+
+    def set_active(self, active: bool) -> None:
+        if self._is_voice_active == active:
+            return
+        self._is_voice_active = active
+        if active:
+            self._voice_timer.start()
+        else:
+            self._voice_timer.stop()
+            self._bar_heights = [4.0, 12.0, 8.0, 3.5]
+        self.update()
+
+    def set_voice_active(self, active: bool) -> None:
+        self.set_active(active)
+
+    def _toggle_voice_mode(self) -> None:
+        new_state = not self._is_voice_active
+        self.set_active(new_state)
+        self.voice_clicked.emit(new_state)
+
+    def _on_voice_tick(self) -> None:
+        patterns = [
+            [4.0, 12.0, 8.0, 3.5],
+            [7.0, 8.0, 13.0, 6.0],
+            [10.0, 5.0, 10.0, 9.0],
+            [6.0, 13.0, 6.0, 11.0],
+            [9.0, 10.0, 12.0, 5.0],
+            [5.0, 7.0, 9.0, 3.5],
+        ]
+        self._anim_step = (self._anim_step + 1) % len(patterns)
+        self._bar_heights = patterns[self._anim_step]
+        self.update()
+
+    # ------------------------------------------------------------------
+    # Modes & Transitions
+    # ------------------------------------------------------------------
     @property
     def current_mode(self) -> str:
         return self._current_mode
@@ -515,18 +399,6 @@ class SliceFeederBar(QWidget):
     @property
     def is_expanded(self) -> bool:
         return self._current_mode == MODE_INPUT
-
-    @property
-    def is_voice_active(self) -> bool:
-        return self._btn_voice.is_active
-
-    def set_voice_active(self, active: bool) -> None:
-        self._btn_voice.set_active(active)
-
-    def _toggle_voice_mode(self) -> None:
-        new_state = not self._btn_voice.is_active
-        self._btn_voice.set_active(new_state)
-        self.voice_clicked.emit(new_state)
 
     def show_handle(self) -> None:
         """Switch to tiny pill handle mode."""
@@ -556,6 +428,7 @@ class SliceFeederBar(QWidget):
         """Collapse back from input mode to handle mode."""
         self._input.clear()
         self.show_handle()
+
     def toggle_input(self) -> None:
         if self._current_mode == MODE_INPUT:
             self.collapse()
@@ -565,14 +438,11 @@ class SliceFeederBar(QWidget):
     def _apply_mode(self, mode: str, *, animate: bool = True) -> None:
         self._current_mode = mode
 
-        # Strict container isolation to completely prevent widget overlapping
+        # Strict isolation: hide input widget immediately when entering handle or pill
         if mode == MODE_INPUT:
-            self._pill_widget.hide()
-            self._handle_widget.hide()
             pill_w, pill_h = INPUT_WIDTH, INPUT_HEIGHT
         elif mode == MODE_PILL:
             self._input_widget.hide()
-            self._handle_widget.hide()
             pill_w, pill_h = PILL_WIDTH, PILL_HEIGHT
         else:  # MODE_HANDLE
             self._input_widget.hide()
@@ -581,7 +451,6 @@ class SliceFeederBar(QWidget):
         target_w = pill_w + SHADOW_MARGIN * 2
         target_h = pill_h + SHADOW_MARGIN * 2
 
-        # In offscreen test environments, set size immediately without waiting for timers
         is_offscreen = QApplication.platformName() == "offscreen"
         if animate and self.isVisible() and not is_offscreen:
             self._from_w = self.width()
@@ -606,36 +475,16 @@ class SliceFeederBar(QWidget):
 
         if self._current_mode == MODE_PILL:
             self._input_widget.hide()
-            self._handle_widget.hide()
-            inner_w = float(cur_w - SHADOW_MARGIN * 2)
-            inner_h = float(cur_h - SHADOW_MARGIN * 2)
-            px = int(round(SHADOW_MARGIN + (inner_w - PILL_WIDTH) / 2.0))
-            py = int(round(SHADOW_MARGIN + (inner_h - PILL_HEIGHT) / 2.0))
-            self._pill_widget.setGeometry(px, py, PILL_WIDTH, PILL_HEIGHT)
-            self._pill_widget.show()
-            # Synchronous scale and fade: icons scale from 0.25x to 1.0x smoothly
-            scale = 0.25 + 0.75 * val
-            opacity = max(0.0, min(1.0, val * 1.3))
-            self._pill_controls.set_clip_bounds(inner_w, inner_h)
-            self._pill_controls.set_morph(scale, opacity)
+            self._morph_val = val
         elif self._current_mode == MODE_HANDLE:
             self._input_widget.hide()
-            inner_w = float(cur_w - SHADOW_MARGIN * 2)
-            inner_h = float(cur_h - SHADOW_MARGIN * 2)
-            px = int(round(SHADOW_MARGIN + (inner_w - PILL_WIDTH) / 2.0))
-            py = int(round(SHADOW_MARGIN + (inner_h - PILL_HEIGHT) / 2.0))
-            self._pill_widget.setGeometry(px, py, PILL_WIDTH, PILL_HEIGHT)
-            # Synchronous scale down: icons shrink from 1.0x to 0.25x smoothly
-            scale = 0.25 + 0.75 * (1.0 - val)
-            opacity = max(0.0, min(1.0, (1.0 - val) * 1.3))
-            self._pill_controls.set_clip_bounds(inner_w, inner_h)
-            self._pill_controls.set_morph(scale, opacity)
+            self._morph_val = 1.0 - val
         elif self._current_mode == MODE_INPUT:
-            self._pill_widget.hide()
-            self._handle_widget.hide()
-            self._input_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT)
+            self._morph_val = 0.0
+            self._input_widget.setGeometry(
+                SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
+            )
             self._input_widget.show()
-            self._input_opacity.setOpacity(max(0.0, min(1.0, (val - 0.2) / 0.8)))
 
         self.update()
 
@@ -643,29 +492,22 @@ class SliceFeederBar(QWidget):
         self._finalize_mode(self._current_mode, self._to_w, self._to_h)
 
     def _finalize_mode(self, mode: str, total_w: int, total_h: int) -> None:
-        self._handle_widget.hide()
-        self._pill_widget.hide()
-        self._input_widget.hide()
+        self.setFixedSize(total_w, total_h)
+        self._re_anchor()
 
-        if mode == MODE_HANDLE:
-            self._handle_widget.setGeometry(
-                SHADOW_MARGIN, SHADOW_MARGIN, HANDLE_PILL_WIDTH, HANDLE_PILL_HEIGHT
-            )
-            self._handle_widget.show()
-        elif mode == MODE_PILL:
-            self._pill_widget.setGeometry(
-                SHADOW_MARGIN, SHADOW_MARGIN, PILL_WIDTH, PILL_HEIGHT
-            )
-            self._pill_widget.show()
-            self._pill_controls.set_morph(1.0, 1.0)
-        else:  # MODE_INPUT
+        if mode == MODE_INPUT:
+            self._morph_val = 0.0
             self._input_widget.setGeometry(
                 SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
             )
             self._input_widget.show()
-            self._input_opacity.setOpacity(1.0)
-        self.setFixedSize(total_w, total_h)
-        self._re_anchor()
+        elif mode == MODE_PILL:
+            self._input_widget.hide()
+            self._morph_val = 1.0
+        else:  # MODE_HANDLE
+            self._input_widget.hide()
+            self._morph_val = 0.0
+
         self.update()
 
     def _re_anchor(self) -> None:
@@ -690,9 +532,7 @@ class SliceFeederBar(QWidget):
         if screen is not None:
             geom = screen.availableGeometry()
             margin = 8
-            # Clamping horizontally
             target_x = max(geom.left() + margin, min(target_x, geom.right() - total_w - margin))
-            # If bottom screen bound is reached, clamp or place above pet
             if target_y + total_h > geom.bottom() - margin:
                 above_y = pet_pos.y() - total_h - 4 + SHADOW_MARGIN
                 if above_y >= geom.top() + margin:
@@ -702,6 +542,9 @@ class SliceFeederBar(QWidget):
 
         self.move(target_x, target_y)
 
+    # ------------------------------------------------------------------
+    # Mouse & Proximity Events
+    # ------------------------------------------------------------------
     def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802
         super().enterEvent(event)
         self._retract_timer.stop()
@@ -710,11 +553,52 @@ class SliceFeederBar(QWidget):
 
     def leaveEvent(self, event: QEvent) -> None:  # noqa: N802
         super().leaveEvent(event)
-        if self._current_mode == MODE_PILL and not self._btn_voice.is_active:
-            self._retract_timer.start(300)
+        self._hover_btn = None
+        if self._current_mode == MODE_PILL and not self._is_voice_active:
+            self._retract_timer.start(DISMISS_DELAY_MS)
+        self.update()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self._current_mode == MODE_PILL and self._morph_val > 0.8:
+            margin = float(SHADOW_MARGIN)
+            cx = margin + (float(self.width()) - margin * 2.0) / 2.0
+            new_hover = "edit" if event.position().x() < cx else "voice"
+            if new_hover != self._hover_btn:
+                self._hover_btn = new_hover
+                self.update()
+        else:
+            if self._hover_btn is not None:
+                self._hover_btn = None
+                self.update()
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._current_mode == MODE_HANDLE:
+                self.show_pill()
+                event.accept()
+                return
+            if self._current_mode == MODE_PILL and self._morph_val > 0.6:
+                margin = float(SHADOW_MARGIN)
+                cx = margin + (float(self.width()) - margin * 2.0) / 2.0
+                if event.position().x() < cx:
+                    self.expand_input()
+                else:
+                    self._toggle_voice_mode()
+                event.accept()
+                return
+
+            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = None
+            self._save_pos()
+            event.accept()
 
     def _on_retract_timeout(self) -> None:
-        if self._current_mode == MODE_PILL and not self._btn_voice.is_active:
+        if self._current_mode == MODE_PILL and not self._is_voice_active:
             self.show_handle()
 
     def _on_submit(self) -> None:
@@ -731,38 +615,8 @@ class SliceFeederBar(QWidget):
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self._retract_timer.stop()
-        self._btn_voice.set_active(False)
+        self._voice_timer.stop()
         super().closeEvent(event)
-
-    # ------------------------------------------------------------------
-    # Dragging Support (active when standalone / not docked to pet)
-    # ------------------------------------------------------------------
-    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton:
-            if self._current_mode == MODE_HANDLE:
-                self.show_pill()
-            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if self._drag_offset is not None:
-            cur_pos = event.globalPosition().toPoint()
-            new_pos = cur_pos - self._drag_offset
-            screen = self.screen() or QApplication.primaryScreen()
-            if screen is not None:
-                geom = screen.availableGeometry()
-                clamped_x = max(geom.left(), min(new_pos.x(), geom.right() - self.width()))
-                clamped_y = max(geom.top(), min(new_pos.y(), geom.bottom() - self.height()))
-                self.move(clamped_x, clamped_y)
-            else:
-                self.move(new_pos)
-            event.accept()
-
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_offset = None
-            self._save_pos()
-            event.accept()
 
     def _get_pos_file(self) -> Path:
         return Path("data") / "feeder_position.json"
@@ -798,7 +652,7 @@ class SliceFeederBar(QWidget):
         self.show_at_saved_or_center()
 
     # ------------------------------------------------------------------
-    # Rendering: Soft drop shadow + pure white rounded pill
+    # Single-Painter Unified Rendering (Concentric & Hard-Clipped)
     # ------------------------------------------------------------------
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802
         painter = QPainter(self)
@@ -807,12 +661,16 @@ class SliceFeederBar(QWidget):
         margin = float(SHADOW_MARGIN)
         pill_w = float(self.width() - SHADOW_MARGIN * 2)
         pill_h = float(self.height() - SHADOW_MARGIN * 2)
-        radius = pill_h / 2.0  # perfect capsule radius
+        radius = pill_h / 2.0
 
-        # Multi-pass soft diffused drop shadow (refined to match Codex)
+        # Exact center of the white capsule on every single frame
+        cx = margin + pill_w / 2.0
+        cy = margin + pill_h / 2.0
+
+        # 1. Soft diffused shadow
         for step in range(3):
             spread = 2.0 - float(step) * 0.7
-            alpha = int(4 + step * 4)  # 4, 8, 12
+            alpha = int(4 + step * 4)
             shadow_path = QPainterPath()
             shadow_path.addRoundedRect(
                 QRectF(
@@ -826,14 +684,66 @@ class SliceFeederBar(QWidget):
             )
             painter.fillPath(shadow_path, QColor(0, 0, 0, alpha))
 
-        # Solid pure white pill background
+        # 2. Pure white pill capsule background
         pill_path = QPainterPath()
         pill_path.addRoundedRect(QRectF(margin, margin, pill_w, pill_h), radius, radius)
         painter.fillPath(pill_path, QColor(255, 255, 255, 252))
 
-        # Delicate hairline outer border
+        # Hairline subtle border
         painter.setPen(QPen(QColor(0, 0, 0, 10), 1.0))
         painter.drawPath(pill_path)
+
+        # 3. Synchronously scaled and concentric pill icons (only when not in input mode)
+        if self._current_mode != MODE_INPUT and self._morph_val > 0.05:
+            # Official Codex: scale interpolates smoothly from contentHiddenScale (.75) to 1.0!
+            content_scale = CONTENT_HIDDEN_SCALE + (1.0 - CONTENT_HIDDEN_SCALE) * self._morph_val
+            content_opacity = self._morph_val
+            alpha = int(255 * content_opacity)
+
+            painter.save()
+            # Hard clip to the pill capsule so nothing can EVER bleed outside!
+            painter.setClipPath(pill_path)
+
+            painter.translate(cx, cy)
+            painter.scale(content_scale, content_scale)
+            painter.translate(-cx, -cy)
+
+            # Hover background when pill is fully or nearly expanded
+            if self._morph_val > 0.85 and self._hover_btn:
+                painter.setBrush(QColor(241, 245, 249, int(alpha * 0.9)))
+                painter.setPen(Qt.PenStyle.NoPen)
+                if self._hover_btn == "edit":
+                    painter.drawRoundedRect(QRectF(cx - 36, cy - 12, 34, 24), 10, 10)
+                elif self._hover_btn == "voice":
+                    painter.drawRoundedRect(QRectF(cx + 2, cy - 12, 34, 24), 10, 10)
+
+            # Middle divider
+            painter.setPen(QPen(QColor(229, 231, 235, alpha), 1.0))
+            painter.drawLine(QPointF(cx, cy - 6), QPointF(cx, cy + 6))
+
+            # Left icon (SquarePen)
+            target_rect = QRectF(cx - 19.0 - 7.5, cy - 7.5, 15, 15)
+            self._edit_renderer.render(painter, target_rect)
+
+            # Right waveform
+            color = (
+                QColor(37, 99, 235, alpha) if self._is_voice_active else QColor(51, 65, 85, alpha)
+            )
+            pen = QPen(color, 1.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+
+            vx = cx + 19.0
+            spacing = 3.2
+            xs = [vx - 1.5 * spacing, vx - 0.5 * spacing, vx + 0.5 * spacing, vx + 1.5 * spacing]
+            for x, h in zip(xs, self._bar_heights, strict=False):
+                painter.drawLine(
+                    int(round(x)),
+                    int(round(cy - h / 2.0)),
+                    int(round(x)),
+                    int(round(cy + h / 2.0)),
+                )
+
+            painter.restore()
 
 
 # Alias for 100% backward compatibility with all existing tests and imports
