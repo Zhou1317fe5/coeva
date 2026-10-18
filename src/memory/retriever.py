@@ -171,6 +171,11 @@ class MemoryRetriever:
                     if len(recalled_slices) >= limit:
                         break
 
+        # If an explicit date was requested, we strictly honor the temporal target
+        # and do not backfill with unrelated dates.
+        if target_date is not None:
+            return recalled_slices[:limit]
+
         # ── 2. Topic / Keyword Substring Search ──
         keywords = self._extract_keywords(clean_q)
         if keywords and len(recalled_slices) < limit:

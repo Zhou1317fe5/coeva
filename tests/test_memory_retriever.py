@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
-from src.core.personality import build_system_prompt, format_memory_snippet, load_personality
+from src.core.personality import build_system_prompt, load_personality
 from src.memory.retriever import MemoryRetriever
 from src.memory.store import ChronicleStore, SliceRecord
 
@@ -201,7 +201,7 @@ def test_system_prompt_injection() -> None:
     )
     prompt = build_system_prompt(profile, memories=memories)
 
-    assert "【你与用户的过往真实经历记忆" in prompt
+    assert "【你与用户过往的真实经历记忆" in prompt
     assert "挺顺的，一直在开发桌宠项目" in prompt
     assert "目前在优化交流功能还有你的形象和行为" in prompt
 
