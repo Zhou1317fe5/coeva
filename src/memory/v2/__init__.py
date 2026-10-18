@@ -1,0 +1,83 @@
+"""Memory V2 package root.
+
+Provides access to V2.1 entities, schema definitions, and ChronicleStoreV2.
+"""
+
+from __future__ import annotations
+
+from src.memory.v2.entities import (
+    CalibrationEventEntity,
+    ChapterEpisodeLinkEntity,
+    ChapterInsightLinkEntity,
+    ChapterMetadataEntity,
+    ChapterSliceLinkEntity,
+    ConfirmedInsightEntity,
+    EpisodeEntity,
+    EpisodeEventLinkEntity,
+    EpisodeSliceLinkEntity,
+    EventSkeletonEntity,
+    EvidenceReinforcementEntity,
+    HypothesisEntity,
+    HypothesisObservationLinkEntity,
+    ObservationEntity,
+    ObservationEpisodeLinkEntity,
+    ObservationEventLinkEntity,
+    ObservationMemoryLinkEntity,
+    ObservationSliceLinkEntity,
+    RawSliceEntity,
+    SemanticMemoryEntity,
+)
+from src.memory.v2.router import RawEvidenceRouter
+from src.memory.v2.store import (
+    CANONICAL_TABLES,
+    SCHEMA_VERSION,
+    TECHNICAL_METADATA_TABLES,
+    ChronicleStoreV2,
+    SchemaDriftError,
+)
+from src.memory.v2.write_service import (
+    RawEvidenceWriteService,
+    WriteConflictError,
+    WriteDurabilityError,
+    WriteEventCommand,
+    WriteEventResult,
+    WriteSliceCommand,
+    WriteSliceResult,
+)
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "CANONICAL_TABLES",
+    "TECHNICAL_METADATA_TABLES",
+    "SchemaDriftError",
+    "ChronicleStoreV2",
+    "RawSliceEntity",
+    "EventSkeletonEntity",
+    "EpisodeEntity",
+    "EpisodeSliceLinkEntity",
+    "EpisodeEventLinkEntity",
+    "SemanticMemoryEntity",
+    "EvidenceReinforcementEntity",
+    "ObservationEntity",
+    "ObservationSliceLinkEntity",
+    "ObservationEventLinkEntity",
+    "ObservationMemoryLinkEntity",
+    "ObservationEpisodeLinkEntity",
+    "HypothesisEntity",
+    "HypothesisObservationLinkEntity",
+    "CalibrationEventEntity",
+    "ConfirmedInsightEntity",
+    "ChapterMetadataEntity",
+    "ChapterSliceLinkEntity",
+    "ChapterEpisodeLinkEntity",
+    "ChapterInsightLinkEntity",
+    "ChapterInsightLinkEntity",
+    "RawEvidenceWriteService",
+    "WriteSliceCommand",
+    "WriteSliceResult",
+    "WriteEventCommand",
+    "WriteEventResult",
+    "WriteConflictError",
+    "WriteDurabilityError",
+    "RawEvidenceRouter",
+]

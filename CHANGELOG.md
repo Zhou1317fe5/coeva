@@ -6,6 +6,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Memory V2.1 Stage 2: Raw Evidence Write Path (WP-2)
+
+### ✍️ Memory V2.1 Raw Evidence Write Path (WP-2)
+- **实现原生轻量写入服务 (`src/memory/v2/write_service.py`)**：
+  - `RawEvidenceWriteService` 提供类型化、原子持久化与幂等冲突校验的底座证据写入管道；
+  - `write_slice()`：严格维护内容保真（Content Fidelity，零 LLM 篡改/摘要）、作用域合规（未指定工程安全归入 `unresolved`，绝不自动晋升为 `global`）；
+  - `write_event()`：严格强制隐私硬边界（W-S05），彻底剥离丢弃外部 Agent Prompt 正文、思考链（CoT）、工具执行完整返回值与崩溃栈，仅保留结构化遥测骨架。
+- **落实核心物理写入不变量（`ACKED WRITE MUST BE DURABLE`）**：
+  - 只有在 SQLite 主事务 COMMIT 物理落盘成功后，写入器方才向调用方返回成功 ACK；
+  - 事务失败直接抛出 `WriteDurabilityError`，绝对无半生效记录，绝对不使用易失性内存队列假 ACK。
+- **实现三态幂等与确定性冲突防御（Idempotency & Conflict Fail-Closed）**：
+  - 同一标识符与相同 Payload 重放判定为 `idempotent_replay`，安全返回现有记录并不增加物理行；
+  - 同一标识符携带变异 Payload 立即抛出 `WriteConflictError` 并直接 Fail-Closed 阻断，原始记录 100% 完好；
+  - 彻底杜绝使用 SQLite 隐式 `rowid` 作为业务主键。
+- **实现路由边界抽象 (`src/memory/v2/router.py`)**：
+  - `RawEvidenceRouter` 依赖特性开关隔离生产环境与沙箱测试；
+  - 生产环境默认 `memory_v2_storage = False`，100% 锁定 V1 写入路径与现有 JSONL 双写；
+  - 沙箱隔离测试下显式绑定 V2 仓储与服务执行。
+- **新增 Stage 2 全量自动化测试套件 (`tests/memory_v2/`)**：
+  - `test_write_service_slices.py`：覆盖 W-S01, W-S03, W-S04, W-S12（保真度、作用域、派生表零副作用）；
+  - `test_write_service_events.py`：覆盖 W-S05（隐私脱敏与遥测骨架白名单）；
+  - `test_write_durability.py`：覆盖 W-S01, W-S02（提交前不可 ACK、故障回滚零残留）；
+  - `test_write_idempotency.py`：覆盖 W-S06, W-S07, W-S08（重放幂等、冲突阻断、无 rowid 依赖）；
+  - `test_write_routing.py`：覆盖 W-S09, W-S10, W-S11（生产路由锁定 V1、沙箱路由切 V2、生产库物理零触碰）。
+
+---
+
+## [Unreleased] - Memory V2.1 Stage 1: V2.1 Storage Layer & Schema Abstraction (WP-1)
+
+### 💾 Memory V2.1 Storage Layer & Schema Abstraction
+- **关键外键删除语义治理与防盲目级联修复 (`src/memory/v2/schema.sql`)**：
+  - 依据 Frozen Logical Data Model 规范，全面废除 18 处关键证据/溯源外键上的 `ON DELETE CASCADE` 与 `SET NULL`，严格替换为 `ON DELETE RESTRICT`；
+  - 确保直接物理 `DELETE` 底座证据在未由应用层完成认知降级/脱敏前必须触发 `IntegrityError` Fail-Closed；
+  - 严格审计并仅在 11 处纯所有权附属边（如经历/观察/假说所专属拥有的映射行）上保留 `ON DELETE CASCADE`。
+- **IMPL-2 强类型多源溯源物理闭环**：
+  - `semantic_memories` 原生支持直接引用 `raw_slices`、`event_skeletons` 与 `episodes`；
+  - 引入 SQLite 引擎级 CHECK 约束（`source_slice_id IS NOT NULL OR source_event_id IS NOT NULL OR source_episode_id IS NOT NULL`），彻底物理阻断零证据孤儿记忆入库；
+  - 提供覆盖索引反向遍历 API（`get_memories_by_source_*`）与强类型 `get_provenance_refs_for_memory` 输出。
+- **新增 Stage 1 外键删除语义与溯源专项测试 (`tests/memory_v2/`)**：
+  - `test_storage_fk_delete_semantics.py`：覆盖 S1-D01 ~ S1-D07，验证底座直接删除阻断、应用层事务清理后删除成功、纯所有权级联清理而证据完好；
+  - `test_storage_provenance.py`：覆盖 S1-P01 ~ S1-P06，验证三源溯源有效性、零溯源阻断与反向索引命中。
+- **实现权威 20 大实体与技术元数据 DDL (`src/memory/v2/schema.sql`)**：
+  - 严格映射 Frozen Logical Data Model 20 大实体与 4 大技术运维/迁移元数据表；
+  - 原生强外键约束（`PRAGMA foreign_keys = ON`）与 WAL 模式；
+  - 强制性作用域与枚举 CHECK 约束，彻底断绝伪多态外键。
+- **实现强类型数据模型 (`src/memory/v2/entities.py`)**：
+  - 20 个强类型不可变 `@dataclass(frozen=True)` 实体与 4 个技术记录类；
+  - 严格类型注解与 Literal 枚举约束。
+- **实现最小仓储与显式事务底座 (`src/memory/v2/store.py`)**：
+  - 独立连接所有权（`check_same_thread=True`，杜绝跨线程不安全复用）；
+  - 显式原子事务管理器 `with store.transaction():`；
+  - Schema 契约验证与漂移检测（`validate_schema_contract()`），漂移直接 Fail-Closed。
+- **新增 Stage 1 自动化测试套件 (`tests/memory_v2/`)**：
+  - `test_storage_schema.py`：验证沙箱库初始化、20 大实体完备性、技术元数据隔离、版本识别与漂移防御；
+  - `test_storage_crud.py`：覆盖全实体类型化 CRUD 读写；
+  - `test_storage_fk_integrity.py`：覆盖外键断绝悬空、类型化靶向约束与 CHECK 枚举测试；
+  - `test_storage_transactions.py`：覆盖多写原子性、异常回滚零残留、多线程独立连接共存与生产数据库零触碰证明。
+- **严格遵守范围红线**：生产库 `data/companion_chronicle.db` 原封不动，生产 V2 写入器未激活，未进入 Stage 2。
+
+
+### 🛡️ Memory V2.1 Safety Harness & Feature Flags
+- **实现细粒度特性开关体系（`src/core/flags.py`）**：
+  - 包含 `memory_v2_storage`, `memory_v2_retrieval`, `memory_v2_consolidation`, `memory_v2_self_model`, `memory_v2_migration`, `memory_v2_backfill`；
+  - 全量开关**严格默认全部为 False（OFF）**；
+  - 编码实现特性开关依赖矩阵校验（I-S05），非法配置组合直接 Fail-Closed 拒绝启动；
+  - 支持层级覆盖：默认值 $\rightarrow$ `agent_settings.json` $\rightarrow$ 环境变量（`COEVA_FLAG_*`）$\rightarrow$ 单元测试 `@override_flags`。
+- **接入轻量启动验证与开发诊断**：
+  - 在 `run_companion.py` 启动阶段引入 `validate_memory_v2_configuration()` 薄调用；
+  - 默认状态下输出 `selected_path = "v1"`，V1 运行时行为 100% 保持不变；
+  - 绝无敏感 Prompt、CoT 或用户原话日志泄露。
+- **建立黄金回归基准测试架构（`tests/memory_v2/`）**：
+  - `test_feature_flags.py`：覆盖默认值、配置持久化、环境变量与上下文管理器；
+  - `test_flag_dependencies.py`：覆盖依赖矩阵、非法组合 Fail-Closed 与合法组合演进；
+  - `test_v1_default_behavior.py`：证实默认全 OFF 下 V1 切片双写、事件写入、Retriever 与避风港 100% 正常；
+  - `test_stage0_invariants.py`：建立 10 大实施安全断言（I-S01 ~ I-S10）追溯清单，验证 Stage 0 Exit Gate 全部通过。
+- **严格遵守范围红线**：零生产代码越级修改，零生产数据库改动，零 V2 权威写入开启。
+
+
 ## [Unreleased] - UI: 完全参照 Clawd on Desk 重构“打开足迹”记忆档案库界面
 
 ### 🎨 UI & UX Modernization（足迹档案库纯白轻量化）

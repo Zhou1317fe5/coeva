@@ -1,0 +1,595 @@
+{
+  "dev_set": [
+    {
+      "id": "DEV_A_NEW_FACT",
+      "category": "A. New fact",
+      "input_slice": {
+        "id": "slice_in_01",
+        "content": "我的主显示器换成了 4K 144Hz 的 LG 27GP95R。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_101",
+        "project_id": null
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "notes": "此前无显示器事实，准入且新增为 active 语义事实 (无前置目标不能 SUPERSEDE)"
+    },
+    {
+      "id": "DEV_B_DUP_TRANSPORT",
+      "category": "B. Duplicate transport",
+      "input_slice": {
+        "id": "slice_in_02_retry",
+        "content": "我的主显示器换成了 4K 144Hz 的 LG 27GP95R。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:02+00:00",
+        "session_id": "sess_101",
+        "ingestion_dedup_key": "dedup_lg_display_hash",
+        "project_id": null
+      },
+      "existing_key_matched": true,
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "2秒内双击或网络重试物理防抖，物理层直接 NOOP"
+    },
+    {
+      "id": "DEV_C_REINFORCE",
+      "category": "C. Same meaning new independent evidence",
+      "input_slice": {
+        "id": "slice_in_03_month_later",
+        "content": "顺便说下，这台 4K 144Hz LG 显示器打代码确实比旧的舒服多了。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-11-17T12:00:00+00:00",
+        "session_id": "sess_205",
+        "episode_id": "ep_display_review",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_display_lg_27gp",
+      "expected_admission": "ADMIT",
+      "expected_action": "REINFORCE",
+      "expected_proof_delta": 1,
+      "notes": "跨月跨会话独立重申同一事实，增加 proof_count"
+    },
+    {
+      "id": "DEV_D_PREF_SUPERSEDE",
+      "category": "D. Explicit preference change",
+      "input_slice": {
+        "id": "slice_in_04_terminal_change",
+        "content": "我现在开发全面迁移到 PowerShell 7 了，不再用 CMD。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_102",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_term_cmd",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "显式偏好更替：旧事实置为 superseded，新事实生效"
+    },
+    {
+      "id": "DEV_E_WEAK_CONFLICT",
+      "category": "E. Weak conflict",
+      "input_slice": {
+        "id": "slice_in_05_tabs_vs_spaces",
+        "content": "有些前端项目用 2 格缩进看起来也挺紧凑好看的。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_103",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_indent_4",
+      "expected_admission": "ADMIT",
+      "expected_action": "AMBIGUOUS",
+      "expected_proof_delta": 0,
+      "notes": "与已有 4 格缩进偏好表面冲突但不足以断言推翻，标记 ambiguous 不得覆盖"
+    },
+    {
+      "id": "DEV_F_USER_CORRECTION",
+      "category": "F. User correction",
+      "input_slice": {
+        "id": "slice_in_06_correction",
+        "content": "刚才我说错了，那个项目用的其实是 PySide6 不是 PyQt5。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_104",
+        "project_id": "co-evolving-companion"
+      },
+      "target_existing_memory": "mem_fact_gui_pyside",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "用户显式纠错，以最高主观权威置换对应前置事实"
+    },
+    {
+      "id": "DEV_G_SHORT_LIVED",
+      "category": "G. Short-lived statement",
+      "input_slice": {
+        "id": "slice_in_07_lunch",
+        "content": "先去吃个午饭，半小时后回来。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_105",
+        "project_id": null
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "纯瞬时日常日程，无长期持久语义价值，准入直接 NOOP"
+    },
+    {
+      "id": "DEV_H_RULE_ADD",
+      "category": "H. Relationship rule",
+      "input_slice": {
+        "id": "slice_in_08_rule",
+        "content": "以后我专注写代码时，千万别弹窗打扰我或提醒我喝水。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_106",
+        "project_id": null
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "notes": "相处硬边界设立，高优先级落盘为 relationship_rule"
+    },
+    {
+      "id": "DEV_I_RULE_CHANGE",
+      "category": "I. Relationship rule later changed",
+      "input_slice": {
+        "id": "slice_in_09_rule_change",
+        "content": "之前说别提醒喝水，现在觉得工作超过 3 小时还是轻轻提醒我一下吧。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-11-07T12:00:00+00:00",
+        "session_id": "sess_180",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_rule_no_interrupt_rest",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "用户改变相处规则：相处规则不是永恒真理，支持正常版本更替"
+    },
+    {
+      "id": "DEV_J_SAME_EPISODE_REP",
+      "category": "J. Same-episode repetition",
+      "input_slice": {
+        "id": "slice_in_10_chatter",
+        "content": "这 PySide6 确实挺不错的，今天一直在用 PySide6 写样式。",
+        "actor": "user",
+        "source": "bubble_reply",
+        "occurred_at": "2026-10-18T12:10:00+00:00",
+        "session_id": "sess_104",
+        "episode_id": "ep_pyside_work",
+        "project_id": "co-evolving-companion"
+      },
+      "target_existing_memory": "mem_fact_gui_pyside",
+      "expected_admission": "ADMIT",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "同一 Episode/Session 内部的反复提及，独立性指纹重复，proof_count 不递增"
+    },
+    {
+      "id": "DEV_K_CROSS_EPISODE_REAF",
+      "category": "K. Cross-episode reaffirmation",
+      "input_slice": {
+        "id": "slice_in_11_reaf",
+        "content": "经过几个月的迭代，事实证明选择 PySide6 作为桌宠表现层是完全正确的决定。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-12-17T12:00:00+00:00",
+        "session_id": "sess_310",
+        "episode_id": "ep_months_later_review",
+        "project_id": "co-evolving-companion"
+      },
+      "target_existing_memory": "mem_fact_gui_pyside",
+      "expected_admission": "ADMIT",
+      "expected_action": "REINFORCE",
+      "expected_proof_delta": 1,
+      "notes": "数月后跨经历显式再确认，指纹独立，成功增加支撑计数"
+    },
+    {
+      "id": "DEV_L_CONNECTOR_REPLAY",
+      "category": "L. Connector replay",
+      "input_event": {
+        "event_id": "evt_replay_01",
+        "session_id": "sess_104",
+        "event_type": "tool_failure",
+        "tool_name": "bash",
+        "error_category": "Timeout",
+        "is_replay": true
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "外部 Connector 重连重放的骨架事件，绝不触发记忆生成或加权"
+    },
+    {
+      "id": "DEV_M_LLM_ECHO_PURE_ACK",
+      "category": "M. LLM echo",
+      "input_slice": {
+        "id": "slice_in_12_echo_ack",
+        "content": "嗯，你说的对。",
+        "actor": "user",
+        "source": "bubble_reply",
+        "echoed_proposition": "你之前提到过偏好深色主题与暗黑模式对吧？",
+        "session_id": "sess_107",
+        "project_id": null
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "回音壁Case E1：纯附和不包含用户新创语义delta，准入门禁判为 NOOP"
+    },
+    {
+      "id": "DEV_N_UNKNOWN_SCOPE",
+      "category": "N. Unknown scope",
+      "input_slice": {
+        "id": "slice_in_13_unresolved",
+        "content": "把单元测试框架统一换成 pytest。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_108",
+        "project_id": null
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "expected_scope": "unresolved",
+      "notes": "无法确定工程归属时，强制赋予 scope='unresolved'，绝不偷渡为 global"
+    },
+    {
+      "id": "DEV_O_PROJECT_SCOPED",
+      "category": "O. Project-scoped fact",
+      "input_slice": {
+        "id": "slice_in_14_proj",
+        "content": "这个 CRM 门户后台我们用 FastAPI 编写 API 接口。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_109",
+        "project_id": "crm-web-portal"
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "expected_scope": "project",
+      "notes": "明确绑定的工程事实，仅在对应工程下成立"
+    },
+    {
+      "id": "DEV_P_USER_VS_TELEMETRY",
+      "category": "P. User self-description vs telemetry conflict",
+      "input_slice": {
+        "id": "slice_in_15_self_desc",
+        "content": "我频繁中断并不是因为逃避挫折，单纯是这个命令行工具的响应太慢了。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_110",
+        "project_id": "co-evolving-companion"
+      },
+      "conflicting_telemetry_id": "telemetry_inferred_avoidance",
+      "target_existing_memory": "telemetry_inferred_avoidance",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "用户主观解释权绝对优先于遥测行为推测"
+    },
+    {
+      "id": "DEV_Q_HISTORICAL_QUERYABLE",
+      "category": "Q. Historical fact queryable",
+      "query_target": "mem_pref_term_cmd",
+      "is_past_query": true,
+      "expected_admission": "ADMIT",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "被置失效的历史事实依然保留演化足迹，在历史查询中可读"
+    },
+    {
+      "id": "DEV_R_EVENT_PIN_UNPIN",
+      "category": "R. Event pin / unpin",
+      "event_id": "evt_crash_debug_001",
+      "linked_to_observation": true,
+      "expected_admission": "ADMIT",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "IMPL-1 闭环：被信念采纳时 Retention Pin，信念撤回后 Pin 释放"
+    },
+    {
+      "id": "DEV_S_HARD_DELETE_RECOMPUTE",
+      "category": "S. Hard Delete recompute",
+      "target_slice_to_delete": "slice_in_01",
+      "dependent_memories": [
+        "mem_display_lg_27gp"
+      ],
+      "expected_admission": "ADMIT",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "底层切片物理抹除，派生记忆置失效，原话明文残留为零"
+    },
+    {
+      "id": "DEV_T_PARTLY_CALIBRATION",
+      "category": "T. Partly calibration",
+      "candidate_hypothesis": {
+        "id": "hyp_delegation",
+        "statement": "在长链路复杂任务中，用户倾向于完全授权 Agent 自主闭环执行。"
+      },
+      "user_calibration": {
+        "action": "partly",
+        "note": "科研实验代码可以直接自主试，但生产架构改动必须先向我确认。"
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "expected_result_entity": "confirmed_insights",
+      "notes": "Partly 校准生成独立的 confirmed_insights 实体与校准后共识文本"
+    }
+  ],
+  "holdout_set": [
+    {
+      "id": "HOLD_01_NEGATION",
+      "category": "Negation Guard",
+      "input_slice": {
+        "id": "slice_h_01",
+        "content": "我不是不喜欢深色，只是不喜欢纯黑，深灰调其实挺舒服的。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_01",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_theme_dark",
+      "expected_admission": "ADMIT",
+      "expected_action": "AMBIGUOUS",
+      "expected_proof_delta": 0,
+      "notes": "否定句式防御：'不是不喜欢深色'不能错误推断为不喜欢深色并粗暴覆盖"
+    },
+    {
+      "id": "HOLD_02_THIRD_PERSON_QUOTE",
+      "category": "Quote / Third-Person Attribution",
+      "input_slice": {
+        "id": "slice_h_02",
+        "content": "我室友说他极度讨厌 React，觉得 JSX 语法反人类。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_02",
+        "project_id": null
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "第三人称引用过滤：他人主观厌恶绝对不能作为用户本人的长期偏好落盘"
+    },
+    {
+      "id": "HOLD_03_CONDITIONAL_PREF",
+      "category": "Conditional Preference",
+      "input_slice": {
+        "id": "slice_h_03",
+        "content": "做实验代码时我可以直接边写边试，但做产品架构时必须先定好设计规范。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_03",
+        "project_id": null
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "notes": "条件化偏好独立成项，不破坏既有单一通用偏好"
+    },
+    {
+      "id": "HOLD_04_TEMP_LOCAL_SCOPE",
+      "category": "Temporary Preference",
+      "input_slice": {
+        "id": "slice_h_04",
+        "content": "这次演示 demo 先临时别加复杂的错误重试逻辑了，跑通就行。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_04",
+        "project_id": "co-evolving-companion"
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "'这次先别'属于局部临时任务指令，无长期架构规则留存价值"
+    },
+    {
+      "id": "HOLD_05_EXPLICIT_CORRECTION",
+      "category": "Explicit User Correction",
+      "input_slice": {
+        "id": "slice_h_05",
+        "content": "不好意思，刚才我记错了，显卡其实是 RTX 4080 不是 4090。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_05",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_fact_gpu_4090",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "显式更正物理设备参数，以最高主观权威更替旧 4090 记录"
+    },
+    {
+      "id": "HOLD_06_WEAK_CONTRADICTION",
+      "category": "Weak Contradiction (Fail-Closed)",
+      "input_slice": {
+        "id": "slice_h_06",
+        "content": "偶尔在单文件临时脚本里用 Tab 制表符缩进其实也挺省事的。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_06",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_indent_4",
+      "expected_admission": "ADMIT",
+      "expected_action": "AMBIGUOUS",
+      "expected_proof_delta": 0,
+      "notes": "Fail-closed原则：偶发尝鲜不构成全局推翻，决绝草率 SUPERSEDE，标记 AMBIGUOUS"
+    },
+    {
+      "id": "HOLD_07_AMBIG_VS_SUPERSEDE",
+      "category": "Ambiguous vs Supersede",
+      "input_slice": {
+        "id": "slice_h_07",
+        "content": "有时候敲命令觉得命令行终端也挺繁琐的，不如图形界面点两下。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_07",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_term_cmd",
+      "expected_admission": "ADMIT",
+      "expected_action": "AMBIGUOUS",
+      "expected_proof_delta": 0,
+      "notes": "随口感慨并非正式弃用终端，严格保留 AMBIGUOUS，不可破坏性更替"
+    },
+    {
+      "id": "HOLD_08_ECHO_WITH_NEW_DELTA",
+      "category": "Echo Guard Delta-Aware (Case E2)",
+      "input_slice": {
+        "id": "slice_h_08",
+        "content": "嗯，不过现在改用浅色主题确实看久了更舒服。",
+        "actor": "user",
+        "source": "bubble_reply",
+        "echoed_proposition": "你之前提到过偏好深色主题对吧？",
+        "session_id": "sess_h_08",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_theme_dark",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "P0核心验证：伴生体回音剥离后，用户新创语义增量（浅色舒服）正常准入并触发更替！"
+    },
+    {
+      "id": "HOLD_09_ECHO_PARROT_NO_DELTA",
+      "category": "Echo Guard Parroting (Case E3)",
+      "input_slice": {
+        "id": "slice_h_09",
+        "content": "对啊，我之前是提到过偏好深色主题。",
+        "actor": "user",
+        "source": "bubble_reply",
+        "echoed_proposition": "你之前提到过偏好深色主题对吧？",
+        "session_id": "sess_h_09",
+        "project_id": null
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "P0核心验证：单纯鹦鹉学舌复述伴生体原话、无新语义增量者，判定为 NOOP，绝不刷分"
+    },
+    {
+      "id": "HOLD_10_LONG_AFTER_REAFFIRM",
+      "category": "Cross-Temporal Reaffirmation",
+      "input_slice": {
+        "id": "slice_h_10",
+        "content": "在任何项目里我都还是坚持 4 格缩进，代码整洁度确实完全不同。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2027-04-16T12:00:00+00:00",
+        "session_id": "sess_h_10",
+        "episode_id": "ep_six_months_later",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_pref_indent_4",
+      "expected_admission": "ADMIT",
+      "expected_action": "REINFORCE",
+      "expected_proof_delta": 1,
+      "notes": "时隔半年新经历显式重申，生成独立指纹并递增 proof_count"
+    },
+    {
+      "id": "HOLD_11_UNRESOLVED_SCOPE",
+      "category": "Unresolved Scope",
+      "input_slice": {
+        "id": "slice_h_11",
+        "content": "这个模块我们用 mypy --strict 做最严类型检查。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_11",
+        "project_id": null
+      },
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "expected_scope": "unresolved",
+      "notes": "工程未决，强制 scope='unresolved'，绝不偷渡升级为全局"
+    },
+    {
+      "id": "HOLD_12_RULE_EVOLUTION",
+      "category": "Relationship Rule Evolution",
+      "input_slice": {
+        "id": "slice_h_12",
+        "content": "之前说别说教，但如果检测到严重架构陷阱或死锁风险，请严肃打断我提醒。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-11-22T12:00:00+00:00",
+        "session_id": "sess_h_12",
+        "project_id": null
+      },
+      "target_existing_memory": "mem_rule_no_preach",
+      "expected_admission": "ADMIT",
+      "expected_action": "SUPERSEDE",
+      "expected_proof_delta": 1,
+      "notes": "相处硬规则随着信任建立发生演进，以更替机制保留演变足迹"
+    },
+    {
+      "id": "HOLD_13_EVENT_REPLAY",
+      "category": "Event Replay",
+      "input_event": {
+        "event_id": "evt_crash_debug_001",
+        "session_id": "sess_104",
+        "is_replay": true
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "重放事件零突变，绝不增加印证计数"
+    },
+    {
+      "id": "HOLD_14_OBSERVATION_COUNTER_EVIDENCE",
+      "category": "Counter-Evidence Observation",
+      "supporting_count": 3,
+      "counter_count": 2,
+      "expected_admission": "ADMIT",
+      "expected_action": "ADD",
+      "expected_proof_delta": 1,
+      "notes": "包含反例时 Observation 必须保留语境限定，绝不输出绝对化 'always' 论断"
+    },
+    {
+      "id": "HOLD_15_SINGLE_EVIDENCE_ISOLATION",
+      "category": "Single Evidence Psychological Isolation",
+      "input_slice": {
+        "id": "slice_h_15",
+        "content": "今天写代码感觉心力特别交瘁，完全不想动了。",
+        "actor": "user",
+        "source": "manual_feed",
+        "occurred_at": "2026-10-18T12:00:00+00:00",
+        "session_id": "sess_h_15",
+        "project_id": null
+      },
+      "expected_admission": "NOOP_LONG_TERM",
+      "expected_action": "NOOP",
+      "expected_proof_delta": 0,
+      "notes": "单条瞬时身心抱怨绝对禁止直接升级为心理画像或假说"
+    }
+  ]
+}

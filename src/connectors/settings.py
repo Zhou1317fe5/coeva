@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.core.flags import MemoryFeatureFlags, resolve_flags
 from src.core.llm_client import LLMConfig
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, parse_hotkey
 
@@ -162,6 +163,12 @@ class AgentSettingsStore:
             self._llm_config = LLMConfig.from_dict(llm_data)
         else:
             self._llm_config = LLMConfig.load()
+        flags_data = raw_data.get("memory_v2_flags")
+        self._memory_v2_flags = (
+            MemoryFeatureFlags.from_dict(flags_data)
+            if isinstance(flags_data, dict)
+            else MemoryFeatureFlags()
+        )
         agents_data = raw_data.get("agents", {})
         self._configs = {}
 
@@ -212,6 +219,7 @@ class AgentSettingsStore:
             "selected_pet": self._selected_pet,
             "feeder_hotkey": self._feeder_hotkey,
             "llm": self._llm_config.to_dict(),
+            "memory_v2_flags": self._memory_v2_flags.to_dict(),
             "agents": {aid: cfg.to_dict() for aid, cfg in self._configs.items()},
         }
         with open(self.file_path, "w", encoding="utf-8") as f:
@@ -263,8 +271,23 @@ class AgentSettingsStore:
         config.save()
         self.save()
 
+    @property
+    def memory_v2_flags(self) -> MemoryFeatureFlags:
+        """Return active Memory V2.1 feature flags (resolving settings and env overrides)."""
+        return resolve_flags(self._memory_v2_flags.to_dict())
+
+    def set_memory_v2_flag(self, flag_name: str, enabled: bool) -> None:
+        """Update and persist a single Memory V2.1 flag, validating dependency matrix."""
+        d = self._memory_v2_flags.to_dict()
+        if flag_name not in d:
+            raise KeyError(f"Unknown Memory V2 feature flag: {flag_name}")
+        d[flag_name] = enabled
+        updated = MemoryFeatureFlags.from_dict(d)
+        updated.validate()
+        self._memory_v2_flags = updated
+        self.save()
+
     def is_agent_enabled(self, agent_id: str, instance_id: str | None = None) -> bool:
-        """Check if an agent (and optionally its specific environment instance) is enabled."""
         cfg = self._configs.get(agent_id)
         if cfg is None:
             return True

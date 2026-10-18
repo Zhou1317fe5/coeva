@@ -1,0 +1,779 @@
+{
+  "dev_set": [
+    {
+      "id": "DEV_A_01",
+      "category": "A. No-memory-needed",
+      "query": "Python 里的列表怎么反转排序？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_keyboard",
+        "mem_proj_coeva_gui"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "通用编程语法问题，不应唤醒个人长期记忆"
+    },
+    {
+      "id": "DEV_A_02",
+      "category": "A. No-memory-needed",
+      "query": "明天上海天气怎么样？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_gpu"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "外部常识查询，严禁翻找个人历史"
+    },
+    {
+      "id": "DEV_B_01",
+      "category": "B. Exact factual recall",
+      "query": "我的机械键盘是什么型号来着？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_fact_keyboard"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_theme_dark",
+        "mem_pref_theme_light_new"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "精确物理设备事实召回"
+    },
+    {
+      "id": "DEV_B_02",
+      "category": "B. Exact factual recall",
+      "query": "我的显卡型号是哪张？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_fact_gpu"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "精确硬件规格事实"
+    },
+    {
+      "id": "DEV_C_01",
+      "category": "C. Paraphrased semantic recall",
+      "query": "我不喜欢太刺眼的浅色背景",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_theme_dark"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_indent_4"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "同义表述：刺眼浅色 -> 暗黑模式/深色主题"
+    },
+    {
+      "id": "DEV_C_02",
+      "category": "C. Paraphrased semantic recall",
+      "query": "代码排版我习惯空几格？",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_indent_4"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "同义表述：排版空几格 -> 缩进偏好 4 空格"
+    },
+    {
+      "id": "DEV_D_01",
+      "category": "D. Project-scoped recall",
+      "query": "这个项目我们选定的 GUI 桌面库是什么？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_coeva_state_machine"
+      ],
+      "must_not_retrieve": [
+        "mem_proj_web_vue3",
+        "mem_proj_app_flutter"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "当前工程绑定召回：PySide6"
+    },
+    {
+      "id": "DEV_E_01",
+      "category": "E. Cross-project contamination traps",
+      "query": "我们前端框架用什么？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_web_vue3"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_proj_coeva_gui",
+        "mem_proj_app_flutter"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "在 CRM 项目中问前端框架，严禁召回桌宠项目的 PySide6"
+    },
+    {
+      "id": "DEV_E_02",
+      "category": "E. Cross-project contamination traps",
+      "query": "这个项目的状态机库是哪个？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_proj_coeva_state_machine"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "CRM 项目未配置状态机，严禁将桌宠项目的状态机库跨项目污染"
+    },
+    {
+      "id": "DEV_F_01",
+      "category": "F. Current vs historical preference",
+      "query": "我平时习惯用什么终端？",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_term_pwsh7"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_term_cmd_old"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "当前状态查询：必须返回 active 的 pwsh7，绝不能返回被 superseded 的 cmd"
+    },
+    {
+      "id": "DEV_G_01",
+      "category": "G. Superseded memory",
+      "query": "我以前用过的旧终端是哪个？",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_term_cmd_old"
+      ],
+      "acceptable_retrieve": [
+        "mem_pref_term_pwsh7"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "显式查询历史更迭：允许并要求召回 superseded 事实"
+    },
+    {
+      "id": "DEV_H_01",
+      "category": "H. Ambiguous memory",
+      "query": "我们代码风格关于单引号还是双引号有定论吗？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_ambiguous_quotes"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "歧义/冲突事实：必须保留 ambiguous 标记，供上层声明未决状态"
+    },
+    {
+      "id": "DEV_I_01",
+      "category": "I. Explicit episodic query",
+      "query": "上周我们排查 PySide6 闪退的那次经历了什么？",
+      "retrieval_mode": "EPISODIC_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "ep_pyside_crash_debug"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "经历容器聚合召回"
+    },
+    {
+      "id": "DEV_J_01",
+      "category": "J. Weak reference / continuity",
+      "query": "和上次一样",
+      "retrieval_mode": "CURRENT_CONTEXT_CONTINUITY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "ep_current_error",
+        "ep_recent_build_action"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "弱指代：语义几乎零信息，高度依赖最近 Session/Episode 上下文连续性"
+    },
+    {
+      "id": "DEV_J_02",
+      "category": "J. Weak reference / continuity",
+      "query": "还是那个",
+      "retrieval_mode": "CURRENT_CONTEXT_CONTINUITY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "ep_current_error",
+        "ep_recent_build_action"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "弱指代词，命中连续性上下文"
+    },
+    {
+      "id": "DEV_K_01",
+      "category": "K. Relationship rule",
+      "query": "你对我提建议有什么原则吗？",
+      "retrieval_mode": "RELATIONSHIP_RULE_LOOKUP",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_rule_no_preach"
+      ],
+      "acceptable_retrieve": [
+        "mem_rule_no_interrupt_rest"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "相处硬规则召回：不居高临下说教"
+    },
+    {
+      "id": "DEV_L_01",
+      "category": "L. Emotional false-recall traps",
+      "query": "今天 debug 搞得我好烦啊……",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": true,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_past_frustration_01",
+        "ep_pyside_crash_debug",
+        "insight_psych_autonomy"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "负面情绪表达：避风港模式生效，严禁翻旧账召回过去的受挫历史或心理推断，应返回 NO_MEMORY"
+    },
+    {
+      "id": "DEV_M_01",
+      "category": "M. Duplicate evidence",
+      "query": "我提过几次键盘偏好？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_fact_keyboard"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "独立证据计数核验"
+    },
+    {
+      "id": "DEV_N_01",
+      "category": "N. Unresolved scope",
+      "query": "这个项目我们用 pytest 吗？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "new-untracked-project",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_unresolved_pytest"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "unresolved scope 记忆不得自动在未知新项目中生效"
+    },
+    {
+      "id": "DEV_O_01",
+      "category": "O. Mixed Chinese-English technical entities",
+      "query": "我们桌宠是用 PySide6 的 QThread 还是 asyncio？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_qthread_async"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "中英混合技术符号精准匹配"
+    },
+    {
+      "id": "DEV_P_01",
+      "category": "P. Time-qualified recall",
+      "query": "昨天我们聊了什么？",
+      "retrieval_mode": "EPISODIC_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "slice_yesterday_01"
+      ],
+      "acceptable_retrieve": [
+        "ep_yesterday_error"
+      ],
+      "must_not_retrieve": [
+        "slice_lastweek_01"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "精确时序约束召回（昨天）"
+    },
+    {
+      "id": "DEV_Q_01",
+      "category": "Q. No relevant memory",
+      "query": "你知道量子力学的双缝干涉实验吗？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_gpu",
+        "mem_fact_keyboard"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "库中完全无相关记忆，必须返回 NO_RELEVANT_MEMORY"
+    },
+    {
+      "id": "DEV_ADV_01",
+      "category": "ADV. Adversarial Phrases",
+      "query": "还是算了",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_keyboard",
+        "ep_recent_build_action"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "对抗词句1：放弃/轻量应答，不应召回任何无关实体"
+    },
+    {
+      "id": "DEV_ADV_02",
+      "category": "ADV. Adversarial Phrases",
+      "query": "我之前是不是说过关于代码缩进的事？",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_indent_4"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "对抗词句2：显式记忆询问，唤醒用户代码偏好"
+    },
+    {
+      "id": "DEV_ADV_03",
+      "category": "ADV. Adversarial Phrases",
+      "query": "这个项目不用 React 了",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_web_react"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_web_vue3"
+      ],
+      "must_not_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "对抗词句3：否定句式更迭事件，命中项目历史"
+    },
+    {
+      "id": "DEV_ADV_04",
+      "category": "ADV. Adversarial Phrases",
+      "query": "以后都别这样说教我",
+      "retrieval_mode": "RELATIONSHIP_RULE_LOOKUP",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_rule_no_preach"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "对抗词句4：相处边界设立"
+    },
+    {
+      "id": "DEV_ADV_05",
+      "category": "ADV. Adversarial Phrases",
+      "query": "我现在的界面色彩偏好是什么？",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_theme_light_new"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_theme_dark"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "对抗词句5：新旧事实同句对抗，应以'现在'的最新事实为准"
+    },
+    {
+      "id": "DEV_ADV_06",
+      "category": "ADV. Adversarial Phrases",
+      "query": "昨天那个 PySide6 报错",
+      "retrieval_mode": "EPISODIC_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "ep_yesterday_error"
+      ],
+      "acceptable_retrieve": [
+        "ep_pyside_crash_debug"
+      ],
+      "must_not_retrieve": [
+        "ep_lastweek_error"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "对抗词句6：时态+技术故障引用"
+    },
+    {
+      "id": "DEV_ADV_07",
+      "category": "ADV. Privacy Pending Exclusion (IMPL-3)",
+      "query": "帮我看看第一章人生纪实写了什么",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "chap_01_privacy_pending"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": true,
+      "notes": "IMPL-3 强制检验：处在 needs_privacy_redaction=1 的章节绝对不可读"
+    }
+  ],
+  "holdout_set": [
+    {
+      "id": "HOLD_S1",
+      "category": "Sanctuary Task Continuity (P0)",
+      "query": "烦死了，又是刚才那个报错。",
+      "retrieval_mode": "CURRENT_CONTEXT_CONTINUITY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": true,
+      "must_retrieve": [
+        "ep_current_error"
+      ],
+      "acceptable_retrieve": [
+        "ep_recent_build_action"
+      ],
+      "must_not_retrieve": [
+        "mem_past_frustration_01",
+        "insight_psych_autonomy",
+        "ep_pyside_crash_debug"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "P0核心验证：避风港开启时必须允许最近任务连续性（刚才的报错），但绝不返回历史受挫与心理假说"
+    },
+    {
+      "id": "HOLD_S2",
+      "category": "Sanctuary Reflective Suppression (P0)",
+      "query": "最近我是不是越来越容易烦躁？",
+      "retrieval_mode": "REFLECTIVE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": true,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "insight_psych_autonomy",
+        "mem_past_frustration_01"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "P0核心验证：避风港激活状态下，反思性自模型回忆必须彻底闭锁静默"
+    },
+    {
+      "id": "HOLD_PRE_01",
+      "category": "Fast-Gate Precedence (P1)",
+      "query": "我们之前是怎么解决 PySide 闪退问题的？",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "ep_pyside_crash_debug"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "包含'怎么'但有'之前'，历史意图高于通用QA快筛，严禁被通用QA误杀"
+    },
+    {
+      "id": "HOLD_SEM_01",
+      "category": "Semantic Paraphrase (P0)",
+      "query": "做复杂东西前我更希望先把框架定下来",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_arch_first"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_indent_4"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "同义意图改写：把框架定下来 -> 先稳定架构设计"
+    },
+    {
+      "id": "HOLD_SEM_02",
+      "category": "Semantic Paraphrase (P0)",
+      "query": "别老提醒我休息喝水",
+      "retrieval_mode": "RELATIONSHIP_RULE_LOOKUP",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_rule_no_interrupt_rest"
+      ],
+      "acceptable_retrieve": [
+        "mem_rule_no_preach"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "同义意图改写：别老提醒我休息 -> 不希望被频繁打扰打断"
+    },
+    {
+      "id": "HOLD_NEG_01",
+      "category": "Lexical Hard Negative",
+      "query": "机械键盘的手感和静音红轴有什么渊源？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_keyboard"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "包含'机械键盘'字样，但属于外部通用讨论，不属于查询用户自身键盘型号"
+    },
+    {
+      "id": "HOLD_XPROJ_01",
+      "category": "Cross-Project Collision",
+      "query": "这个项目的构建命令是什么？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_web_vue3"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "ep_recent_build_action",
+        "mem_proj_coeva_gui"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "CRM 项目询问构建，严禁召回桌宠的 uv run pytest/ruff 经历"
+    },
+    {
+      "id": "HOLD_MULTI_01",
+      "category": "Multiple Acceptable Targets",
+      "query": "关于我们项目的技术栈你都知道什么？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_coeva_state_machine",
+        "mem_proj_qthread_async"
+      ],
+      "must_not_retrieve": [
+        "mem_proj_web_vue3",
+        "mem_proj_app_flutter"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "多重合法项目记忆候选，验证 Top-3 Precision 容纳度"
+    },
+    {
+      "id": "HOLD_UNRES_01",
+      "category": "Unresolved Scope",
+      "query": "我们目前工程配置了自动化测试吗？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "unregistered-scratch-project",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_unresolved_pytest",
+        "ep_recent_build_action"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "未知临时工程，严禁未决 pytest 事实或桌宠构建经历跨界生效"
+    },
+    {
+      "id": "HOLD_SUPER_01",
+      "category": "Superseded Fact Isolation",
+      "query": "我们 CRM 前端现在用什么打包？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_web_vue3"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_proj_web_react"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "当前技术栈查询：必须返回 Vue3+Vite，绝不能返回已被取代的 React+Next"
+    },
+    {
+      "id": "HOLD_THRESH_01",
+      "category": "Near-Threshold Boundary",
+      "query": "开发桌面透明挂件通常用什么技术？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "historical_or_current": "none",
+      "no_memory_expected": true,
+      "notes": "虽有'桌面透明挂件'，但带有'通常用什么'通用问法，应被通用QA截断或低于置信阈值"
+    },
+    {
+      "id": "HOLD_MIX_01",
+      "category": "Mixed Chinese-English Entity",
+      "query": "我的开发机显卡显存多大？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_fact_gpu"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "技术显存与显卡规格绑定"
+    },
+    {
+      "id": "HOLD_AMBIG_01",
+      "category": "Ambiguity Preservation",
+      "query": "我们 Python 项目引号规范是什么？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_ambiguous_quotes"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "争议未决事实召回并保留 ambiguous 标记"
+    },
+    {
+      "id": "HOLD_PRIV_01",
+      "category": "Privacy Redaction Pending (IMPL-3)",
+      "query": "请总结第一章的内容",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "chap_01_privacy_pending"
+      ],
+      "historical_or_current": "historical",
+      "no_memory_expected": true,
+      "notes": "IMPL-3 强制阻断，待脱敏制品绝对不可读"
+    },
+    {
+      "id": "HOLD_PAST_01",
+      "category": "Explicit Past Query",
+      "query": "我最初习惯用的命令行终端是哪个？",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_term_cmd_old"
+      ],
+      "acceptable_retrieve": [
+        "mem_pref_term_pwsh7"
+      ],
+      "must_not_retrieve": [],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "显式查询旧终端CMD"
+    }
+  ]
+}

@@ -25,6 +25,7 @@ from src.connectors.hermes_connector import HermesConnector
 from src.connectors.hook_manager import AgentHookManager
 from src.connectors.http_server import CompanionHttpServer
 from src.connectors.settings import AgentSettingsStore
+from src.core.flags import validate_memory_v2_configuration
 from src.core.cold_start import ColdStartPolicy
 from src.core.intervention import InterventionPolicy
 from src.core.llm_client import CompanionAIEngine, LLMConfig
@@ -59,6 +60,7 @@ class CompanionApp:
 
         # 0. Multi-Agent & Companion Settings
         self.agent_settings = AgentSettingsStore()
+        self.memory_v2_diag = validate_memory_v2_configuration(self.agent_settings.memory_v2_flags)
         self.hook_manager = AgentHookManager()
         self.settings_window = SettingsWindow(self.agent_settings, self.hook_manager)
         self.settings_window.pet_changed.connect(self._on_pet_changed)

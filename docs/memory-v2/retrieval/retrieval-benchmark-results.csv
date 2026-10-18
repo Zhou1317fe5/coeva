@@ -1,0 +1,45 @@
+﻿case_id,dataset,category,query,must,acceptable,forbidden,retrieved,passed,latency_ms
+DEV_A_01,DEV_SET,A. No-memory-needed,Python 里的列表怎么反转排序？,,,mem_fact_keyboard;mem_proj_coeva_gui,,PASS,3.335
+DEV_A_02,DEV_SET,A. No-memory-needed,明天上海天气怎么样？,,,mem_fact_gpu,,PASS,0.011
+DEV_B_01,DEV_SET,B. Exact factual recall,我的机械键盘是什么型号来着？,mem_fact_keyboard,,mem_pref_theme_light_new;mem_pref_theme_dark,mem_fact_keyboard,PASS,3.001
+DEV_B_02,DEV_SET,B. Exact factual recall,我的显卡型号是哪张？,mem_fact_gpu,,,mem_fact_gpu;mem_fact_keyboard,PASS,2.964
+DEV_C_01,DEV_SET,C. Paraphrased semantic recall,我不喜欢太刺眼的浅色背景,mem_pref_theme_dark,,mem_pref_indent_4,,FAIL,3.022
+DEV_C_02,DEV_SET,C. Paraphrased semantic recall,代码排版我习惯空几格？,mem_pref_indent_4,,,mem_pref_indent_4;mem_ambiguous_quotes,PASS,2.941
+DEV_D_01,DEV_SET,D. Project-scoped recall,这个项目我们选定的 GUI 桌面库是什么？,mem_proj_coeva_gui,mem_proj_coeva_state_machine,mem_proj_web_vue3;mem_proj_app_flutter,mem_proj_coeva_gui;mem_proj_qthread_async;slice_yesterday_01,PASS,3.46
+DEV_E_01,DEV_SET,E. Cross-project contamination traps,我们前端框架用什么？,mem_proj_web_vue3,,mem_proj_app_flutter;mem_proj_coeva_gui,mem_proj_web_vue3,PASS,1.913
+DEV_E_02,DEV_SET,E. Cross-project contamination traps,这个项目的状态机库是哪个？,,,mem_proj_coeva_state_machine,mem_proj_web_vue3,FAIL,1.85
+DEV_F_01,DEV_SET,F. Current vs historical preference,我平时习惯用什么终端？,mem_pref_term_pwsh7,,mem_pref_term_cmd_old,mem_pref_term_pwsh7,PASS,2.901
+DEV_G_01,DEV_SET,G. Superseded memory,我以前用过的旧终端是哪个？,mem_pref_term_cmd_old,mem_pref_term_pwsh7,,mem_pref_term_pwsh7;mem_pref_term_cmd_old,PASS,3.195
+DEV_H_01,DEV_SET,H. Ambiguous memory,我们代码风格关于单引号还是双引号有定论吗？,mem_ambiguous_quotes,,,mem_ambiguous_quotes,PASS,2.941
+DEV_I_01,DEV_SET,I. Explicit episodic query,上周我们排查 PySide6 闪退的那次经历了什么？,ep_pyside_crash_debug,,,ep_pyside_crash_debug;ep_yesterday_error;ep_recent_build_action,PASS,3.171
+DEV_J_01,DEV_SET,J. Weak reference / continuity,和上次一样,ep_current_error;ep_recent_build_action,,,ep_current_error,PASS,0.008
+DEV_J_02,DEV_SET,J. Weak reference / continuity,还是那个,ep_current_error;ep_recent_build_action,,,ep_current_error,PASS,0.007
+DEV_K_01,DEV_SET,K. Relationship rule,你对我提建议有什么原则吗？,mem_rule_no_preach,mem_rule_no_interrupt_rest,,mem_rule_no_preach;mem_rule_no_interrupt_rest,PASS,3.042
+DEV_L_01,DEV_SET,L. Emotional false-recall traps,今天 debug 搞得我好烦啊……,,,insight_psych_autonomy;mem_past_frustration_01;ep_pyside_crash_debug,,PASS,0.007
+DEV_M_01,DEV_SET,M. Duplicate evidence,我提过几次键盘偏好？,mem_fact_keyboard,,,mem_rule_no_interrupt_rest;mem_fact_keyboard,PASS,2.894
+DEV_N_01,DEV_SET,N. Unresolved scope,这个项目我们用 pytest 吗？,,,mem_unresolved_pytest,,PASS,1.728
+DEV_O_01,DEV_SET,O. Mixed Chinese-English technical entities,我们桌宠是用 PySide6 的 QThread 还是 asyncio？,mem_proj_qthread_async,mem_proj_coeva_gui,,mem_proj_qthread_async,PASS,2.923
+DEV_P_01,DEV_SET,P. Time-qualified recall,昨天我们聊了什么？,slice_yesterday_01,ep_yesterday_error,slice_lastweek_01,slice_yesterday_01;ep_yesterday_error,PASS,0.412
+DEV_Q_01,DEV_SET,Q. No relevant memory,你知道量子力学的双缝干涉实验吗？,,,mem_fact_keyboard;mem_fact_gpu,,PASS,0.009
+DEV_ADV_01,DEV_SET,ADV. Adversarial Phrases,还是算了,,,mem_fact_keyboard;ep_recent_build_action,,PASS,0.006
+DEV_ADV_02,DEV_SET,ADV. Adversarial Phrases,我之前是不是说过关于代码缩进的事？,mem_pref_indent_4,,,mem_pref_indent_4;mem_ambiguous_quotes,PASS,3.337
+DEV_ADV_03,DEV_SET,ADV. Adversarial Phrases,这个项目不用 React 了,mem_proj_web_react,mem_proj_web_vue3,mem_proj_coeva_gui,mem_proj_web_react;mem_proj_web_vue3,PASS,2.258
+DEV_ADV_04,DEV_SET,ADV. Adversarial Phrases,以后都别这样说教我,mem_rule_no_preach,,,mem_rule_no_preach;mem_rule_no_interrupt_rest,PASS,3.107
+DEV_ADV_05,DEV_SET,ADV. Adversarial Phrases,我现在的界面色彩偏好是什么？,mem_pref_theme_light_new,,mem_pref_theme_dark,mem_pref_theme_light_new,PASS,2.968
+DEV_ADV_06,DEV_SET,ADV. Adversarial Phrases,昨天那个 PySide6 报错,ep_yesterday_error,ep_pyside_crash_debug,ep_lastweek_error,ep_yesterday_error;slice_yesterday_01,PASS,0.415
+DEV_ADV_07,DEV_SET,ADV. Privacy Pending Exclusion (IMPL-3),帮我看看第一章人生纪实写了什么,,,chap_01_privacy_pending,,PASS,0.083
+HOLD_S1,HOLDOUT_SET,Sanctuary Task Continuity (P0),烦死了，又是刚才那个报错。,ep_current_error,ep_recent_build_action,insight_psych_autonomy;mem_past_frustration_01;ep_pyside_crash_debug,ep_current_error,PASS,0.009
+HOLD_S2,HOLDOUT_SET,Sanctuary Reflective Suppression (P0),最近我是不是越来越容易烦躁？,,,insight_psych_autonomy;mem_past_frustration_01,,PASS,0.004
+HOLD_PRE_01,HOLDOUT_SET,Fast-Gate Precedence (P1),我们之前是怎么解决 PySide 闪退问题的？,ep_pyside_crash_debug,mem_proj_coeva_gui,,ep_pyside_crash_debug;ep_recent_build_action;ep_current_error,PASS,3.216
+HOLD_SEM_01,HOLDOUT_SET,Semantic Paraphrase (P0),做复杂东西前我更希望先把框架定下来,mem_pref_arch_first,,mem_pref_indent_4,mem_pref_arch_first,PASS,3.1
+HOLD_SEM_02,HOLDOUT_SET,Semantic Paraphrase (P0),别老提醒我休息喝水,mem_rule_no_interrupt_rest,mem_rule_no_preach,,mem_rule_no_interrupt_rest;mem_rule_no_preach,PASS,2.929
+HOLD_NEG_01,HOLDOUT_SET,Lexical Hard Negative,机械键盘的手感和静音红轴有什么渊源？,,,mem_fact_keyboard,,PASS,0.01
+HOLD_XPROJ_01,HOLDOUT_SET,Cross-Project Collision,这个项目的构建命令是什么？,mem_proj_web_vue3,,ep_recent_build_action;mem_proj_coeva_gui,mem_proj_web_vue3,PASS,2.007
+HOLD_MULTI_01,HOLDOUT_SET,Multiple Acceptable Targets,关于我们项目的技术栈你都知道什么？,mem_proj_coeva_gui,mem_proj_qthread_async;mem_proj_coeva_state_machine,mem_proj_web_vue3;mem_proj_app_flutter,mem_proj_coeva_gui;mem_proj_qthread_async;slice_yesterday_01,PASS,3.099
+HOLD_UNRES_01,HOLDOUT_SET,Unresolved Scope,我们目前工程配置了自动化测试吗？,,,ep_recent_build_action;mem_unresolved_pytest,,PASS,1.732
+HOLD_SUPER_01,HOLDOUT_SET,Superseded Fact Isolation,我们 CRM 前端现在用什么打包？,mem_proj_web_vue3,,mem_proj_web_react,mem_proj_web_vue3,PASS,1.876
+HOLD_THRESH_01,HOLDOUT_SET,Near-Threshold Boundary,开发桌面透明挂件通常用什么技术？,,,mem_proj_coeva_gui,,PASS,0.01
+HOLD_MIX_01,HOLDOUT_SET,Mixed Chinese-English Entity,我的开发机显卡显存多大？,mem_fact_gpu,,,mem_fact_gpu;mem_pref_term_pwsh7,PASS,3.037
+HOLD_AMBIG_01,HOLDOUT_SET,Ambiguity Preservation,我们 Python 项目引号规范是什么？,mem_ambiguous_quotes,,,mem_ambiguous_quotes,PASS,3.22
+HOLD_PRIV_01,HOLDOUT_SET,Privacy Redaction Pending (IMPL-3),请总结第一章的内容,,,chap_01_privacy_pending,,PASS,0.105
+HOLD_PAST_01,HOLDOUT_SET,Explicit Past Query,我最初习惯用的命令行终端是哪个？,mem_pref_term_cmd_old,mem_pref_term_pwsh7,,mem_pref_term_cmd_old,PASS,3.621

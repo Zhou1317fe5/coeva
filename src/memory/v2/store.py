@@ -1,0 +1,822 @@
+"""ChronicleStoreV2: V2.1 SQLite storage layer with typed repository primitives.
+
+Part of Coeva Long-Term Memory V2.1 Stage 1 (WP-1).
+Features:
+- Explicit SQLite connection ownership (PRAGMA foreign_keys=ON, WAL mode)
+- No cross-thread connection reuse (check_same_thread=True, fail-closed)
+- Explicit atomic transaction context manager
+- Typed CRUD primitives for 20 canonical memory entities
+- Schema contract validation and schema drift detection
+- Isolation from production V1 database (for test/scratch/shadow DBs)
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
+from src.memory.v2.entities import (
+    CalibrationEventEntity,
+    ChapterEpisodeLinkEntity,
+    ChapterInsightLinkEntity,
+    ChapterMetadataEntity,
+    ChapterSliceLinkEntity,
+    ConfirmedInsightEntity,
+    EpisodeEntity,
+    EpisodeEventLinkEntity,
+    EpisodeSliceLinkEntity,
+    EventSkeletonEntity,
+    EvidenceReinforcementEntity,
+    HypothesisEntity,
+    HypothesisObservationLinkEntity,
+    ObservationEntity,
+    ObservationEpisodeLinkEntity,
+    ObservationEventLinkEntity,
+    ObservationMemoryLinkEntity,
+    ObservationSliceLinkEntity,
+    RawSliceEntity,
+    SemanticMemoryEntity,
+)
+
+SCHEMA_VERSION: int = 20261018
+
+SCHEMA_SQL_PATH = Path(__file__).parent / "schema.sql"
+
+CANONICAL_TABLES: tuple[str, ...] = (
+    "raw_slices",
+    "event_skeletons",
+    "episodes",
+    "episode_slice_links",
+    "episode_event_links",
+    "semantic_memories",
+    "evidence_reinforcements",
+    "observations",
+    "observation_slice_links",
+    "observation_event_links",
+    "observation_memory_links",
+    "observation_episode_links",
+    "hypotheses",
+    "hypothesis_observation_links",
+    "calibration_events",
+    "confirmed_insights",
+    "chapter_metadata",
+    "chapter_slice_links",
+    "chapter_episode_links",
+    "chapter_insight_links",
+)
+
+TECHNICAL_METADATA_TABLES: tuple[str, ...] = (
+    "_schema_migrations",
+    "legacy_hypothesis_audit",
+    "consolidation_jobs",
+    "backfill_progress",
+)
+
+
+class SchemaDriftError(RuntimeError):
+    """Raised when the database schema does not match the canonical V2.1 specification."""
+
+    pass
+
+
+class ChronicleStoreV2:
+    """V2.1 Canonical SQLite database store with explicit repository primitives."""
+
+    def __init__(
+        self,
+        db_path: Path | str = ":memory:",
+        *,
+        timeout: float = 5.0,
+        initialize: bool = True,
+    ) -> None:
+        self.db_path = Path(db_path) if db_path != ":memory:" else db_path
+        if isinstance(self.db_path, Path) and str(self.db_path) != ":memory:":
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Thread ownership: check_same_thread=True ensures connection is not unsafely shared
+        self._conn = sqlite3.connect(
+            str(self.db_path),
+            timeout=timeout,
+            check_same_thread=True,
+        )
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA foreign_keys = ON;")
+        if str(self.db_path) != ":memory:":
+            self._conn.execute("PRAGMA journal_mode = WAL;")
+
+        if initialize:
+            self.initialize_schema()
+
+    def close(self) -> None:
+        """Close the database connection."""
+        self._conn.close()
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """Direct connection handle for scoped internal operations."""
+        return self._conn
+
+    # ── Schema Management & Contract Validation ─────────────────────────────
+
+    def initialize_schema(self, force: bool = False) -> None:
+        """Initialize exact V2.1 schema on a new database or verify compatibility."""
+        cur_version = self.get_schema_version()
+        if cur_version == 0 or force:
+            sql = SCHEMA_SQL_PATH.read_text(encoding="utf-8")
+            self._conn.executescript(sql)
+            self._conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION};")
+            self._conn.commit()
+        elif cur_version != SCHEMA_VERSION:
+            raise SchemaDriftError(
+                f"Incompatible database schema version {cur_version}; expected {SCHEMA_VERSION}."
+            )
+
+    def get_schema_version(self) -> int:
+        """Return the current user_version pragma value."""
+        row = self._conn.execute("PRAGMA user_version;").fetchone()
+        return int(row[0]) if row else 0
+
+    def validate_schema_contract(self) -> dict[str, Any]:
+        """Validate that all 20 canonical tables and foreign keys conform to V2.1.
+
+        Raises:
+            SchemaDriftError: If any canonical table is missing or FK violations exist.
+        """
+        # 1. Version check
+        cur_ver = self.get_schema_version()
+        if cur_ver != SCHEMA_VERSION:
+            raise SchemaDriftError(
+                f"Schema version drift: found {cur_ver}, expected {SCHEMA_VERSION}"
+            )
+
+        # 2. Required tables check
+        existing_tables = set(
+            row[0]
+            for row in self._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        )
+        missing_canonical = [t for t in CANONICAL_TABLES if t not in existing_tables]
+        if missing_canonical:
+            raise SchemaDriftError(f"Missing canonical tables: {missing_canonical}")
+
+        missing_tech = [t for t in TECHNICAL_METADATA_TABLES if t not in existing_tables]
+        if missing_tech:
+            raise SchemaDriftError(f"Missing technical metadata tables: {missing_tech}")
+
+        # 3. Foreign key integrity check
+        fk_violations = self._conn.execute("PRAGMA foreign_key_check;").fetchall()
+        if fk_violations:
+            raise SchemaDriftError(f"Foreign key integrity violations detected: {fk_violations}")
+
+        return {
+            "status": "VALID",
+            "schema_version": cur_ver,
+            "canonical_table_count": len(CANONICAL_TABLES),
+            "technical_table_count": len(TECHNICAL_METADATA_TABLES),
+            "foreign_key_violations": 0,
+        }
+
+    # ── Transaction Context Manager ──────────────────────────────────────────
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Cursor]:
+        """Explicit atomic transaction scope: commits on exit, rollbacks on error."""
+        cursor = self._conn.cursor()
+        cursor.execute("BEGIN;")
+        try:
+            yield cursor
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            cursor.close()
+
+    # ── Repository: Raw Slices (Entity 1) ───────────────────────────────────
+
+    def insert_raw_slice(self, item: RawSliceEntity) -> None:
+        """Insert a canonical raw slice record."""
+        self._conn.execute(
+            """
+            INSERT INTO raw_slices (
+                slice_id, occurred_at, content, actor, source, scope, project_id,
+                ingestion_dedup_key, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                item.slice_id,
+                item.occurred_at,
+                item.content,
+                item.actor,
+                item.source,
+                item.scope,
+                item.project_id,
+                item.ingestion_dedup_key,
+                item.created_at or item.occurred_at,
+            ),
+        )
+
+    def get_raw_slice(self, slice_id: str) -> RawSliceEntity | None:
+        """Fetch a single raw slice by its ID."""
+        row = self._conn.execute(
+            "SELECT * FROM raw_slices WHERE slice_id = ?;", (slice_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return RawSliceEntity(
+            slice_id=row["slice_id"],
+            occurred_at=row["occurred_at"],
+            content=row["content"],
+            actor=row["actor"],
+            source=row["source"],
+            scope=row["scope"],
+            project_id=row["project_id"],
+            ingestion_dedup_key=row["ingestion_dedup_key"],
+            created_at=row["created_at"],
+        )
+    def get_raw_slice_by_dedup_key(self, dedup_key: str) -> RawSliceEntity | None:
+        """Fetch a single raw slice by its ingestion dedup key."""
+        row = self._conn.execute(
+            "SELECT * FROM raw_slices WHERE ingestion_dedup_key = ?;", (dedup_key,)
+        ).fetchone()
+        if not row:
+            return None
+        return RawSliceEntity(
+            slice_id=row["slice_id"],
+            occurred_at=row["occurred_at"],
+            content=row["content"],
+            actor=row["actor"],
+            source=row["source"],
+            scope=row["scope"],
+            project_id=row["project_id"],
+            ingestion_dedup_key=row["ingestion_dedup_key"],
+            created_at=row["created_at"],
+        )
+
+
+    def list_raw_slices(self, limit: int = 50, offset: int = 0) -> list[RawSliceEntity]:
+        """List raw slices ordered newest-first."""
+        rows = self._conn.execute(
+            "SELECT * FROM raw_slices ORDER BY occurred_at DESC LIMIT ? OFFSET ?;",
+            (limit, offset),
+        ).fetchall()
+        return [
+            RawSliceEntity(
+                slice_id=r["slice_id"],
+                occurred_at=r["occurred_at"],
+                content=r["content"],
+                actor=r["actor"],
+                source=r["source"],
+                scope=r["scope"],
+                project_id=r["project_id"],
+                ingestion_dedup_key=r["ingestion_dedup_key"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    # ── Repository: Event Skeletons (Entity 2) ──────────────────────────────
+
+    def insert_event_skeleton(self, item: EventSkeletonEntity) -> None:
+        """Insert a structured telemetry event skeleton (respects privacy boundary)."""
+        self._conn.execute(
+            """
+            INSERT INTO event_skeletons (
+                event_id, occurred_at, agent_id, session_id, event_type,
+                tool_name, error_category, retention_class, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                item.event_id,
+                item.occurred_at,
+                item.agent_id,
+                item.session_id,
+                item.event_type,
+                item.tool_name,
+                item.error_category,
+                item.retention_class,
+                item.created_at or item.occurred_at,
+            ),
+        )
+
+    def get_event_skeleton(self, event_id: str) -> EventSkeletonEntity | None:
+        """Fetch an event skeleton by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM event_skeletons WHERE event_id = ?;", (event_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return EventSkeletonEntity(
+            event_id=row["event_id"],
+            occurred_at=row["occurred_at"],
+            agent_id=row["agent_id"],
+            session_id=row["session_id"],
+            event_type=row["event_type"],
+            tool_name=row["tool_name"],
+            error_category=row["error_category"],
+            retention_class=row["retention_class"],
+            created_at=row["created_at"],
+        )
+
+    # ── Repository: Episodes & Links (Entities 3, 4, 5) ─────────────────────
+
+    def insert_episode(self, ep: EpisodeEntity) -> None:
+        """Insert an experience grouping container."""
+        self._conn.execute(
+            """
+            INSERT INTO episodes (
+                episode_id, scope, project_id, started_at, closed_at,
+                title_hint, summary, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                ep.episode_id,
+                ep.scope,
+                ep.project_id,
+                ep.started_at,
+                ep.closed_at,
+                ep.title_hint,
+                ep.summary,
+                ep.status,
+                ep.created_at or ep.started_at,
+            ),
+        )
+
+    def get_episode(self, episode_id: str) -> EpisodeEntity | None:
+        """Fetch an episode by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM episodes WHERE episode_id = ?;", (episode_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return EpisodeEntity(
+            episode_id=row["episode_id"],
+            scope=row["scope"],
+            project_id=row["project_id"],
+            started_at=row["started_at"],
+            closed_at=row["closed_at"],
+            title_hint=row["title_hint"],
+            summary=row["summary"],
+            status=row["status"],
+            created_at=row["created_at"],
+        )
+
+    def insert_episode_slice_link(self, link: EpisodeSliceLinkEntity) -> None:
+        """Link an episode to a raw slice."""
+        self._conn.execute(
+            """
+            INSERT INTO episode_slice_links (episode_id, slice_id, curation_source, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.episode_id, link.slice_id, link.curation_source, link.linked_at),
+        )
+
+    def insert_episode_event_link(self, link: EpisodeEventLinkEntity) -> None:
+        """Link an episode to an event skeleton."""
+        self._conn.execute(
+            """
+            INSERT INTO episode_event_links (episode_id, event_id, curation_source, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.episode_id, link.event_id, link.curation_source, link.linked_at),
+        )
+
+    # ── Repository: Semantic Memories & Reinforcements (Entities 6, 7) ──────
+
+    def insert_semantic_memory(self, mem: SemanticMemoryEntity) -> None:
+        """Insert a derived semantic memory item."""
+        self._conn.execute(
+            """
+            INSERT INTO semantic_memories (
+                memory_id, category, statement, authority_class, scope, project_id,
+                source_slice_id, source_event_id, source_episode_id, valid_from, invalidated_at,
+                superseded_by, validity_status, expression_policy, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                mem.memory_id,
+                mem.category,
+                mem.statement,
+                mem.authority_class,
+                mem.scope,
+                mem.project_id,
+                mem.source_slice_id,
+                mem.source_event_id,
+                mem.source_episode_id,
+                mem.valid_from,
+                mem.invalidated_at,
+                mem.superseded_by,
+                mem.validity_status,
+                mem.expression_policy,
+                mem.created_at or mem.valid_from,
+            ),
+        )
+
+    def get_semantic_memory(self, memory_id: str) -> SemanticMemoryEntity | None:
+        """Fetch a semantic memory by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM semantic_memories WHERE memory_id = ?;", (memory_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return SemanticMemoryEntity(
+            memory_id=row["memory_id"],
+            category=row["category"],
+            statement=row["statement"],
+            authority_class=row["authority_class"],
+            scope=row["scope"],
+            project_id=row["project_id"],
+            source_slice_id=row["source_slice_id"],
+            source_event_id=row["source_event_id"],
+            source_episode_id=row["source_episode_id"],
+            valid_from=row["valid_from"],
+            invalidated_at=row["invalidated_at"],
+            superseded_by=row["superseded_by"],
+            validity_status=row["validity_status"],
+            expression_policy=row["expression_policy"],
+            created_at=row["created_at"],
+        )
+
+    def insert_evidence_reinforcement(self, item: EvidenceReinforcementEntity) -> None:
+        """Record an independent evidence confirmation."""
+        self._conn.execute(
+            """
+            INSERT INTO evidence_reinforcements (
+                reinforcement_id, memory_id, slice_id, event_id,
+                independence_fingerprint, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?);
+            """,
+            (
+                item.reinforcement_id,
+                item.memory_id,
+                item.slice_id,
+                item.event_id,
+                item.independence_fingerprint,
+                item.occurred_at,
+            ),
+        )
+
+    def get_memories_by_source_slice(self, slice_id: str) -> list[SemanticMemoryEntity]:
+        """Reverse-traversal: find all semantic memories derived directly from a raw slice."""
+        rows = self._conn.execute(
+            "SELECT * FROM semantic_memories WHERE source_slice_id = ?;", (slice_id,)
+        ).fetchall()
+        return [
+            SemanticMemoryEntity(
+                memory_id=row["memory_id"],
+                category=row["category"],
+                statement=row["statement"],
+                authority_class=row["authority_class"],
+                scope=row["scope"],
+                project_id=row["project_id"],
+                source_slice_id=row["source_slice_id"],
+                source_event_id=row["source_event_id"],
+                source_episode_id=row["source_episode_id"],
+                valid_from=row["valid_from"],
+                invalidated_at=row["invalidated_at"],
+                superseded_by=row["superseded_by"],
+                validity_status=row["validity_status"],
+                expression_policy=row["expression_policy"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    def get_memories_by_source_event(self, event_id: str) -> list[SemanticMemoryEntity]:
+        """Reverse-traversal: find all semantic memories derived directly from an event skeleton."""
+        rows = self._conn.execute(
+            "SELECT * FROM semantic_memories WHERE source_event_id = ?;", (event_id,)
+        ).fetchall()
+        return [
+            SemanticMemoryEntity(
+                memory_id=row["memory_id"],
+                category=row["category"],
+                statement=row["statement"],
+                authority_class=row["authority_class"],
+                scope=row["scope"],
+                project_id=row["project_id"],
+                source_slice_id=row["source_slice_id"],
+                source_event_id=row["source_event_id"],
+                source_episode_id=row["source_episode_id"],
+                valid_from=row["valid_from"],
+                invalidated_at=row["invalidated_at"],
+                superseded_by=row["superseded_by"],
+                validity_status=row["validity_status"],
+                expression_policy=row["expression_policy"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    def get_memories_by_source_episode(self, episode_id: str) -> list[SemanticMemoryEntity]:
+        """Reverse-traversal: find all semantic memories derived directly from an episode."""
+        rows = self._conn.execute(
+            "SELECT * FROM semantic_memories WHERE source_episode_id = ?;", (episode_id,)
+        ).fetchall()
+        return [
+            SemanticMemoryEntity(
+                memory_id=row["memory_id"],
+                category=row["category"],
+                statement=row["statement"],
+                authority_class=row["authority_class"],
+                scope=row["scope"],
+                project_id=row["project_id"],
+                source_slice_id=row["source_slice_id"],
+                source_event_id=row["source_event_id"],
+                source_episode_id=row["source_episode_id"],
+                valid_from=row["valid_from"],
+                invalidated_at=row["invalidated_at"],
+                superseded_by=row["superseded_by"],
+                validity_status=row["validity_status"],
+                expression_policy=row["expression_policy"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    def get_provenance_refs_for_memory(self, memory_id: str) -> list[dict[str, str]]:
+        """Return typed provenance references (IMPL-2) for a given semantic memory."""
+        mem = self.get_semantic_memory(memory_id)
+        if not mem:
+            return []
+        refs: list[dict[str, str]] = []
+        if mem.source_slice_id:
+            refs.append({"kind": "slice", "id": mem.source_slice_id, "role": "primary_source"})
+        if mem.source_event_id:
+            refs.append({"kind": "event", "id": mem.source_event_id, "role": "primary_source"})
+        if mem.source_episode_id:
+            refs.append(
+                {"kind": "episode", "id": mem.source_episode_id, "role": "contextual_source"}
+            )
+        reinf_rows = self._conn.execute(
+            "SELECT slice_id, event_id FROM evidence_reinforcements WHERE memory_id = ?;",
+            (memory_id,),
+        ).fetchall()
+        for r in reinf_rows:
+            if r["slice_id"]:
+                refs.append({"kind": "slice", "id": r["slice_id"], "role": "reinforcement"})
+            if r["event_id"]:
+                refs.append({"kind": "event", "id": r["event_id"], "role": "reinforcement"})
+        return refs
+
+    # ── Repository: Observations & Links (Entities 8 ~ 12) ──────────────────
+
+    def insert_observation(self, obs: ObservationEntity) -> None:
+        """Insert an aggregated objective belief."""
+        self._conn.execute(
+            """
+            INSERT INTO observations (
+                observation_id, scope, project_id, statement, proof_count,
+                status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                obs.observation_id,
+                obs.scope,
+                obs.project_id,
+                obs.statement,
+                obs.proof_count,
+                obs.status,
+                obs.created_at,
+                obs.updated_at or obs.created_at,
+            ),
+        )
+
+    def get_observation(self, observation_id: str) -> ObservationEntity | None:
+        """Fetch an observation by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM observations WHERE observation_id = ?;", (observation_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return ObservationEntity(
+            observation_id=row["observation_id"],
+            scope=row["scope"],
+            project_id=row["project_id"],
+            statement=row["statement"],
+            proof_count=row["proof_count"],
+            status=row["status"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def insert_observation_slice_link(self, link: ObservationSliceLinkEntity) -> None:
+        """Link an observation to a raw slice."""
+        self._conn.execute(
+            """
+            INSERT INTO observation_slice_links (observation_id, slice_id, role, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.observation_id, link.slice_id, link.role, link.linked_at),
+        )
+
+    def insert_observation_event_link(self, link: ObservationEventLinkEntity) -> None:
+        """Link an observation to an event skeleton (Retention Pin)."""
+        self._conn.execute(
+            """
+            INSERT INTO observation_event_links (observation_id, event_id, role, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.observation_id, link.event_id, link.role, link.linked_at),
+        )
+
+    def insert_observation_memory_link(self, link: ObservationMemoryLinkEntity) -> None:
+        """Link an observation to a semantic memory."""
+        self._conn.execute(
+            """
+            INSERT INTO observation_memory_links (observation_id, memory_id, role, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.observation_id, link.memory_id, link.role, link.linked_at),
+        )
+
+    def insert_observation_episode_link(self, link: ObservationEpisodeLinkEntity) -> None:
+        """Link an observation to an episode context scope."""
+        self._conn.execute(
+            """
+            INSERT INTO observation_episode_links (observation_id, episode_id, role, linked_at)
+            VALUES (?, ?, ?, ?);
+            """,
+            (link.observation_id, link.episode_id, link.role, link.linked_at),
+        )
+
+    # ── Repository: Hypotheses & Calibration (Entities 13 ~ 16) ─────────────
+
+    def insert_hypothesis(self, hyp: HypothesisEntity) -> None:
+        """Insert a development hypothesis."""
+        self._conn.execute(
+            """
+            INSERT INTO hypotheses (
+                hypothesis_id, statement, lenses, confidence_class,
+                status, last_calibrated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                hyp.hypothesis_id,
+                hyp.statement,
+                hyp.lenses,
+                hyp.confidence_class,
+                hyp.status,
+                hyp.last_calibrated_at,
+                hyp.created_at,
+            ),
+        )
+
+    def get_hypothesis(self, hypothesis_id: str) -> HypothesisEntity | None:
+        """Fetch a hypothesis by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM hypotheses WHERE hypothesis_id = ?;", (hypothesis_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return HypothesisEntity(
+            hypothesis_id=row["hypothesis_id"],
+            statement=row["statement"],
+            lenses=row["lenses"],
+            confidence_class=row["confidence_class"],
+            status=row["status"],
+            last_calibrated_at=row["last_calibrated_at"],
+            created_at=row["created_at"],
+        )
+
+    def insert_hypothesis_observation_link(self, link: HypothesisObservationLinkEntity) -> None:
+        """Link a hypothesis to a supporting/counter observation."""
+        self._conn.execute(
+            """
+            INSERT INTO hypothesis_observation_links (
+                hypothesis_id, observation_id, role, is_primary, linked_at
+            ) VALUES (?, ?, ?, ?, ?);
+            """,
+            (link.hypothesis_id, link.observation_id, link.role, link.is_primary, link.linked_at),
+        )
+
+    def insert_calibration_event(self, calib: CalibrationEventEntity) -> None:
+        """Record an immutable human calibration decision."""
+        self._conn.execute(
+            """
+            INSERT INTO calibration_events (
+                calibration_id, hypothesis_id, user_action, user_note, calibrated_at
+            ) VALUES (?, ?, ?, ?, ?);
+            """,
+            (
+                calib.calibration_id,
+                calib.hypothesis_id,
+                calib.user_action,
+                calib.user_note,
+                calib.calibrated_at,
+            ),
+        )
+
+    def insert_confirmed_insight(self, insight: ConfirmedInsightEntity) -> None:
+        """Insert a human-confirmed self model insight."""
+        self._conn.execute(
+            """
+            INSERT INTO confirmed_insights (
+                insight_id, source_hypothesis_id, source_calibration_id, statement,
+                valid_from, invalidated_at, superseded_by, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                insight.insight_id,
+                insight.source_hypothesis_id,
+                insight.source_calibration_id,
+                insight.statement,
+                insight.valid_from,
+                insight.invalidated_at,
+                insight.superseded_by,
+                insight.status,
+                insight.created_at or insight.valid_from,
+            ),
+        )
+
+    def get_confirmed_insight(self, insight_id: str) -> ConfirmedInsightEntity | None:
+        """Fetch a confirmed insight by ID."""
+        row = self._conn.execute(
+            "SELECT * FROM confirmed_insights WHERE insight_id = ?;", (insight_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return ConfirmedInsightEntity(
+            insight_id=row["insight_id"],
+            source_hypothesis_id=row["source_hypothesis_id"],
+            source_calibration_id=row["source_calibration_id"],
+            statement=row["statement"],
+            valid_from=row["valid_from"],
+            invalidated_at=row["invalidated_at"],
+            superseded_by=row["superseded_by"],
+            status=row["status"],
+            created_at=row["created_at"],
+        )
+
+    # ── Repository: Chapter Metadata & Links (Entities 17 ~ 20) ─────────────
+
+    def insert_chapter_metadata(self, chap: ChapterMetadataEntity) -> None:
+        """Insert chapter metadata and privacy redaction flag."""
+        self._conn.execute(
+            """
+            INSERT INTO chapter_metadata (
+                chapter_id, title, file_path, time_span_start, time_span_end,
+                needs_privacy_redaction, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                chap.chapter_id,
+                chap.title,
+                chap.file_path,
+                chap.time_span_start,
+                chap.time_span_end,
+                chap.needs_privacy_redaction,
+                chap.created_at,
+            ),
+        )
+
+    def get_chapter_metadata(self, chapter_id: str) -> ChapterMetadataEntity | None:
+        """Fetch a growth chapter's metadata record."""
+        row = self._conn.execute(
+            "SELECT * FROM chapter_metadata WHERE chapter_id = ?;", (chapter_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return ChapterMetadataEntity(
+            chapter_id=row["chapter_id"],
+            title=row["title"],
+            file_path=row["file_path"],
+            time_span_start=row["time_span_start"],
+            time_span_end=row["time_span_end"],
+            needs_privacy_redaction=int(row["needs_privacy_redaction"]),
+            created_at=row["created_at"],
+        )
+
+    def insert_chapter_slice_link(self, link: ChapterSliceLinkEntity) -> None:
+        """Link a chapter to a referenced slice."""
+        self._conn.execute(
+            """
+            INSERT INTO chapter_slice_links (chapter_id, slice_id, linked_at)
+            VALUES (?, ?, ?);
+            """,
+            (link.chapter_id, link.slice_id, link.linked_at),
+        )
+
+    def insert_chapter_episode_link(self, link: ChapterEpisodeLinkEntity) -> None:
+        """Link a chapter to a referenced episode."""
+        self._conn.execute(
+            """
+            INSERT INTO chapter_episode_links (chapter_id, episode_id, linked_at)
+            VALUES (?, ?, ?);
+            """,
+            (link.chapter_id, link.episode_id, link.linked_at),
+        )
+
+    def insert_chapter_insight_link(self, link: ChapterInsightLinkEntity) -> None:
+        """Link a chapter to a confirmed insight."""
+        self._conn.execute(
+            """
+            INSERT INTO chapter_insight_links (chapter_id, insight_id, linked_at)
+            VALUES (?, ?, ?);
+            """,
+            (link.chapter_id, link.insight_id, link.linked_at),
+        )
