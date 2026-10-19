@@ -39,6 +39,7 @@ from src.memory.v2.entities import (
     ObservationSliceLinkEntity,
     RawSliceEntity,
     SemanticMemoryEntity,
+    ValidityStatus,
 )
 
 SCHEMA_VERSION: int = 20261018
@@ -186,7 +187,8 @@ class ChronicleStoreV2:
     def transaction(self) -> Iterator[sqlite3.Cursor]:
         """Explicit atomic transaction scope: commits on exit, rollbacks on error."""
         cursor = self._conn.cursor()
-        cursor.execute("BEGIN;")
+        if not self._conn.in_transaction:
+            cursor.execute("BEGIN;")
         try:
             yield cursor
             self._conn.commit()
@@ -439,6 +441,35 @@ class ChronicleStoreV2:
             validity_status=row["validity_status"],
             expression_policy=row["expression_policy"],
             created_at=row["created_at"],
+        )
+
+    def update_semantic_memory_superseded(
+        self,
+        memory_id: str,
+        invalidated_at: str,
+        superseded_by: str,
+    ) -> None:
+        """Update a semantic memory to superseded status with audit tracking."""
+        self._conn.execute(
+            """
+            UPDATE semantic_memories
+               SET validity_status = 'superseded',
+                   invalidated_at = ?,
+                   superseded_by = ?
+             WHERE memory_id = ?;
+            """,
+            (invalidated_at, superseded_by, memory_id),
+        )
+
+    def update_semantic_memory_status(
+        self,
+        memory_id: str,
+        validity_status: ValidityStatus,
+    ) -> None:
+        """Update validity status of a semantic memory (e.g. to ambiguous or invalidated)."""
+        self._conn.execute(
+            "UPDATE semantic_memories SET validity_status = ? WHERE memory_id = ?;",
+            (validity_status, memory_id),
         )
 
     def insert_evidence_reinforcement(self, item: EvidenceReinforcementEntity) -> None:

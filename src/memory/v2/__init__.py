@@ -5,6 +5,13 @@ Provides access to V2.1 entities, schema definitions, ChronicleStoreV2, and life
 
 from __future__ import annotations
 
+from src.memory.v2.admission import AdmissionFilter
+from src.memory.v2.candidate_extraction import (
+    CandidateExtractor,
+    ProposalProvider,
+    RuleBasedProposalProvider,
+)
+from src.memory.v2.echo_guard import EchoGuard, EchoGuardResult
 from src.memory.v2.entities import (
     CalibrationEventEntity,
     ChapterEpisodeLinkEntity,
@@ -38,11 +45,28 @@ from src.memory.v2.lifecycle import (
     MemoryLifecycleManager,
     TargetNotFoundError,
 )
+from src.memory.v2.proposals import (
+    AdmissionDecision,
+    CandidateSemanticMemory,
+    ConsolidationProposal,
+    SuggestedAction,
+)
 from src.memory.v2.provenance import (
     ProvenanceKind,
     ProvenanceRef,
     ProvenanceRepository,
     ProvenanceRole,
+)
+from src.memory.v2.reconciliation import (
+    MutationPlan,
+    ReconciliationEngine,
+    ReconciliationResult,
+)
+from src.memory.v2.reconciliation_validator import (
+    ReconciliationAction,
+    ReconciliationDecision,
+    ReconciliationValidator,
+    compute_independence_fingerprint,
 )
 from src.memory.v2.router import RawEvidenceRouter
 from src.memory.v2.store import (
@@ -109,4 +133,21 @@ __all__ = [
     "TargetNotFoundError",
     "EventPinnedError",
     "DependencyClosureError",
+    "AdmissionFilter",
+    "CandidateExtractor",
+    "ProposalProvider",
+    "RuleBasedProposalProvider",
+    "EchoGuard",
+    "EchoGuardResult",
+    "AdmissionDecision",
+    "CandidateSemanticMemory",
+    "ConsolidationProposal",
+    "SuggestedAction",
+    "ReconciliationAction",
+    "ReconciliationDecision",
+    "ReconciliationValidator",
+    "compute_independence_fingerprint",
+    "MutationPlan",
+    "ReconciliationResult",
+    "ReconciliationEngine",
 ]
