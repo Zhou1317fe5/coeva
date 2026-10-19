@@ -483,7 +483,9 @@ def build_frozen_canonical_corpus(
             proof_count=1,
             needs_privacy_redaction=1,  # IMPL-3: Physically unreadable
             expression_policy="do_not_mention",
-            provenance_refs=(ProvenanceRef(kind="chapter", id="chap_01", role="supporting"),),
+            provenance_refs=(
+                ProvenanceRef(kind="slice", id="slice_chap_01_origin", role="supporting"),
+            ),
             importance=0.5,
         ),
     ]

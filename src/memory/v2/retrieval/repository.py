@@ -254,7 +254,38 @@ class RetrievalRepository:
             )
             for row in cur.fetchall():
                 chap_id = str(row["chapter_id"])
-                prov = [ProvenanceRef(kind="chapter", id=chap_id, role="supporting")]
+                prov = []
+                if self._has_table("chapter_slice_links"):
+                    s_cur = self._conn.execute(
+                        "SELECT slice_id FROM chapter_slice_links WHERE chapter_id = ?",
+                        (chap_id,),
+                    )
+                    for srow in s_cur.fetchall():
+                        prov.append(
+                            ProvenanceRef(kind="slice", id=str(srow["slice_id"]), role="supporting")
+                        )
+                if self._has_table("chapter_episode_links"):
+                    e_cur = self._conn.execute(
+                        "SELECT episode_id FROM chapter_episode_links WHERE chapter_id = ?",
+                        (chap_id,),
+                    )
+                    for erow in e_cur.fetchall():
+                        prov.append(
+                            ProvenanceRef(
+                                kind="episode", id=str(erow["episode_id"]), role="contextual"
+                            )
+                        )
+                if self._has_table("chapter_insight_links"):
+                    i_cur = self._conn.execute(
+                        "SELECT insight_id FROM chapter_insight_links WHERE chapter_id = ?",
+                        (chap_id,),
+                    )
+                    for irow in i_cur.fetchall():
+                        prov.append(
+                            ProvenanceRef(
+                                kind="insight", id=str(irow["insight_id"]), role="supporting"
+                            )
+                        )
                 needs_redaction = int(row["needs_privacy_redaction"])
                 policy = "normal" if needs_redaction == 0 else "do_not_mention"
                 candidates.append(

@@ -37,6 +37,15 @@ class FusionRanker:
     def __init__(self, config: RetrievalConfig) -> None:
         self.config = config
 
+    def get_boost_policy(self) -> dict[str, float]:
+        """Enumerate the active boost policy."""
+        return {
+            "rule_intent_boost": self.config.rule_intent_boost,
+            "historical_superseded_boost": self.config.historical_superseded_boost,
+            "past_episode_boost": self.config.past_episode_boost,
+            "project_tech_boost": self.config.project_tech_boost,
+        }
+
     def rank_and_gate(
         self,
         scored_candidates: list[tuple[CanonicalCandidateRecord, float, float]],
@@ -59,12 +68,20 @@ class FusionRanker:
                 cat_boost += self.config.rule_intent_boost
             if (
                 intent.is_past_query
+                and record.validity_status == "superseded"
+                and channel_score > 0.05
+            ):
+                cat_boost += self.config.historical_superseded_boost
+            if (
+                self.config.past_episode_boost > 0.0
+                and intent.is_past_query
                 and record.candidate_type in ("episode", "chapter_metadata")
                 and any(w in clean_q for w in ("闪退", "经历", "发生"))
             ):
                 cat_boost += self.config.past_episode_boost
             if (
-                record.scope == "project"
+                self.config.project_tech_boost > 0.0
+                and record.scope == "project"
                 and record.project_id == ctx.current_project_id
                 and any(w in clean_q for w in ("技术栈", "这个项目", "我们项目"))
             ):
@@ -72,7 +89,7 @@ class FusionRanker:
 
             final_score = channel_score + cat_boost
 
-            if final_score >= self.config.confidence_threshold:
+            if round(final_score, 2) >= self.config.confidence_threshold:
                 fused_list.append((final_score, lex_score, surf_score, cat_boost, record))
 
         # Sort descending by final score

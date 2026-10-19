@@ -13,17 +13,18 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class RetrievalConfig:
-    """Frozen tuning parameters and operational bounds."""
+    """Frozen tuning parameters and operational bounds (V2.1 Frozen Calibration)."""
 
     # Fusion weights
     lexical_weight: float = 0.6
     surface_weight: float = 0.4
 
     # Confidence threshold for NO_RELEVANT_MEMORY gating
-    confidence_threshold: float = 0.15
+    confidence_threshold: float = 0.16
 
-    # Category boosts
+    # Intent category boosts
     rule_intent_boost: float = 0.30
+    historical_superseded_boost: float = 0.20
     past_episode_boost: float = 0.25
     project_tech_boost: float = 0.15
 

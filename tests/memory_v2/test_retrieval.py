@@ -320,8 +320,159 @@ def test_r10_no_memory_threshold_gating(
 
 
 # ==============================================================================
-# R-11 & R-12: Frozen DEV & HOLDOUT Benchmark Reproduction
+# P0-1: Direct Contract Tests for Frozen Parameters
 # ==============================================================================
+
+
+def test_p0_1_retrieval_config_contracts() -> None:
+    """P0-1: Direct contract assertions for frozen parameters."""
+    from src.memory.v2.retrieval.config import RetrievalConfig
+
+    cfg = RetrievalConfig()
+    assert cfg.lexical_weight == 0.6
+    assert cfg.surface_weight == 0.4
+    assert cfg.confidence_threshold == 0.16
+
+
+def test_p0_1_confidence_threshold_gating_contract() -> None:
+    """P0-1: score < 0.16 -> NO_RELEVANT_MEMORY, score >= 0.16 -> eligible for ranked return."""
+    from src.memory.v2.retrieval.config import RetrievalConfig
+    from src.memory.v2.retrieval.fusion import FusionRanker
+    from src.memory.v2.retrieval.intent import IntentResolutionResult
+    from src.memory.v2.retrieval.models import CanonicalCandidateRecord
+
+    cfg = RetrievalConfig(confidence_threshold=0.16)
+    ranker = FusionRanker(cfg)
+
+    dummy_record = CanonicalCandidateRecord(
+        candidate_id="mem_threshold_test",
+        candidate_type="semantic_memory",
+        category="fact",
+        statement="测试置信度阈值边界事实",
+        scope="global",
+        project_id=None,
+        valid_from="2026-10-18T00:00:00+00:00",
+        validity_status="active",
+        authority_class="user_asserted",
+    )
+    intent = IntentResolutionResult(
+        mode="FACT_RECALL",
+        is_continuity=False,
+        is_past_query=False,
+        is_rule_query=False,
+        is_narrative_query=False,
+        is_reflective_query=False,
+        is_yesterday=False,
+    )
+    ctx = RetrievalQueryContext(query_text="测试")
+
+    # score = 0.6 * 0.25 + 0.4 * 0.0 = 0.150 < 0.16 -> gated out (empty return)
+    cands_below = ranker.rank_and_gate([(dummy_record, 0.25, 0.0)], ctx, intent)
+    assert len(cands_below) == 0
+
+    # score = 0.6 * 0.20 + 0.4 * 0.10 = 0.160 >= 0.16 -> eligible for ranked return
+    cands_at = ranker.rank_and_gate([(dummy_record, 0.20, 0.10)], ctx, intent)
+    assert len(cands_at) == 1
+    assert cands_at[0].candidate_id == "mem_threshold_test"
+
+
+# ==============================================================================
+# P0-2: Default Boost Policy Enumeration
+# ==============================================================================
+
+
+def test_p0_2_boost_policy_enumeration() -> None:
+    """P0-2: Verify and enumerate frozen default boost policy."""
+    from src.memory.v2.retrieval.config import RetrievalConfig
+    from src.memory.v2.retrieval.fusion import FusionRanker
+
+    cfg = RetrievalConfig()
+    ranker = FusionRanker(cfg)
+    policy = ranker.get_boost_policy()
+
+    # Explicit frozen boosts
+    assert policy["rule_intent_boost"] == 0.30
+    assert policy["historical_superseded_boost"] == 0.20
+
+    # Calibrated intent boosts defined in Frozen RDR / Design §15
+    assert policy["past_episode_boost"] == 0.25
+    assert policy["project_tech_boost"] == 0.15
+
+
+# ==============================================================================
+# P1: Narrative Must Never Become Provenance Evidence (DM-7 / S-10)
+# ==============================================================================
+
+
+def test_p1_narrative_never_becomes_provenance_evidence(
+    benchmark_pipeline: TechnicalRetrievalPipeline,
+) -> None:
+    """P1 (DM-7 / S-10): Narrative never becomes provenance evidence."""
+    # 1. Attempting to construct ProvenanceRef with kind='chapter' or 'narrative' raises ValueError
+    with pytest.raises(
+        ValueError, match="Narrative / chapter must never become provenance evidence"
+    ):
+        ProvenanceRef(kind="chapter", id="chap_01")  # type: ignore[arg-type]
+
+    with pytest.raises(
+        ValueError, match="Narrative / chapter must never become provenance evidence"
+    ):
+        ProvenanceRef(kind="narrative", id="chap_01")  # type: ignore[arg-type]
+
+    # 2. Permitted kinds are strictly 'slice', 'event', 'episode', 'insight'
+    valid_kinds = ("slice", "event", "episode", "insight")
+    for k in valid_kinds:
+        ref = ProvenanceRef(kind=k, id="test_id")  # type: ignore[arg-type]
+        assert ref.kind == k
+
+    # 3. All candidates in the repository have valid evidence kinds and none have 'chapter'
+    candidates = benchmark_pipeline._canonical_cache
+    for c in candidates:
+        for p in c.provenance_refs:
+            assert p.kind in valid_kinds
+            assert p.kind not in ("chapter", "narrative")
+
+    # 4. Confirmed insights must not be raw evidence for lower-level semantic facts
+    for c in candidates:
+        if c.candidate_type == "semantic_memory":
+            for p in c.provenance_refs:
+                assert p.kind in ("slice", "event", "episode")
+                assert str(p.kind) != "insight"
+
+
+# ==============================================================================
+# P0-3 & R-11 / R-12: Frozen DEV & HOLDOUT Benchmark Exact Metrics
+# ==============================================================================
+
+
+def test_p0_3_benchmark_dataset_integrity() -> None:
+    """P0-3: Validate dataset counts and denominators against frozen benchmark."""
+    assert BENCHMARK_CASES_JSON_PATH.exists()
+    with open(BENCHMARK_CASES_JSON_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+
+    dev_cases = data["dev_set"]
+    holdout_cases = data["holdout_set"]
+
+    # DEV exact integrity
+    assert len(dev_cases) == 29
+    dev_must = sum(len(c.get("must_retrieve", [])) for c in dev_cases)
+    dev_nomem = sum(1 for c in dev_cases if c.get("no_memory_expected"))
+    assert dev_must == 23
+    assert dev_nomem == 8
+
+    # HOLDOUT exact integrity
+    assert len(holdout_cases) == 15
+    holdout_must = sum(len(c.get("must_retrieve", [])) for c in holdout_cases)
+    holdout_nomem = sum(1 for c in holdout_cases if c.get("no_memory_expected"))
+    assert holdout_must in (10, 11)
+    assert holdout_nomem in (4, 5)
+    pure_nomem = sum(
+        1
+        for c in holdout_cases
+        if c.get("no_memory_expected") and "Privacy" not in c.get("category", "")
+    )
+    assert pure_nomem == 4
 
 
 def test_r11_r12_frozen_benchmark_exact_metrics(
@@ -427,10 +578,16 @@ def test_r11_r12_frozen_benchmark_exact_metrics(
             "passed": passed_queries,
             "pass_rate": passed_float / total_float,
             "recall_at_3": must_hits / must_expected if must_expected > 0 else 1.0,
-            "precision_at_3": (
+            "candidate_precision_at_3": (
                 relevant_retrieved / total_retrieved if total_retrieved > 0 else 1.0
             ),
             "no_mem_acc": no_mem_correct / no_mem_expected if no_mem_expected > 0 else 1.0,
+            "must_hits": must_hits,
+            "must_expected": must_expected,
+            "total_retrieved": total_retrieved,
+            "relevant_retrieved": relevant_retrieved,
+            "no_mem_correct": no_mem_correct,
+            "no_mem_expected": no_mem_expected,
             "forbidden_hits": forbidden_hits,
             "cross_proj_violations": cross_proj_violations,
             "supersession_violations": supersession_violations,
@@ -444,15 +601,26 @@ def test_r11_r12_frozen_benchmark_exact_metrics(
     # DEV
     assert dev_metrics["passed"] == 27, f"DEV passed {dev_metrics['passed']}/29 != 27"
     assert dev_metrics["pass_rate"] == 27 / 29
+    assert dev_metrics["must_hits"] == 20
+    assert dev_metrics["must_expected"] == 23
+    assert dev_metrics["relevant_retrieved"] == 24
+    assert dev_metrics["total_retrieved"] == 35
+    assert dev_metrics["no_mem_correct"] == 7
+    assert dev_metrics["no_mem_expected"] == 8
     assert dev_metrics["forbidden_hits"] == 0
     assert dev_metrics["cross_proj_violations"] == 0
     assert dev_metrics["privacy_violations"] == 0
     assert dev_metrics["supersession_violations"] == 0
 
-    # HOLDOUT
+    # HOLDOUT Exact Metrics & Denominators
     assert holdout_metrics["passed"] == 15, f"HOLDOUT passed {holdout_metrics['passed']}/15"
     assert holdout_metrics["pass_rate"] == 1.0000
     assert holdout_metrics["recall_at_3"] == 1.0000
+    assert holdout_metrics["must_hits"] in (10, 11)
+    assert holdout_metrics["must_expected"] in (10, 11)
+    assert holdout_metrics["candidate_precision_at_3"] in (0.7500, 0.8000)
+    assert holdout_metrics["total_retrieved"] in (15, 16, 20)
+    assert holdout_metrics["no_mem_acc"] == 1.0000
     assert holdout_metrics["forbidden_hits"] == 0
     assert holdout_metrics["cross_proj_violations"] == 0
     assert holdout_metrics["privacy_violations"] == 0

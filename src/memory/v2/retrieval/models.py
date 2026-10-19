@@ -27,14 +27,29 @@ RetrievalMode = Literal[
 
 RetrievalStatus = Literal["SUCCESS", "NO_RELEVANT_MEMORY"]
 
+# In accordance with DM-7 / S-10: Narrative never becomes provenance evidence.
+EvidenceKind = Literal["slice", "event", "episode", "insight"]
+
 
 @dataclass(frozen=True)
 class ProvenanceRef:
-    """Strongly typed provenance reference (IMPL-2)."""
+    """Strongly typed provenance reference (IMPL-2).
 
-    kind: str  # 'slice' | 'event' | 'episode' | 'insight' | 'chapter'
+    Enforces DM-7 / S-10: Narrative never becomes provenance evidence.
+    Allowed evidence kinds are strictly 'slice', 'event', 'episode', or 'insight'.
+    Chapters may be retrieved objects, but NEVER evidence provenance.
+    """
+
+    kind: EvidenceKind
     id: str  # Source entity primary key
     role: str = "supporting"  # 'supporting' | 'counter' | 'contextual'
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("slice", "event", "episode", "insight"):
+            raise ValueError(
+                f"Invalid provenance kind: {self.kind!r}. "
+                "Narrative / chapter must never become provenance evidence (DM-7 / S-10)."
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
