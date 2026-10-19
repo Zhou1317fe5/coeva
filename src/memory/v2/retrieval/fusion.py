@@ -126,6 +126,9 @@ class FusionRanker:
                 final_score=round(final_score, 4),
                 why_retrieved=why,
                 is_ambiguous=(rec.validity_status == "ambiguous"),
+                needs_privacy_redaction=rec.needs_privacy_redaction,
+                expression_policy=rec.expression_policy,
+                category=rec.category,
             )
             results.append(cand)
 

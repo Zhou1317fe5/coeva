@@ -95,3 +95,18 @@ Coeva 作为轻量常驻 Windows 桌面伴生体，必须在 Python 3.11 + SQLit
 ### 明确合规边界 (Compliance Boundary)
 - 检索层绝不直接将未经验证的候选文本塞入 LLM 回复；
 - 检索结果必须封装为强类型 `RetrievedCandidate` 交付给 Recall Gate 处理。
+
+---
+
+## 4. INTERFACE CHANGE REQUEST (WP-8 Recall Gate & Sanctuary Integration)
+
+- **Change Scope**: `src/memory/v2/retrieval/models.py` (`RetrievedCandidate`)
+- **Motivation**: WP-8 Recall Gate acts as an authoritative second policy boundary (Prompt §3 & §8) performing defense-in-depth verification (IMPL-3 privacy-pending unreadability, Sanctuary expression policy, category isolation) without re-executing storage lookups.
+- **Specification**:
+  - Add optional fields to `RetrievedCandidate` with backwards-compatible defaults:
+    - `needs_privacy_redaction: int = 0`
+    - `expression_policy: str = "normal"`
+    - `category: str = "fact"`
+- **Backwards Compatibility**:
+  - 100% backwards-compatible: existing positional/keyword construction in WP-7 continues to function identically.
+  - Passes all 89 retrieval tests and maintains zero benchmark degradation.

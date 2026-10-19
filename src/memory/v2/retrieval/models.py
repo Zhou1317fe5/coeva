@@ -95,6 +95,9 @@ class RetrievedCandidate:
     final_score: float
     why_retrieved: str
     is_ambiguous: bool
+    needs_privacy_redaction: int = 0
+    expression_policy: str = "normal"
+    category: str = "fact"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -113,6 +116,9 @@ class RetrievedCandidate:
             "final_score": self.final_score,
             "why_retrieved": self.why_retrieved,
             "is_ambiguous": self.is_ambiguous,
+            "needs_privacy_redaction": self.needs_privacy_redaction,
+            "expression_policy": self.expression_policy,
+            "category": self.category,
         }
 
 

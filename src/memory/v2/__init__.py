@@ -27,6 +27,18 @@ from src.memory.v2.entities import (
     RawSliceEntity,
     SemanticMemoryEntity,
 )
+from src.memory.v2.injection_policy import (
+    InjectedMemoryItem,
+    InjectionContext,
+    MinimalInjectionPolicy,
+)
+from src.memory.v2.recall_gate import (
+    RecallContext,
+    RecallDecision,
+    RecallDisposition,
+    RecallGate,
+    RecallReason,
+)
 from src.memory.v2.router import RawEvidenceRouter
 from src.memory.v2.store import (
     CANONICAL_TABLES,
@@ -80,4 +92,12 @@ __all__ = [
     "WriteConflictError",
     "WriteDurabilityError",
     "RawEvidenceRouter",
+    "RecallGate",
+    "RecallContext",
+    "RecallDecision",
+    "RecallDisposition",
+    "RecallReason",
+    "InjectionContext",
+    "InjectedMemoryItem",
+    "MinimalInjectionPolicy",
 ]

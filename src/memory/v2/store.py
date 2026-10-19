@@ -238,6 +238,7 @@ class ChronicleStoreV2:
             ingestion_dedup_key=row["ingestion_dedup_key"],
             created_at=row["created_at"],
         )
+
     def get_raw_slice_by_dedup_key(self, dedup_key: str) -> RawSliceEntity | None:
         """Fetch a single raw slice by its ingestion dedup key."""
         row = self._conn.execute(
@@ -256,7 +257,6 @@ class ChronicleStoreV2:
             ingestion_dedup_key=row["ingestion_dedup_key"],
             created_at=row["created_at"],
         )
-
 
     def list_raw_slices(self, limit: int = 50, offset: int = 0) -> list[RawSliceEntity]:
         """List raw slices ordered newest-first."""
