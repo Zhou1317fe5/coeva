@@ -238,6 +238,7 @@ class ChronicleStoreV2:
             ingestion_dedup_key=row["ingestion_dedup_key"],
             created_at=row["created_at"],
         )
+
     def get_raw_slice_by_dedup_key(self, dedup_key: str) -> RawSliceEntity | None:
         """Fetch a single raw slice by its ingestion dedup key."""
         row = self._conn.execute(
@@ -256,7 +257,6 @@ class ChronicleStoreV2:
             ingestion_dedup_key=row["ingestion_dedup_key"],
             created_at=row["created_at"],
         )
-
 
     def list_raw_slices(self, limit: int = 50, offset: int = 0) -> list[RawSliceEntity]:
         """List raw slices ordered newest-first."""
@@ -820,3 +820,259 @@ class ChronicleStoreV2:
             """,
             (link.chapter_id, link.insight_id, link.linked_at),
         )
+
+    # ── Typed Provenance Reverse Traversal & Query Primitives ───────────────
+
+    def get_observations_by_source_slice(self, slice_id: str) -> list[ObservationEntity]:
+        """Return all observations directly referencing a raw slice."""
+        rows = self._conn.execute(
+            """
+            SELECT o.* FROM observation_slice_links osl
+            JOIN observations o ON osl.observation_id = o.observation_id
+            WHERE osl.slice_id = ?;
+            """,
+            (slice_id,),
+        ).fetchall()
+        return [
+            ObservationEntity(
+                observation_id=r["observation_id"],
+                scope=r["scope"],
+                project_id=r["project_id"],
+                statement=r["statement"],
+                proof_count=r["proof_count"],
+                status=r["status"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+            for r in rows
+        ]
+
+    def get_observations_by_source_event(self, event_id: str) -> list[ObservationEntity]:
+        """Return all observations referencing an event skeleton."""
+        rows = self._conn.execute(
+            """
+            SELECT o.* FROM observation_event_links oel
+            JOIN observations o ON oel.observation_id = o.observation_id
+            WHERE oel.event_id = ?;
+            """,
+            (event_id,),
+        ).fetchall()
+        return [
+            ObservationEntity(
+                observation_id=r["observation_id"],
+                scope=r["scope"],
+                project_id=r["project_id"],
+                statement=r["statement"],
+                proof_count=r["proof_count"],
+                status=r["status"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+            for r in rows
+        ]
+
+    def get_observations_by_source_memory(self, memory_id: str) -> list[ObservationEntity]:
+        """Return all observations referencing a semantic memory."""
+        rows = self._conn.execute(
+            """
+            SELECT o.* FROM observation_memory_links oml
+            JOIN observations o ON oml.observation_id = o.observation_id
+            WHERE oml.memory_id = ?;
+            """,
+            (memory_id,),
+        ).fetchall()
+        return [
+            ObservationEntity(
+                observation_id=r["observation_id"],
+                scope=r["scope"],
+                project_id=r["project_id"],
+                statement=r["statement"],
+                proof_count=r["proof_count"],
+                status=r["status"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+            for r in rows
+        ]
+
+    def get_hypotheses_by_observation(self, observation_id: str) -> list[HypothesisEntity]:
+        """Return all hypotheses referencing an observation."""
+        rows = self._conn.execute(
+            """
+            SELECT h.* FROM hypothesis_observation_links hol
+            JOIN hypotheses h ON hol.hypothesis_id = h.hypothesis_id
+            WHERE hol.observation_id = ?;
+            """,
+            (observation_id,),
+        ).fetchall()
+        return [
+            HypothesisEntity(
+                hypothesis_id=r["hypothesis_id"],
+                statement=r["statement"],
+                lenses=r["lenses"],
+                confidence_class=r["confidence_class"],
+                status=r["status"],
+                last_calibrated_at=r["last_calibrated_at"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_confirmed_insights_by_hypothesis(
+        self, hypothesis_id: str
+    ) -> list[ConfirmedInsightEntity]:
+        """Return all confirmed insights derived from a hypothesis."""
+        rows = self._conn.execute(
+            "SELECT * FROM confirmed_insights WHERE source_hypothesis_id = ?;",
+            (hypothesis_id,),
+        ).fetchall()
+        return [
+            ConfirmedInsightEntity(
+                insight_id=r["insight_id"],
+                source_hypothesis_id=r["source_hypothesis_id"],
+                source_calibration_id=r["source_calibration_id"],
+                statement=r["statement"],
+                valid_from=r["valid_from"],
+                invalidated_at=r["invalidated_at"],
+                superseded_by=r["superseded_by"],
+                status=r["status"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_chapters_by_slice(self, slice_id: str) -> list[ChapterMetadataEntity]:
+        """Return all chapters referencing a raw slice."""
+        rows = self._conn.execute(
+            """
+            SELECT cm.* FROM chapter_slice_links csl
+            JOIN chapter_metadata cm ON csl.chapter_id = cm.chapter_id
+            WHERE csl.slice_id = ?;
+            """,
+            (slice_id,),
+        ).fetchall()
+        return [
+            ChapterMetadataEntity(
+                chapter_id=r["chapter_id"],
+                title=r["title"],
+                file_path=r["file_path"],
+                time_span_start=r["time_span_start"],
+                time_span_end=r["time_span_end"],
+                needs_privacy_redaction=int(r["needs_privacy_redaction"]),
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_chapters_by_episode(self, episode_id: str) -> list[ChapterMetadataEntity]:
+        """Return all chapters referencing an episode."""
+        rows = self._conn.execute(
+            """
+            SELECT cm.* FROM chapter_episode_links cel
+            JOIN chapter_metadata cm ON cel.chapter_id = cm.chapter_id
+            WHERE cel.episode_id = ?;
+            """,
+            (episode_id,),
+        ).fetchall()
+        return [
+            ChapterMetadataEntity(
+                chapter_id=r["chapter_id"],
+                title=r["title"],
+                file_path=r["file_path"],
+                time_span_start=r["time_span_start"],
+                time_span_end=r["time_span_end"],
+                needs_privacy_redaction=int(r["needs_privacy_redaction"]),
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_chapters_by_insight(self, insight_id: str) -> list[ChapterMetadataEntity]:
+        """Return all chapters referencing a confirmed insight."""
+        rows = self._conn.execute(
+            """
+            SELECT cm.* FROM chapter_insight_links cil
+            JOIN chapter_metadata cm ON cil.chapter_id = cm.chapter_id
+            WHERE cil.insight_id = ?;
+            """,
+            (insight_id,),
+        ).fetchall()
+        return [
+            ChapterMetadataEntity(
+                chapter_id=r["chapter_id"],
+                title=r["title"],
+                file_path=r["file_path"],
+                time_span_start=r["time_span_start"],
+                time_span_end=r["time_span_end"],
+                needs_privacy_redaction=int(r["needs_privacy_redaction"]),
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def get_provenance_refs_for_observation(self, observation_id: str) -> list[dict[str, str]]:
+        """Return typed provenance references (IMPL-2) for an observation."""
+        refs: list[dict[str, str]] = []
+        # Slices
+        for r in self._conn.execute(
+            "SELECT slice_id, role FROM observation_slice_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall():
+            refs.append({"kind": "slice", "id": r["slice_id"], "role": r["role"]})
+        # Events
+        for r in self._conn.execute(
+            "SELECT event_id, role FROM observation_event_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall():
+            refs.append({"kind": "event", "id": r["event_id"], "role": r["role"]})
+        # Memories
+        for r in self._conn.execute(
+            "SELECT memory_id, role FROM observation_memory_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall():
+            refs.append({"kind": "semantic_memory", "id": r["memory_id"], "role": r["role"]})
+        # Episodes
+        for r in self._conn.execute(
+            "SELECT episode_id, role FROM observation_episode_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall():
+            refs.append({"kind": "episode", "id": r["episode_id"], "role": r["role"]})
+        return refs
+
+    def get_provenance_refs_for_hypothesis(self, hypothesis_id: str) -> list[dict[str, str]]:
+        """Return typed provenance references (IMPL-2) for a hypothesis."""
+        refs: list[dict[str, str]] = []
+        for r in self._conn.execute(
+            "SELECT observation_id, role, is_primary FROM hypothesis_observation_links "
+            "WHERE hypothesis_id = ?;",
+            (hypothesis_id,),
+        ).fetchall():
+            role = "primary_supporting" if r["is_primary"] else r["role"]
+            refs.append({"kind": "observation", "id": r["observation_id"], "role": role})
+        return refs
+
+    def get_provenance_refs_for_chapter(self, chapter_id: str) -> list[dict[str, str]]:
+        """Return typed provenance references for a growth chapter."""
+        refs: list[dict[str, str]] = []
+        for r in self._conn.execute(
+            "SELECT slice_id FROM chapter_slice_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall():
+            refs.append({"kind": "slice", "id": r["slice_id"], "role": "citation"})
+        for r in self._conn.execute(
+            "SELECT episode_id FROM chapter_episode_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall():
+            refs.append({"kind": "episode", "id": r["episode_id"], "role": "citation"})
+        for r in self._conn.execute(
+            "SELECT insight_id FROM chapter_insight_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall():
+            refs.append({"kind": "insight", "id": r["insight_id"], "role": "citation"})
+        return refs
+
+    def get_lifecycle_service(self) -> Any:
+        """Return a LifecycleService bound to this store."""
+        from src.memory.v2.lifecycle import LifecycleService
+
+        return LifecycleService(self)

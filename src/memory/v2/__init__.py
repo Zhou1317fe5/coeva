@@ -1,6 +1,6 @@
 """Memory V2 package root.
 
-Provides access to V2.1 entities, schema definitions, and ChronicleStoreV2.
+Provides access to V2.1 entities, schema definitions, ChronicleStoreV2, and lifecycle management.
 """
 
 from __future__ import annotations
@@ -26,6 +26,23 @@ from src.memory.v2.entities import (
     ObservationSliceLinkEntity,
     RawSliceEntity,
     SemanticMemoryEntity,
+)
+from src.memory.v2.lifecycle import (
+    DependencyClosureError,
+    EventPinnedError,
+    HardDeleteResult,
+    ImpactReport,
+    LifecycleAction,
+    LifecycleError,
+    LifecycleService,
+    MemoryLifecycleManager,
+    TargetNotFoundError,
+)
+from src.memory.v2.provenance import (
+    ProvenanceKind,
+    ProvenanceRef,
+    ProvenanceRepository,
+    ProvenanceRole,
 )
 from src.memory.v2.router import RawEvidenceRouter
 from src.memory.v2.store import (
@@ -71,7 +88,6 @@ __all__ = [
     "ChapterSliceLinkEntity",
     "ChapterEpisodeLinkEntity",
     "ChapterInsightLinkEntity",
-    "ChapterInsightLinkEntity",
     "RawEvidenceWriteService",
     "WriteSliceCommand",
     "WriteSliceResult",
@@ -80,4 +96,17 @@ __all__ = [
     "WriteConflictError",
     "WriteDurabilityError",
     "RawEvidenceRouter",
+    "ProvenanceKind",
+    "ProvenanceRole",
+    "ProvenanceRef",
+    "ProvenanceRepository",
+    "LifecycleService",
+    "MemoryLifecycleManager",
+    "LifecycleAction",
+    "ImpactReport",
+    "HardDeleteResult",
+    "LifecycleError",
+    "TargetNotFoundError",
+    "EventPinnedError",
+    "DependencyClosureError",
 ]
