@@ -139,7 +139,6 @@ def seed_canonical_benchmark_database(store: ChronicleStoreV2) -> None:
     fp_pyside_init = compute_independence_fingerprint(
         statement="项目用 PySide6 作为表现层",
         episode_id="ep_pyside_work",
-        source_day_utc="2026-10-18",
     )
     store.connection.execute(
         """

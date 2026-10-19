@@ -67,6 +67,8 @@ from src.memory.v2.reconciliation_validator import (
     ReconciliationDecision,
     ReconciliationValidator,
     compute_independence_fingerprint,
+    compute_independence_hash,
+    normalize_content,
 )
 from src.memory.v2.router import RawEvidenceRouter
 from src.memory.v2.store import (
@@ -147,6 +149,8 @@ __all__ = [
     "ReconciliationDecision",
     "ReconciliationValidator",
     "compute_independence_fingerprint",
+    "compute_independence_hash",
+    "normalize_content",
     "MutationPlan",
     "ReconciliationResult",
     "ReconciliationEngine",

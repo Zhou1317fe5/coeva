@@ -14,10 +14,12 @@ Phase 2 Deterministic Local Validation Engine:
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
+from src.memory.v2.candidate_extraction import NORMALIZATION_STRIP_PREFIXES
 from src.memory.v2.echo_guard import EchoGuard, EchoGuardResult
 from src.memory.v2.entities import (
     AuthorityClass,
@@ -81,6 +83,19 @@ UNIVERSAL_SCOPE_MARKERS = [
 ]
 
 
+def normalize_content(content: str) -> str:
+    """Normalize statement content for canonical independence hashing.
+
+    Strips conversational fillers and trailing punctuation while preserving
+    semantic qualifiers and conditionality.
+    """
+    cleaned = content.strip()
+    for pattern in NORMALIZATION_STRIP_PREFIXES:
+        cleaned = pattern.sub("", cleaned).strip()
+    cleaned = re.sub(r"[\s,，.。!！?？~、]+$", "", cleaned).strip()
+    return cleaned
+
+
 def compute_independence_fingerprint(
     statement: str,
     episode_id: str = "",
@@ -88,14 +103,22 @@ def compute_independence_fingerprint(
 ) -> str:
     """Compute SHA256 independence fingerprint for evidence reinforcement deduplication.
 
-    Follows Frozen Consolidation Design Section 14.2:
-        fingerprint = SHA256(normalized_statement + "|" + episode_id + "|" + source_day_utc)
+    Follows Frozen Data Model:
+        independence_hash = hash(episode_id + normalized_content)
+    and:
+        proof_count = COUNT(DISTINCT independence_hash)
+
+    Notice: source_day_utc is strictly excluded from the hash identity so that
+    same-Episode repetitions across UTC date boundaries never inflate proof_count.
     """
-    normalized = statement.strip()
+    normalized = normalize_content(statement)
     ep = episode_id.strip() if episode_id else ""
-    day = source_day_utc.strip() if source_day_utc else ""
-    raw = f"{normalized}|{ep}|{day}"
+    raw = f"{ep}|{normalized}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+# Canonical alias aligned with Frozen Data Model terminology
+compute_independence_hash = compute_independence_fingerprint
 
 
 @dataclass(frozen=True)
@@ -300,12 +323,19 @@ class ReconciliationValidator:
         proof_delta = 1
         final_target_id: str | None = None
         fingerprint: str | None = None
+        is_same_content = target_mem is not None and normalize_content(
+            claim.statement
+        ) == normalize_content(target_mem.statement)
 
-        is_supersede_intent = (
-            suggested_action == "SUPERSEDE"
-            or is_explicit_correction
-            or (is_migration and target_mem is not None)
-        )
+        if is_same_content and suggested_action != "SUPERSEDE":
+            is_supersede_intent = False
+        else:
+            is_supersede_intent = (
+                suggested_action == "SUPERSEDE"
+                or is_explicit_correction
+                or (is_migration and target_mem is not None and not is_same_content)
+            )
+
         if is_supersede_intent:
             if target_mem is None or target_mem.validity_status != "active":
                 # P0 Fail-Closed: No active target exists in DB!
@@ -331,10 +361,8 @@ class ReconciliationValidator:
             else:
                 # Rule-V5: Independent Evidence Fingerprint Collision Check
                 ep_id = str(ctx.get("episode_id") or "")
-                occurred_at = claim.temporal_anchor or str(ctx.get("occurred_at", ""))
-                source_day_utc = occurred_at[:10] if len(occurred_at) >= 10 else ""
                 stmt_to_hash = target_mem.statement if target_mem else claim.statement
-                fingerprint = compute_independence_fingerprint(stmt_to_hash, ep_id, source_day_utc)
+                fingerprint = compute_independence_fingerprint(stmt_to_hash, ep_id)
 
                 existing_reinf = self.store.connection.execute(
                     "SELECT 1 FROM evidence_reinforcements WHERE memory_id = ? "
@@ -385,12 +413,8 @@ class ReconciliationValidator:
                 elif not is_migration and not is_explicit_correction:
                     # Reaffirmation or repetition of existing target memory
                     ep_id = str(ctx.get("episode_id") or "")
-                    occurred_at = claim.temporal_anchor or str(ctx.get("occurred_at", ""))
-                    source_day_utc = occurred_at[:10] if len(occurred_at) >= 10 else ""
                     stmt_to_hash = target_mem.statement if target_mem else claim.statement
-                    fingerprint = compute_independence_fingerprint(
-                        stmt_to_hash, ep_id, source_day_utc
-                    )
+                    fingerprint = compute_independence_fingerprint(stmt_to_hash, ep_id)
 
                     existing_reinf = self.store.connection.execute(
                         "SELECT 1 FROM evidence_reinforcements WHERE memory_id = ? "

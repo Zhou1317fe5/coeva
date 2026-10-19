@@ -28,6 +28,8 @@ from src.memory.v2.proposals import (
 from src.memory.v2.reconciliation_validator import (
     ReconciliationValidator,
     compute_independence_fingerprint,
+    compute_independence_hash,
+    normalize_content,
 )
 from src.memory.v2.store import ChronicleStoreV2
 
@@ -255,11 +257,10 @@ def test_rule_v5_fingerprint_collision_degrades_to_noop(
     )
     in_memory_store.insert_semantic_memory(existing_mem)
 
-    # Pre-record reinforcement for episode ep_pyside_work on 2026-10-18
+    # Pre-record reinforcement for episode ep_pyside_work
     fp = compute_independence_fingerprint(
         statement="项目用 PySide6 作为表现层",
         episode_id="ep_pyside_work",
-        source_day_utc="2026-10-18",
     )
     in_memory_store.connection.execute(
         """
@@ -323,11 +324,10 @@ def test_rule_v5_new_episode_reinforces_successfully(
     )
     in_memory_store.insert_semantic_memory(existing_mem)
 
-    # Pre-record reinforcement for episode ep_pyside_work on 2026-10-18
+    # Pre-record reinforcement for episode ep_pyside_work
     fp = compute_independence_fingerprint(
         statement="项目用 PySide6 作为表现层",
         episode_id="ep_pyside_work",
-        source_day_utc="2026-10-18",
     )
     in_memory_store.connection.execute(
         """
@@ -422,6 +422,241 @@ def test_echo_guard_pure_echo_results_in_noop(
         claim,
         admission,
         echo_result=echo_result,
+    )
+    assert decision.action == "NOOP"
+    assert decision.proof_delta == 0
+
+
+def test_independence_hash_same_episode_across_utc_midnight(
+    in_memory_store: ChronicleStoreV2,
+) -> None:
+    """Same episode + same normalized content + different timestamps/days -> same hash, NOOP."""
+    statement = "主显示器换成了 4K 显示器"
+    ep_id = "ep_cross_midnight"
+
+    # Compute hash on day 1 vs day 2 (crossing UTC midnight)
+    hash_day1 = compute_independence_fingerprint(
+        statement, episode_id=ep_id, source_day_utc="2026-10-18"
+    )
+    hash_day2 = compute_independence_fingerprint(
+        statement, episode_id=ep_id, source_day_utc="2026-10-19"
+    )
+    canonical_hash = compute_independence_hash(statement, episode_id=ep_id)
+
+    # Must be 100% identical regardless of timestamp or day
+    assert hash_day1 == hash_day2 == canonical_hash
+
+    # Seed base slice & memory at 23:55 UTC on 2026-10-18
+    slice_day1 = make_test_slice(
+        slice_id="slice_mid_01",
+        occurred_at="2026-10-18T23:55:00+00:00",
+        content=statement,
+    )
+    in_memory_store.insert_raw_slice(slice_day1)
+    mem = SemanticMemoryEntity(
+        memory_id="mem_mid_01",
+        category="fact",
+        statement=statement,
+        authority_class="user_asserted",
+        scope="unresolved",
+        valid_from="2026-10-18T23:55:00+00:00",
+        validity_status="active",
+        source_slice_id="slice_mid_01",
+    )
+    in_memory_store.insert_semantic_memory(mem)
+
+    # Record first reinforcement in ep_cross_midnight
+    in_memory_store.connection.execute(
+        """
+        INSERT INTO evidence_reinforcements (
+            reinforcement_id, memory_id, slice_id, independence_fingerprint, occurred_at
+        ) VALUES (?, ?, ?, ?, ?);
+        """,
+        (
+            "reinf_mid_01",
+            "mem_mid_01",
+            "slice_mid_01",
+            canonical_hash,
+            "2026-10-18T23:55:00+00:00",
+        ),
+    )
+
+    # Second mention at 00:05 UTC on next day (2026-10-19) in SAME episode
+    slice_day2 = make_test_slice(
+        slice_id="slice_mid_02",
+        occurred_at="2026-10-19T00:05:00+00:00",
+        content=statement,
+    )
+    in_memory_store.insert_raw_slice(slice_day2)
+
+    validator = ReconciliationValidator(in_memory_store)
+    claim = CandidateSemanticMemory(
+        statement=statement,
+        category="fact",
+        scope="unresolved",
+        authority_class="user_asserted",
+        source_slice_id="slice_mid_02",
+        suggested_action="REINFORCE",
+        target_superseded_id="mem_mid_01",
+        temporal_anchor="2026-10-19T00:05:00+00:00",
+    )
+    admission = AdmissionDecision(decision="ADMIT", rationale="Next-day mention in same episode")
+
+    decision = validator.validate_claim(
+        claim,
+        admission,
+        context={"episode_id": ep_id},
+    )
+
+    # Same episode duplicate must be NOOP with proof_delta 0!
+    assert decision.action == "NOOP"
+    assert decision.proof_delta == 0
+    assert decision.target_memory_id == "mem_mid_01"
+
+
+def test_independence_hash_different_episodes_reinforce(
+    in_memory_store: ChronicleStoreV2,
+) -> None:
+    """Different episode + same normalized content -> different hash, may REINFORCE."""
+    statement = "主显示器换成了 4K 显示器"
+    hash_ep1 = compute_independence_hash(statement, episode_id="ep_session_01")
+    hash_ep2 = compute_independence_hash(statement, episode_id="ep_session_02")
+
+    # Cross-episode hashes must be distinct
+    assert hash_ep1 != hash_ep2
+
+    slice_ep1 = make_test_slice(
+        slice_id="slice_cross_01",
+        occurred_at="2026-10-18T10:00:00+00:00",
+        content=statement,
+    )
+    in_memory_store.insert_raw_slice(slice_ep1)
+    mem = SemanticMemoryEntity(
+        memory_id="mem_cross_01",
+        category="fact",
+        statement=statement,
+        authority_class="user_asserted",
+        scope="unresolved",
+        valid_from="2026-10-18T10:00:00+00:00",
+        validity_status="active",
+        source_slice_id="slice_cross_01",
+    )
+    in_memory_store.insert_semantic_memory(mem)
+    in_memory_store.connection.execute(
+        """
+        INSERT INTO evidence_reinforcements (
+            reinforcement_id, memory_id, slice_id, independence_fingerprint, occurred_at
+        ) VALUES (?, ?, ?, ?, ?);
+        """,
+        (
+            "reinf_cross_01",
+            "mem_cross_01",
+            "slice_cross_01",
+            hash_ep1,
+            "2026-10-18T10:00:00+00:00",
+        ),
+    )
+
+    # In ep_session_02:
+    slice_ep2 = make_test_slice(
+        slice_id="slice_cross_02",
+        occurred_at="2026-10-19T10:00:00+00:00",
+        content=statement,
+    )
+    in_memory_store.insert_raw_slice(slice_ep2)
+
+    validator = ReconciliationValidator(in_memory_store)
+    claim = CandidateSemanticMemory(
+        statement=statement,
+        category="fact",
+        scope="unresolved",
+        authority_class="user_asserted",
+        source_slice_id="slice_cross_02",
+        suggested_action="REINFORCE",
+        target_superseded_id="mem_cross_01",
+        temporal_anchor="2026-10-19T10:00:00+00:00",
+    )
+    admission = AdmissionDecision(decision="ADMIT", rationale="Independent episode mention")
+
+    decision = validator.validate_claim(
+        claim,
+        admission,
+        context={"episode_id": "ep_session_02"},
+    )
+    assert decision.action == "REINFORCE"
+    assert decision.proof_delta == 1
+    assert decision.independence_fingerprint == hash_ep2
+
+
+def test_independence_hash_normalization_equivalent_wording(
+    in_memory_store: ChronicleStoreV2,
+) -> None:
+    """Same episode + normalization-equivalent wording -> same hash, second evidence NOOP."""
+    wording_raw = "顺便说下，项目用 PySide6 作为表现层。"
+    wording_clean = "项目用 PySide6 作为表现层"
+
+    assert normalize_content(wording_raw) == normalize_content(wording_clean)
+
+    hash_raw = compute_independence_hash(wording_raw, episode_id="ep_norm_01")
+    hash_clean = compute_independence_hash(wording_clean, episode_id="ep_norm_01")
+    assert hash_raw == hash_clean
+
+    slice_clean = make_test_slice(
+        slice_id="slice_norm_01",
+        content=wording_clean,
+    )
+    in_memory_store.insert_raw_slice(slice_clean)
+    mem = SemanticMemoryEntity(
+        memory_id="mem_norm_01",
+        category="fact",
+        statement=wording_clean,
+        authority_class="user_asserted",
+        scope="project",
+        project_id="co-evolving-companion",
+        valid_from="2026-10-18T12:00:00+00:00",
+        validity_status="active",
+        source_slice_id="slice_norm_01",
+    )
+    in_memory_store.insert_semantic_memory(mem)
+    in_memory_store.connection.execute(
+        """
+        INSERT INTO evidence_reinforcements (
+            reinforcement_id, memory_id, slice_id, independence_fingerprint, occurred_at
+        ) VALUES (?, ?, ?, ?, ?);
+        """,
+        (
+            "reinf_norm_01",
+            "mem_norm_01",
+            "slice_norm_01",
+            hash_clean,
+            "2026-10-18T12:00:00+00:00",
+        ),
+    )
+
+    slice_filler = make_test_slice(
+        slice_id="slice_norm_02",
+        occurred_at="2026-10-18T12:05:00+00:00",
+        content=wording_raw,
+    )
+    in_memory_store.insert_raw_slice(slice_filler)
+
+    validator = ReconciliationValidator(in_memory_store)
+    claim = CandidateSemanticMemory(
+        statement=wording_raw,
+        category="fact",
+        scope="project",
+        authority_class="user_asserted",
+        source_slice_id="slice_norm_02",
+        suggested_action="REINFORCE",
+        target_superseded_id="mem_norm_01",
+        temporal_anchor="2026-10-18T12:05:00+00:00",
+    )
+    admission = AdmissionDecision(decision="ADMIT", rationale="Filler wording duplicate")
+
+    decision = validator.validate_claim(
+        claim,
+        admission,
+        context={"episode_id": "ep_norm_01"},
     )
     assert decision.action == "NOOP"
     assert decision.proof_delta == 0

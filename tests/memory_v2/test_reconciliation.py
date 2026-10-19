@@ -693,10 +693,10 @@ def test_scenario_14_same_episode_retry_cannot_inflate_proof(
     assert res1.action == "REINFORCE"
     assert res1.proof_delta == 1
 
-    # Second repetition in SAME episode ep_work_01 and SAME date
+    # Second repetition in SAME episode ep_work_01 crossing UTC midnight to next day
     slice_reinf2 = make_test_slice(
         slice_id="slice_reinf2",
-        occurred_at="2026-10-18T12:15:00+00:00",
+        occurred_at="2026-10-19T02:15:00+00:00",
         content="项目用 PySide6 作为表现层",
     )
     store.insert_raw_slice(slice_reinf2)
@@ -705,7 +705,7 @@ def test_scenario_14_same_episode_retry_cannot_inflate_proof(
         context={
             "target_existing_memory": "mem_pyside_s14",
             "episode_id": "ep_work_01",
-            "occurred_at": "2026-10-18T12:15:00+00:00",
+            "occurred_at": "2026-10-19T02:15:00+00:00",
         },
     )[0]
     assert res2.action == "NOOP"
