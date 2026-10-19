@@ -390,13 +390,11 @@ def test_p0_2_boost_policy_enumeration() -> None:
     ranker = FusionRanker(cfg)
     policy = ranker.get_boost_policy()
 
-    # Explicit frozen boosts
-    assert policy["rule_intent_boost"] == 0.30
-    assert policy["historical_superseded_boost"] == 0.20
-
-    # Calibrated intent boosts defined in Frozen RDR / Design §15
-    assert policy["past_episode_boost"] == 0.25
-    assert policy["project_tech_boost"] == 0.15
+    # Strictly frozen explicit boosts only:
+    assert policy == {
+        "rule_intent_boost": 0.30,
+        "historical_superseded_boost": 0.20,
+    }
 
 
 # ==============================================================================

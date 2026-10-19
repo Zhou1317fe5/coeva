@@ -22,11 +22,9 @@ class RetrievalConfig:
     # Confidence threshold for NO_RELEVANT_MEMORY gating
     confidence_threshold: float = 0.16
 
-    # Intent category boosts
+    # Intent category boosts (strictly frozen explicit boosts only)
     rule_intent_boost: float = 0.30
     historical_superseded_boost: float = 0.20
-    past_episode_boost: float = 0.25
-    project_tech_boost: float = 0.15
 
     # Top-K candidate capacity delivered to Recall Gate
     top_k: int = 3
