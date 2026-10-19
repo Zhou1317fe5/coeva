@@ -113,9 +113,6 @@ class TechnicalRetrievalPipeline:
                     final_score=1.0,
                     why_retrieved="task_continuity_shortcut",
                     is_ambiguous=False,
-                    needs_privacy_redaction=shortcut_ep.needs_privacy_redaction,
-                    expression_policy=shortcut_ep.expression_policy,
-                    category=shortcut_ep.category,
                 )
                 lat_ms = (time.perf_counter() - t_start) * 1000.0
                 return RetrievalResult(

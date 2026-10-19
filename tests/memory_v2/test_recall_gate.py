@@ -59,9 +59,6 @@ def _make_candidate(
     authority_class: str = "user_asserted",
     proof_count: int = 1,
     final_score: float = 0.85,
-    needs_privacy_redaction: int = 0,
-    expression_policy: str = "normal",
-    category: str = "fact",
     provenance_refs: tuple[ProvenanceRef, ...] = (
         ProvenanceRef(kind="slice", id="slice_test_1", role="supporting"),
     ),
@@ -83,9 +80,6 @@ def _make_candidate(
         final_score=final_score,
         why_retrieved="test_fixture",
         is_ambiguous=False,
-        needs_privacy_redaction=needs_privacy_redaction,
-        expression_policy=expression_policy,
-        category=category,
     )
 
 
@@ -168,7 +162,6 @@ def test_03_sanctuary_reflective_self_model_blocked() -> None:
         candidate_id="insight_anxiety_pattern",
         candidate_type="confirmed_insight",
         statement="用户在高负荷排错时容易产生焦虑急躁情绪。",
-        category="self_model",
     )
     dec_a = gate.evaluate([cand_insight], ctx_query)
     assert dec_a.disposition == RecallDisposition.SUPPRESS
@@ -207,7 +200,6 @@ def test_04_sanctuary_current_task_continuity_allowed() -> None:
         statement="刚才运行测试时遭遇 PySide6 DLL load failed 动态链接库丢失报错。",
         scope="project",
         project_id="co-evolving-companion",
-        category="task_continuity",
     )
 
     decision = gate.evaluate([task_cand], ctx)
@@ -235,13 +227,11 @@ def test_05_historical_frustration_blocked_under_sanctuary() -> None:
         sanctuary_active=True,
     )
 
-    # Frustration candidate marked do_not_mention
+    # Frustration candidate containing frustration keywords
     cand_frustration = _make_candidate(
         candidate_id="mem_past_frustration",
         candidate_type="semantic_memory",
         statement="用户在昨天排查死锁问题时极度崩溃烦躁与队友发生争吵。",
-        expression_policy="do_not_mention",
-        category="past_frustration",
     )
 
     decision = gate.evaluate([cand_frustration], ctx)
@@ -269,7 +259,16 @@ def test_06_privacy_pending_blocked() -> None:
         candidate_id="chap_01_privacy",
         candidate_type="chapter_metadata",
         statement="第一章人生纪实包含未完成脱敏的敏感日记记录。",
-        needs_privacy_redaction=1,
+    )
+    # Using live_validator to report privacy_pending
+    ctx = RecallContext(
+        query_text="帮我看看之前的记录",
+        current_project_id="co-evolving-companion",
+        sanctuary_active=False,
+        explicit_historical_intent=True,
+        live_validator=lambda cid: (
+            RecallReason.PRIVACY_PENDING if cid == "chap_01_privacy" else None
+        ),
     )
 
     decision = gate.evaluate([cand_privacy], ctx)
@@ -368,7 +367,6 @@ def test_09_explicit_historical_request_outside_sanctuary_allowed() -> None:
         statement="之前通过调整 PySide6 动态链接库并修复无边框窗口双重重绘解决了闪退。",
         scope="project",
         project_id="co-evolving-companion",
-        category="past_episode",
     )
 
     decision = gate.evaluate([cand_history], ctx)
@@ -397,7 +395,6 @@ def test_10_relationship_rule_lookup_allowed() -> None:
         candidate_id="mem_rule_rest",
         candidate_type="semantic_memory",
         statement="用户专注工作时不希望被频繁打扰或反复提醒喝水休息，偏好自主掌握节奏。",
-        category="relationship_rule",
     )
 
     decision = gate.evaluate([cand_rule], ctx)
@@ -541,7 +538,6 @@ def test_14_wp8_generates_no_final_assistant_sentence() -> None:
     cand = _make_candidate(
         candidate_id="mem_pref_indent",
         statement="用户写所有代码都严格偏好 4 空格缩进排版。",
-        category="preference",
     )
 
     decision = gate.evaluate([cand], ctx)
@@ -605,7 +601,6 @@ def test_15_non_sensitive_observability_category_and_reason_emitted() -> None:
             statement="相关测试经历或事实。",
             scope="project",
             project_id="co-evolving-companion",
-            category="task_continuity" if "报错" in q else "fact",
         )
         decision = gate.evaluate([cand], ctx)
         assert decision.observability_category in valid_categories
@@ -632,7 +627,6 @@ def test_16_no_random_forced_80_15_5_speaking_behavior() -> None:
         statement="刚才运行测试时遭遇 PySide6 闪退报错。",
         scope="project",
         project_id="co-evolving-companion",
-        category="task_continuity",
     )
 
     first_decision = gate.evaluate([cand], ctx)
