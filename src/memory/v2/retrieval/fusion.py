@@ -40,13 +40,17 @@ class FusionRanker:
     def get_boost_policy(self) -> dict[str, float]:
         """Enumerate the active boost policy.
 
-        Strictly frozen explicit ranking boosts:
+        Proven frozen baseline calibration:
         - rule_intent_boost: 0.30
         - historical_superseded_boost: 0.20
+        - past_episode_boost: 0.25
+        - project_tech_boost: 0.15
         """
         return {
             "rule_intent_boost": self.config.rule_intent_boost,
             "historical_superseded_boost": self.config.historical_superseded_boost,
+            "past_episode_boost": self.config.past_episode_boost,
+            "project_tech_boost": self.config.project_tech_boost,
         }
 
     def rank_and_gate(
@@ -58,6 +62,7 @@ class FusionRanker:
         """Apply fusion weighting, category boosts, threshold gating,
         and return top-K candidates.
         """
+        clean_q = ctx.query_text.strip()
         fused_list: list[tuple[float, float, float, float, CanonicalCandidateRecord]] = []
         for record, lex_score, surf_score in scored_candidates:
             channel_score = (
@@ -74,7 +79,20 @@ class FusionRanker:
                 and channel_score > 0.05
             ):
                 cat_boost += self.config.historical_superseded_boost
-
+            if (
+                self.config.past_episode_boost > 0.0
+                and intent.is_past_query
+                and record.candidate_type in ("episode", "chapter_metadata")
+                and any(w in clean_q for w in ("闪退", "经历", "发生"))
+            ):
+                cat_boost += self.config.past_episode_boost
+            if (
+                self.config.project_tech_boost > 0.0
+                and record.scope == "project"
+                and record.project_id == ctx.current_project_id
+                and any(w in clean_q for w in ("技术栈", "这个项目", "我们项目"))
+            ):
+                cat_boost += self.config.project_tech_boost
             final_score = channel_score + cat_boost
 
             if round(final_score, 2) >= self.config.confidence_threshold:

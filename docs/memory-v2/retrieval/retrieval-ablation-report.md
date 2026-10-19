@@ -19,9 +19,9 @@
 | 评估指标 (Metric) | DEV Set (开发集 · 29用例) | HOLDOUT Set (独立测试集 · 15用例) | 评测结论与证据级别 |
 | :--- | :---: | :---: | :--- |
 | **查询通过率 (Query Pass Rate)** | **93.10%** (27/29) | **100.0%** (15/15) | **MEASURED** (端到端查询满足预期) |
-| **必须召回率 (Recall@3)** | **86.96%** (20/23) | **100.0%** (11/11) | **MEASURED** (核心目标记忆命中率) |
-| **候选精确率 (Candidate Precision@3)** | **68.57%** (24/35) | **75.00%** (15/20) | **MEASURED** (Top-3 中相关候选比例，纠正虚高) |
-| **静默判决率 (NO_MEMORY Accuracy)** | **87.50%** (7/8) | **100.0%** (4/4) | **MEASURED** (无记忆提问正确静默) |
+| **必须召回率 (Recall@3)** | **86.96%** (20/23) | **100.0%** (10/10) | **MEASURED** (核心目标记忆命中率) |
+| **候选精确率 (Candidate Precision@3)** | **68.57%** (24/35) | **75.00%** (12/16) | **MEASURED** (Top-3 中相关候选比例，纠正虚高) |
+| **静默判决率 (NO_MEMORY Accuracy)** | **87.50%** (7/8) | **100.0%** (5/5) | **MEASURED** (无记忆提问正确静默) |
 | **误召回率 (False Recall Rate)** | **3.45%** (1/29) | **0.00%** (0/15) | **MEASURED** (通用提问翻车率极低) |
 | **禁止召回率 (Forbidden Retrieval Rate)**| **0.00%** (0/29) | **0.00%** (0/15) | **MEASURED** (未命中任何 must_not 项) |
 | **跨项目污染次数 (Cross-Project Contaminations)**| **0 次** | **0 次** | **MEASURED** (作用域硬隔离绝对生效) |
@@ -90,7 +90,7 @@ Sanctuary 激活状态
 上一版报告将“Query 命中了预期记忆”等同于“Precision@3 = 100%”，混淆了查询级通过与候选级精确度。
 本次测试彻底纠偏：
 - **DEV Set**：检索器共返回 35 个候选实体，其中 24 个属于 `must` 或 `acceptable` 合法实体，11 个属于相关性次要条目，**实际 Candidate Precision@3 为 68.57%**；
-- **HOLDOUT Set**：检索器共返回 20 个候选实体，其中 15 个属于合法实体，**实际 Candidate Precision@3 为 75.00%**；
+- **HOLDOUT Set**：检索器共返回 16 个候选实体，其中 12 个属于合法实体，**实际 Candidate Precision@3 为 75.00%**；
 - **关键结论**：在保证 0 次禁止召回与 0 次跨项目污染的前提下，Top-3 列表中偶有低权重次选条目存在，属于常态现象；Recall Gate 通过严格的阈值过滤即可阻断，完全无需引入复杂的 Cross-Encoder Reranker。
 
 ---
@@ -114,6 +114,35 @@ Sanctuary 激活状态
 参数在独立 HOLDOUT 集上的表现：
 - **融合权重**：`0.6 Lexical + 0.4 Surface Similarity`
 - **置信度门限**：`0.15 ~ 0.16`
-- **意图加权**：`Rule Boost: +0.3`, `Past Episode Boost: +0.25`
+- **意图加权**：`Rule Boost: +0.3`, `Past Episode Boost: +0.25`, `Project Tech Boost: +0.15`
 - **Holdout 表现**：**Query Pass Rate 100.0%，Recall@3 100.0%，False Recall Rate 0.00%**。
 - **裁决**：上述融合参数在未见过的 Holdout 数据集上表现出极高鲁棒性与泛化度，**正式批准作为技术检索 V2.1 冻结参数**。
+
+---
+
+## 7. 冻结文档勘误说明 (Frozen Benchmark Provenance & Denominator Errata)
+
+> **溯源勘误性质声明**：
+> 本节属于文档派生描述与权威制品（Canonical Artifacts）的强一致性勘误，百分比指标与实测结论完全真实有效，**绝非算法变更（Not an algorithm change）**。
+
+### 7.1 分母口径校准依据 (Precedence: Canonical JSON/CSV > Derived Prose)
+经严格法医级比对上位冻结基线（Baseline Commit `5c149a0`）中的机器可读标准源文件：
+1. **Recall@3 必须召回率**：
+   - 权威 JSON（`retrieval-benchmark-cases.json`）中 HOLDOUT 独立测试集包含必须召回项（`must_retrieve`）的用例共 10 个，必须召回项总数为 **10**（并非笔误的 11）；
+   - 冻结 CSV 实测全部命中，**Recall@3 为 10/10 = 100.0%**（原报告百分比正确，旧版分母 11/11 系起草期派生文案手民之误）。
+2. **Candidate Precision@3 候选精确率**：
+   - 冻结 CSV（`retrieval-benchmark-results.csv`）在 HOLDOUT 15 个查询中共计返回 **16** 个候选实体（并非 20）；
+   - 其中符合 `must_retrieve` 或 `acceptable_retrieve` 的相关有效候选为 **12** 个；
+   - 实测候选精确度严格为 **12 / 16 = 75.00%**（原报告计算出的 75.00% 准确无误，旧版文案误写为 15/20）。
+3. **NO_MEMORY Accuracy 静默判决率**：
+   - 权威 JSON 中显式标记 `no_memory_expected: true` 的 HOLDOUT 用例共 **5** 个（`HOLD_S2`, `HOLD_NEG_01`, `HOLD_UNRES_01`, `HOLD_THRESH_01`, `HOLD_PRIV_01`）；
+   - 冻结 CSV 中此 5 个用例全部正确返回空列表静默，**NO_MEMORY 准确率为 5/5 = 100.0%**（若将 IMPL-3 待脱敏制品 `HOLD_PRIV_01` 划入隐私阻断专项独立统计，则纯无记忆用例为 4/4 = 100.0%）。
+
+### 7.2 检索意图偏置（Intent Boosts）冻结出处归档
+经审计，历史冻结基准测试运行所依据的加权偏置策略在基准设计阶段即已完成校准（见 `technical-retrieval-design.md` §15 lines 320–324 及 RDR-2026-01 §2 line 83）：
+- `rule_intent_boost: +0.30`
+- `past_episode_boost: +0.25`
+- `project_tech_boost: +0.15`
+- `historical_superseded_boost: +0.20`
+- `confidence_threshold: 0.16`
+

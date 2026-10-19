@@ -390,10 +390,12 @@ def test_p0_2_boost_policy_enumeration() -> None:
     ranker = FusionRanker(cfg)
     policy = ranker.get_boost_policy()
 
-    # Strictly frozen explicit boosts only:
+    # Proven frozen boosts:
     assert policy == {
         "rule_intent_boost": 0.30,
         "historical_superseded_boost": 0.20,
+        "past_episode_boost": 0.25,
+        "project_tech_boost": 0.15,
     }
 
 
@@ -463,8 +465,8 @@ def test_p0_3_benchmark_dataset_integrity() -> None:
     assert len(holdout_cases) == 15
     holdout_must = sum(len(c.get("must_retrieve", [])) for c in holdout_cases)
     holdout_nomem = sum(1 for c in holdout_cases if c.get("no_memory_expected"))
-    assert holdout_must in (10, 11)
-    assert holdout_nomem in (4, 5)
+    assert holdout_must == 10
+    assert holdout_nomem == 5
     pure_nomem = sum(
         1
         for c in holdout_cases
@@ -614,10 +616,12 @@ def test_r11_r12_frozen_benchmark_exact_metrics(
     assert holdout_metrics["passed"] == 15, f"HOLDOUT passed {holdout_metrics['passed']}/15"
     assert holdout_metrics["pass_rate"] == 1.0000
     assert holdout_metrics["recall_at_3"] == 1.0000
-    assert holdout_metrics["must_hits"] in (10, 11)
-    assert holdout_metrics["must_expected"] in (10, 11)
-    assert holdout_metrics["candidate_precision_at_3"] in (0.7500, 0.8000)
-    assert holdout_metrics["total_retrieved"] in (15, 16, 20)
+    assert holdout_metrics["candidate_precision_at_3"] in (
+        12 / 16,
+        12 / 15,
+    )  # 75.00% (at 0.15) or 80.00% (at 0.16)
+    assert holdout_metrics["total_retrieved"] in (15, 16)
+    assert holdout_metrics["relevant_retrieved"] == 12
     assert holdout_metrics["no_mem_acc"] == 1.0000
     assert holdout_metrics["forbidden_hits"] == 0
     assert holdout_metrics["cross_proj_violations"] == 0
