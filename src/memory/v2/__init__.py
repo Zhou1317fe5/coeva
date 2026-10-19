@@ -11,6 +11,19 @@ from src.memory.v2.candidate_extraction import (
     ProposalProvider,
     RuleBasedProposalProvider,
 )
+from src.memory.v2.consolidation_queue import (
+    ConsolidationJob,
+    ConsolidationQueue,
+    ConsolidationQueueError,
+    InvalidSourceKindError,
+    JobStatus,
+    compute_job_id,
+)
+from src.memory.v2.consolidation_scheduler import (
+    ConsolidationScheduler,
+    JobResult,
+    SchedulerConfig,
+)
 from src.memory.v2.echo_guard import EchoGuard, EchoGuardResult
 from src.memory.v2.entities import (
     CalibrationEventEntity,
@@ -154,4 +167,13 @@ __all__ = [
     "MutationPlan",
     "ReconciliationResult",
     "ReconciliationEngine",
+    "ConsolidationJob",
+    "ConsolidationQueue",
+    "ConsolidationQueueError",
+    "InvalidSourceKindError",
+    "JobStatus",
+    "compute_job_id",
+    "ConsolidationScheduler",
+    "SchedulerConfig",
+    "JobResult",
 ]

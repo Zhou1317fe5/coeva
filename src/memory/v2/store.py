@@ -16,7 +16,10 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.memory.v2.consolidation_queue import ConsolidationJob, ConsolidationQueue
 
 from src.memory.v2.entities import (
     CalibrationEventEntity,
@@ -1107,3 +1110,100 @@ class ChronicleStoreV2:
         from src.memory.v2.lifecycle import LifecycleService
 
         return LifecycleService(self)
+
+    # ── Technical Metadata: Consolidation Jobs (WP-5) ─────────────────────────
+
+    def get_consolidation_queue(self) -> ConsolidationQueue:
+        """Return a ConsolidationQueue bound to this store."""
+        from src.memory.v2.consolidation_queue import ConsolidationQueue
+
+        return ConsolidationQueue(self)
+
+    def insert_consolidation_job(self, job: ConsolidationJob) -> None:
+        """Insert a technical consolidation background job row."""
+        self._conn.execute(
+            """
+            INSERT INTO consolidation_jobs (
+                job_id, source_kind, source_id, status, retry_count, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                job.job_id,
+                job.source_kind,
+                job.source_id,
+                job.status,
+                job.retry_count,
+                job.created_at,
+                job.updated_at,
+            ),
+        )
+
+    def get_consolidation_job(self, job_id: str) -> ConsolidationJob | None:
+        """Fetch a consolidation job by job_id."""
+        row = self._conn.execute(
+            "SELECT * FROM consolidation_jobs WHERE job_id = ?;",
+            (job_id,),
+        ).fetchone()
+        if not row:
+            return None
+        from src.memory.v2.consolidation_queue import ConsolidationJob
+
+        return ConsolidationJob(
+            job_id=row["job_id"],
+            source_kind=row["source_kind"],
+            source_id=row["source_id"],
+            status=row["status"],
+            retry_count=int(row["retry_count"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+    def get_consolidation_job_by_source(
+        self, source_kind: str, source_id: str
+    ) -> ConsolidationJob | None:
+        """Fetch a consolidation job by source identity."""
+        from src.memory.v2.consolidation_queue import compute_job_id
+
+        job_id = compute_job_id(source_kind, source_id)
+        return self.get_consolidation_job(job_id)
+
+    def list_consolidation_jobs(
+        self, status: str | None = None, limit: int = 100
+    ) -> list[ConsolidationJob]:
+        """List consolidation jobs, optionally filtered by status."""
+        from src.memory.v2.consolidation_queue import ConsolidationJob
+
+        if status:
+            rows = self._conn.execute(
+                """
+                SELECT job_id, source_kind, source_id, status, retry_count, created_at, updated_at
+                  FROM consolidation_jobs
+                 WHERE status = ?
+                 ORDER BY created_at ASC
+                 LIMIT ?;
+                """,
+                (status, limit),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """
+                SELECT job_id, source_kind, source_id, status, retry_count, created_at, updated_at
+                  FROM consolidation_jobs
+                 ORDER BY created_at ASC
+                 LIMIT ?;
+                """,
+                (limit,),
+            ).fetchall()
+
+        return [
+            ConsolidationJob(
+                job_id=r["job_id"],
+                source_kind=r["source_kind"],
+                source_id=r["source_id"],
+                status=r["status"],
+                retry_count=int(r["retry_count"]),
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+            for r in rows
+        ]
