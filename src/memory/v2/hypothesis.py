@@ -51,6 +51,31 @@ class HypothesisValidationError(ValueError):
     pass
 
 
+class AbsoluteClaimWithCounterEvidenceError(HypothesisValidationError):
+    """Raised when hypothesis contains absolute claim despite counter evidence (S-02)."""
+
+    pass
+
+
+ABSOLUTE_CLAIM_MARKERS = [
+    "总是",
+    "一直都是",
+    "一贯",
+    "从来都",
+    "always",
+    "consistently",
+]
+
+
+def match_absolute_claim(text: str) -> str | None:
+    """Return the matched absolute marker if present in text, else None."""
+    text_lower = text.lower()
+    for marker in ABSOLUTE_CLAIM_MARKERS:
+        if marker in text_lower:
+            return marker
+    return None
+
+
 @dataclass
 class HypothesisProposal:
     """Pre-commit proposal for an emerging developmental hypothesis."""
@@ -176,6 +201,36 @@ class HypothesisEngine:
                 raise ScopeIsolationError(
                     f"Observations from project '{sole_project}' cannot form "
                     f"hypothesis for project '{proposal.project_id}'."
+                )
+
+        # Invariant 4: Lock S-14 at WP-6 boundary (Unresolved observation -> global forbidden)
+        has_unresolved_obs = any(scp == "unresolved" for scp, _ in observation_scopes)
+        if has_unresolved_obs and proposal.scope == "global":
+            raise ScopeIsolationError(
+                "Unresolved observation input cannot silently become scope='global' (S-14)."
+            )
+
+        # Invariant 5: S-02 Counter-evidence absolute-claim guard
+        has_counter = bool(proposal.counter_observation_ids)
+        if not has_counter:
+            for obs_id in proposal.supporting_observation_ids:
+                s_links = self._store.get_observation_slice_links(obs_id)
+                e_links = self._store.get_observation_event_links(obs_id)
+                m_links = self._store.get_observation_memory_links(obs_id)
+                if (
+                    any(sl.role == "counter" for sl in s_links)
+                    or any(el.role == "counter" for el in e_links)
+                    or any(ml.role == "counter" for ml in m_links)
+                ):
+                    has_counter = True
+                    break
+
+        if has_counter:
+            matched_marker = match_absolute_claim(proposal.statement)
+            if matched_marker:
+                raise AbsoluteClaimWithCounterEvidenceError(
+                    f"Observation with counter-evidence cannot make absolute claim "
+                    f"'{matched_marker}' (S-02). Rejected."
                 )
 
     def propose_hypothesis(

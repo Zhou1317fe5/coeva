@@ -551,7 +551,7 @@ def test_s6_08_no_calibration(tmp_path: Path) -> None:
 
 
 def test_s6_09_not_now_calibration(tmp_path: Path) -> None:
-    """S6-09: No confirmation/rejection; defer state preserved; no immediate nag."""
+    """S6-09 / P0-1: NOT_NOW preserves candidate; cal_events delta=0; last_calibrated_at same."""
     store = ChronicleStoreV2(tmp_path / "s6_09.db")
     obs_pipeline = ObservationPipeline(store)
     hyp_engine = HypothesisEngine(store)
@@ -574,6 +574,15 @@ def test_s6_09_not_now_calibration(tmp_path: Path) -> None:
         )
     )
 
+    # Baseline row counts before NOT_NOW
+    cal_count_before = store.connection.execute(
+        "SELECT COUNT(*) FROM calibration_events;"
+    ).fetchone()[0]
+    ins_count_before = store.connection.execute(
+        "SELECT COUNT(*) FROM confirmed_insights;"
+    ).fetchone()[0]
+    assert hyp.last_calibrated_at is None
+
     # Apply NOT_NOW calibration (defer)
     res = cal_service.calibrate(
         CalibrationDecision(
@@ -583,19 +592,31 @@ def test_s6_09_not_now_calibration(tmp_path: Path) -> None:
         )
     )
 
+    # P0-1 Explicit Assertions:
+    # 1. Service reports deferred
     assert res.action == "not_now"
     assert res.confirmed_insight is None
+    assert res.calibration_event is None
     assert res.hypothesis_status == "candidate"
+    assert "deferred" in res.detail
 
-    # Hypothesis in SQLite remains candidate with last_calibrated_at recorded
+    # 2. calibration_events delta = 0
+    cal_count_after = store.connection.execute(
+        "SELECT COUNT(*) FROM calibration_events;"
+    ).fetchone()[0]
+    assert cal_count_after - cal_count_before == 0
+
+    # 3. confirmed_insights delta = 0
+    ins_count_after = store.connection.execute(
+        "SELECT COUNT(*) FROM confirmed_insights;"
+    ).fetchone()[0]
+    assert ins_count_after - ins_count_before == 0
+
+    # 4. Hypothesis still candidate and last_calibrated_at remains UNCHANGED (None)
     hyp_db = store.get_hypothesis(hyp.hypothesis_id)
     assert hyp_db is not None
     assert hyp_db.status == "candidate"
-    assert hyp_db.last_calibrated_at == "2026-10-20T12:00:00+00:00"
-
-    # No confirmed insight in DB
-    ins_count = store.connection.execute("SELECT COUNT(*) FROM confirmed_insights;").fetchone()[0]
-    assert ins_count == 0
+    assert hyp_db.last_calibrated_at is None
 
 
 # ── S6-10: Calibration immutable ─────────────────────────────────────────────
@@ -1005,3 +1026,116 @@ def test_s6_19_production_isolation_and_default_flag_off(tmp_path: Path) -> None
         initial_hash = hashlib.sha256(prod_db.read_bytes()).hexdigest()
         # Verify hash remains identical
         assert hashlib.sha256(prod_db.read_bytes()).hexdigest() == initial_hash
+
+
+# ── P0-2: S-02 Counter-evidence absolute-claim guard ─────────────────────────
+
+
+def test_s02_counter_evidence_absolute_claim_guard(tmp_path: Path) -> None:
+    """S-02 / P0-2: Counter-evidence forbids absolute claims; non-absolute succeeds."""
+    from src.memory.v2.hypothesis import AbsoluteClaimWithCounterEvidenceError
+
+    store = ChronicleStoreV2(tmp_path / "s02.db")
+    obs_pipeline = ObservationPipeline(store)
+    hyp_engine = HypothesisEngine(store)
+
+    make_slice(store, "sl_pos1", "我遇到未知错误通常先仔细研读官方文档。")
+    make_slice(store, "sl_pos2", "看文档能帮我快速理清来龙去脉。")
+    make_slice(store, "sl_counter1", "有时候赶进度我也会直接快速搜索解决。")
+
+    # Create observation with positive support and counter evidence
+    obs = obs_pipeline.create_observation(
+        ObservationBuilder("用户技术攻坚以文档为主但偶有快速应急")
+        .add_slice("sl_pos1", "supporting")
+        .add_slice("sl_pos2", "supporting")
+        .add_slice("sl_counter1", "counter")
+        .build()
+    )
+
+    # 1. Absolute claims with counter evidence MUST be rejected (fail-closed, persistence count = 0)
+    absolute_statements = [
+        "用户总是严格研读官方文档",
+        "用户面对问题时一直都是看文档解决",
+        "用户一贯拒绝直接搜索报错",
+        "用户从来都只相信官方文档",
+        "User always reads the official specification",
+        "User consistently relies on first-party docs",
+    ]
+
+    hyps_before = store.connection.execute("SELECT COUNT(*) FROM hypotheses;").fetchone()[0]
+
+    for stmt in absolute_statements:
+        prop_abs = HypothesisProposal(
+            statement=stmt,
+            lenses=[DevelopmentLens.OPENNESS_TO_UNCERTAINTY],
+            supporting_observation_ids=[obs.observation_id],
+        )
+        with pytest.raises(AbsoluteClaimWithCounterEvidenceError):
+            hyp_engine.propose_hypothesis(prop_abs)
+
+    # Persistence count must be 0!
+    hyps_after_rejected = store.connection.execute("SELECT COUNT(*) FROM hypotheses;").fetchone()[0]
+    assert hyps_after_rejected - hyps_before == 0
+
+    # 2. Non-absolute tentative claim with counter evidence succeeds and persists as candidate
+    prop_tentative = HypothesisProposal(
+        statement="用户通常倾向于优先研读官方规范",
+        lenses=[DevelopmentLens.OPENNESS_TO_UNCERTAINTY],
+        supporting_observation_ids=[obs.observation_id],
+    )
+    hyp_tentative = hyp_engine.propose_hypothesis(prop_tentative)
+    assert hyp_tentative.status == "candidate"
+
+    # Verify persisted in DB and counter link preserved
+    db_hyp = store.get_hypothesis(hyp_tentative.hypothesis_id)
+    assert db_hyp is not None
+    assert db_hyp.statement == "用户通常倾向于优先研读官方规范"
+
+
+# ── P1: Lock S-14 at WP-6 boundary ───────────────────────────────────────────
+
+
+def test_s14_unresolved_scope_never_promoted_to_global(tmp_path: Path) -> None:
+    """S-14 / P1: Unresolved evidence or Observation must never silently become scope='global'."""
+    store = ChronicleStoreV2(tmp_path / "s14.db")
+    obs_pipeline = ObservationPipeline(store)
+    hyp_engine = HypothesisEngine(store)
+
+    make_slice(store, "sl_unres1", "未归类切片1", scope="unresolved", project_id=None)
+    make_slice(store, "sl_unres2", "未归类切片2", scope="unresolved", project_id=None)
+
+    # 1. Unresolved evidence -> attempting global Observation fails closed
+    cand_global_from_unres = (
+        ObservationBuilder("根据未归类证据聚合全局观察")
+        .with_scope("global")
+        .add_slice("sl_unres1", "supporting")
+        .add_slice("sl_unres2", "supporting")
+        .build()
+    )
+    with pytest.raises(ScopeIsolationError) as exc_obs:
+        obs_pipeline.create_observation(cand_global_from_unres)
+    assert "Unresolved evidence input cannot silently become scope='global'" in str(exc_obs.value)
+
+    # 2. Creation as scope='unresolved' observation succeeds
+    cand_unres = (
+        ObservationBuilder("未归类切片形成的未决观察")
+        .with_scope("unresolved")
+        .add_slice("sl_unres1", "supporting")
+        .add_slice("sl_unres2", "supporting")
+        .build()
+    )
+    obs_unres = obs_pipeline.create_observation(cand_unres)
+    assert obs_unres.scope == "unresolved"
+
+    # 3. Unresolved Observation -> attempting global Hypothesis fails closed
+    prop_global_from_unres = HypothesisProposal(
+        statement="未归类观察派生全局假说",
+        lenses=[DevelopmentLens.TEMPORAL_INTEGRATION],
+        supporting_observation_ids=[obs_unres.observation_id],
+        scope="global",
+    )
+    with pytest.raises(ScopeIsolationError) as exc_hyp:
+        hyp_engine.propose_hypothesis(prop_global_from_unres)
+    assert "Unresolved observation input cannot silently become scope='global'" in str(
+        exc_hyp.value
+    )

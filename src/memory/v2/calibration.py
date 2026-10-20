@@ -258,23 +258,20 @@ class CalibrationService:
             )
 
         else:  # NOT_NOW
-            # Postpone/defer: preserves candidate status, records deferral timestamp,
-            # produces ZERO confirmed insight, and stops immediate resurfacing (S6-09).
-            with self._store.transaction():
-                self._store.update_hypothesis_status(
-                    hyp.hypothesis_id,
-                    status="candidate",
-                    last_calibrated_at=now,
-                )
-
+            # Postpone/defer: non-epistemic deferral only (P0-1).
+            # Does NOT create calibration_events row.
+            # Does NOT create confirmed_insights row.
+            # Does NOT reject or confirm hypothesis.
+            # Does NOT update last_calibrated_at.
+            # Database state remains completely unchanged.
             return CalibrationResult(
                 action="not_now",
                 hypothesis_id=hyp.hypothesis_id,
                 calibration_event=None,
                 confirmed_insight=None,
-                hypothesis_status="candidate",
+                hypothesis_status=hyp.status,
                 refined_statement=None,
-                detail="Hypothesis deferred; stays candidate with updated timestamp (S6-09).",
+                detail="Hypothesis deferred; non-epistemic deferral only, DB unchanged (P0-1).",
             )
 
     def get_calibration_history(self, hypothesis_id: str) -> list[CalibrationEventEntity]:

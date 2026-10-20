@@ -58,6 +58,7 @@ from src.memory.v2.entities import (
     SemanticMemoryEntity,
 )
 from src.memory.v2.hypothesis import (
+    AbsoluteClaimWithCounterEvidenceError,
     DevelopmentLens,
     HypothesisEngine,
     HypothesisProposal,
@@ -218,6 +219,7 @@ __all__ = [
     "DevelopmentLens",
     "HypothesisProposal",
     "HypothesisValidationError",
+    "AbsoluteClaimWithCounterEvidenceError",
     "HypothesisEngine",
     "CalibrationResponse",
     "CalibrationDecision",

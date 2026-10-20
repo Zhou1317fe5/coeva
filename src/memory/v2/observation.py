@@ -265,6 +265,13 @@ class ObservationPipeline:
                     f"Evidence from '{sole_project}' cannot match project '{candidate.project_id}'."
                 )
 
+        # Invariant 6: Lock S-14 at WP-6 boundary (Unresolved evidence -> global forbidden)
+        has_unresolved_evidence = any(scp == "unresolved" for scp, _ in evidence_scopes)
+        if has_unresolved_evidence and candidate.scope == "global":
+            raise ScopeIsolationError(
+                "Unresolved evidence input cannot silently become scope='global' (S-14)."
+            )
+
     def create_observation(
         self,
         candidate: ObservationCandidate,
