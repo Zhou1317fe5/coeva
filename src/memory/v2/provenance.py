@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from src.memory.v2.entities import (
+    ChapterEpisodeLinkEntity,
     ChapterInsightLinkEntity,
     ChapterSliceLinkEntity,
     ConfirmedInsightEntity,
@@ -407,6 +408,22 @@ class ProvenanceRepository:
             ChapterInsightLinkEntity(
                 chapter_id=r["chapter_id"],
                 insight_id=r["insight_id"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_episode_chapter_links(self, episode_id: str) -> list[ChapterEpisodeLinkEntity]:
+        """Fetch all chapter links citing an episode."""
+        rows = self._conn.execute(
+            "SELECT chapter_id, episode_id, linked_at "
+            "FROM chapter_episode_links WHERE episode_id = ?;",
+            (episode_id,),
+        ).fetchall()
+        return [
+            ChapterEpisodeLinkEntity(
+                chapter_id=r["chapter_id"],
+                episode_id=r["episode_id"],
                 linked_at=r["linked_at"],
             )
             for r in rows

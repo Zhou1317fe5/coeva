@@ -58,7 +58,7 @@ class LifecycleAction:
 class ImpactReport:
     """Read-only dry-run analysis report of deleting an evidence entity."""
 
-    target_type: Literal["slice", "event"]
+    target_type: Literal["slice", "event", "episode", "insight"]
     target_id: str
     exists: bool
     is_pinned: bool = False
@@ -79,7 +79,7 @@ class HardDeleteResult:
     """Atomic execution result of a hard delete lifecycle transaction."""
 
     success: bool
-    target_type: Literal["slice", "event"]
+    target_type: Literal["slice", "event", "episode", "insight"]
     target_id: str
     deleted_base_evidence: bool
     actions_performed: list[LifecycleAction] = field(default_factory=list)
@@ -406,7 +406,7 @@ class LifecycleService:
                 )
             )
 
-        # 7. Affected Confirmed Insights
+        # 7. Affected Confirmed Insights & Cascaded Chapter Impacts
         affected_insights: list[dict[str, Any]] = []
         for hid in sorted(affected_hyp_ids):
             insights = self._prov_repo.get_hypothesis_confirmed_insights(hid)
@@ -422,6 +422,27 @@ class LifecycleService:
                         "new_status": new_ins_status,
                     }
                 )
+                if new_ins_status == "retracted" and privacy_sensitive:
+                    ins_chaps = self._prov_repo.get_insight_chapter_links(ins.insight_id)
+                    for ic in ins_chaps:
+                        if not any(c.get("chapter_id") == ic.chapter_id for c in affected_chapters):
+                            affected_chapters.append(
+                                {
+                                    "chapter_id": ic.chapter_id,
+                                    "privacy_redacted": True,
+                                }
+                            )
+                            planned_actions.append(
+                                LifecycleAction(
+                                    action_type="privacy_block_chapter",
+                                    target_type="chapter",
+                                    target_id=ic.chapter_id,
+                                    detail=(
+                                        "Set needs_privacy_redaction = 1 "
+                                        f"(insight {ins.insight_id})"
+                                    ),
+                                )
+                            )
                 planned_actions.append(
                     LifecycleAction(
                         action_type="update_insight_status",
@@ -878,6 +899,27 @@ class LifecycleService:
                                 ),
                             )
                         )
+                        if privacy_sensitive:
+                            ins_chaps = self._prov_repo.get_insight_chapter_links(ins.insight_id)
+                            for ic in ins_chaps:
+                                conn.execute(
+                                    "UPDATE chapter_metadata SET needs_privacy_redaction = 1 "
+                                    "WHERE chapter_id = ?;",
+                                    (ic.chapter_id,),
+                                )
+                                if ic.chapter_id not in privacy_redacted_chapters:
+                                    privacy_redacted_chapters.append(ic.chapter_id)
+                                actions_performed.append(
+                                    LifecycleAction(
+                                        action_type="privacy_block_chapter",
+                                        target_type="chapter_metadata",
+                                        target_id=ic.chapter_id,
+                                        detail=(
+                                            "Set needs_privacy_redaction = 1 "
+                                            f"(via insight {ins.insight_id})"
+                                        ),
+                                    )
+                                )
                     else:
                         conn.execute(
                             "UPDATE confirmed_insights SET status = 'revalidation_required' "
@@ -1192,6 +1234,193 @@ class LifecycleService:
         Fails closed with EventPinnedError if the event is currently retention-pinned.
         """
         return self.hard_delete_event(event_id, cascade=False)
+
+    def hard_delete_episode(
+        self,
+        episode_id: str,
+        *,
+        privacy_sensitive: bool = True,
+    ) -> HardDeleteResult:
+        """Execute hard delete on an episode container with fail-closed privacy marking."""
+        conn = self._store.connection
+        ep_row = conn.execute(
+            "SELECT episode_id FROM episodes WHERE episode_id = ?;", (episode_id,)
+        ).fetchone()
+        if not ep_row:
+            return HardDeleteResult(
+                success=False,
+                target_type="episode",
+                target_id=episode_id,
+                deleted_base_evidence=False,
+                error=f"Episode '{episode_id}' not found",
+            )
+
+        actions_performed: list[LifecycleAction] = []
+        privacy_redacted_chapters: list[str] = []
+
+        with self._store.transaction():
+            # 1. Affected Chapters: Identify and mark unreadable FIRST
+            chap_links = self._prov_repo.get_episode_chapter_links(episode_id)
+            for cl in chap_links:
+                if privacy_sensitive:
+                    conn.execute(
+                        "UPDATE chapter_metadata SET needs_privacy_redaction = 1 "
+                        "WHERE chapter_id = ?;",
+                        (cl.chapter_id,),
+                    )
+                    privacy_redacted_chapters.append(cl.chapter_id)
+                    actions_performed.append(
+                        LifecycleAction(
+                            action_type="privacy_block_chapter",
+                            target_type="chapter_metadata",
+                            target_id=cl.chapter_id,
+                            detail="Set needs_privacy_redaction = 1 synchronously",
+                        )
+                    )
+                conn.execute(
+                    "DELETE FROM chapter_episode_links WHERE chapter_id = ? AND episode_id = ?;",
+                    (cl.chapter_id, episode_id),
+                )
+                actions_performed.append(
+                    LifecycleAction(
+                        action_type="unlink_chapter_episode",
+                        target_type="chapter_episode_link",
+                        target_id=f"{cl.chapter_id}:{episode_id}",
+                    )
+                )
+
+            # 2. Unlink episode links
+            conn.execute("DELETE FROM episode_slice_links WHERE episode_id = ?;", (episode_id,))
+            conn.execute("DELETE FROM episode_event_links WHERE episode_id = ?;", (episode_id,))
+            conn.execute(
+                "DELETE FROM observation_episode_links WHERE episode_id = ?;", (episode_id,)
+            )
+
+            # 3. Check semantic memories referencing this episode as source
+            mem_rows = conn.execute(
+                "SELECT memory_id, source_slice_id, source_event_id "
+                "FROM semantic_memories WHERE source_episode_id = ?;",
+                (episode_id,),
+            ).fetchall()
+            for mr in mem_rows:
+                if mr["source_slice_id"] or mr["source_event_id"]:
+                    conn.execute(
+                        "UPDATE semantic_memories SET source_episode_id = NULL "
+                        "WHERE memory_id = ?;",
+                        (mr["memory_id"],),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE semantic_memories SET validity_status = 'invalidated' "
+                        "WHERE memory_id = ?;",
+                        (mr["memory_id"],),
+                    )
+
+            # 4. Physically delete episode
+            conn.execute("DELETE FROM episodes WHERE episode_id = ?;", (episode_id,))
+            actions_performed.append(
+                LifecycleAction(
+                    action_type="delete_episode",
+                    target_type="episode",
+                    target_id=episode_id,
+                    detail="Episode container physically deleted",
+                )
+            )
+
+            # 5. Check foreign keys
+            fk_violations = conn.execute("PRAGMA foreign_key_check;").fetchall()
+            if fk_violations:
+                raise DependencyClosureError(
+                    f"FK violations after deleting episode: {fk_violations}"
+                )
+
+        return HardDeleteResult(
+            success=True,
+            target_type="episode",
+            target_id=episode_id,
+            deleted_base_evidence=True,
+            actions_performed=actions_performed,
+            privacy_redacted_chapters=privacy_redacted_chapters,
+            foreign_key_check_passed=True,
+        )
+
+    def invalidate_insight_with_privacy(
+        self,
+        insight_id: str,
+        *,
+        privacy_sensitive: bool = True,
+    ) -> HardDeleteResult:
+        """Retract a confirmed insight and synchronously mark citing chapters as privacy pending."""
+        conn = self._store.connection
+        ins = self._store.get_confirmed_insight(insight_id)
+        if not ins:
+            return HardDeleteResult(
+                success=False,
+                target_type="insight",
+                target_id=insight_id,
+                deleted_base_evidence=False,
+                error=f"Insight '{insight_id}' not found",
+            )
+
+        actions_performed: list[LifecycleAction] = []
+        privacy_redacted_chapters: list[str] = []
+        now_ts = datetime.now(UTC).isoformat()
+
+        with self._store.transaction():
+            # 1. Affected Chapters: Identify and mark unreadable FIRST
+            chap_links = self._prov_repo.get_insight_chapter_links(insight_id)
+            for cl in chap_links:
+                if privacy_sensitive:
+                    conn.execute(
+                        "UPDATE chapter_metadata SET needs_privacy_redaction = 1 "
+                        "WHERE chapter_id = ?;",
+                        (cl.chapter_id,),
+                    )
+                    privacy_redacted_chapters.append(cl.chapter_id)
+                    actions_performed.append(
+                        LifecycleAction(
+                            action_type="privacy_block_chapter",
+                            target_type="chapter_metadata",
+                            target_id=cl.chapter_id,
+                            detail=(
+                                "Set needs_privacy_redaction = 1 "
+                                "synchronously on insight invalidation"
+                            ),
+                        )
+                    )
+
+            # 2. Retract insight (calibration events remain immutable)
+            conn.execute(
+                "UPDATE confirmed_insights SET status = 'retracted', invalidated_at = ? "
+                "WHERE insight_id = ?;",
+                (now_ts, insight_id),
+            )
+            actions_performed.append(
+                LifecycleAction(
+                    action_type="retract_insight",
+                    target_type="confirmed_insight",
+                    target_id=insight_id,
+                    detail="Insight retracted; calibration events immutable",
+                )
+            )
+
+            # 3. Check foreign keys
+            fk_violations = conn.execute("PRAGMA foreign_key_check;").fetchall()
+            if fk_violations:
+                raise DependencyClosureError(
+                    f"FK violations after retracting insight: {fk_violations}"
+                )
+
+        return HardDeleteResult(
+            success=True,
+            target_type="insight",
+            target_id=insight_id,
+            deleted_base_evidence=False,
+            actions_performed=actions_performed,
+            retracted_insights=[insight_id],
+            privacy_redacted_chapters=privacy_redacted_chapters,
+            foreign_key_check_passed=True,
+        )
 
 
 # Canonical alias for compatibility

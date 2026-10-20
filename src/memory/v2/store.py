@@ -861,6 +861,93 @@ class ChronicleStoreV2:
             (link.chapter_id, link.insight_id, link.linked_at),
         )
 
+    def update_chapter_privacy_redaction(
+        self, chapter_id: str, needs_privacy_redaction: int
+    ) -> None:
+        """Update needs_privacy_redaction flag for a growth chapter."""
+        self._conn.execute(
+            "UPDATE chapter_metadata SET needs_privacy_redaction = ? WHERE chapter_id = ?;",
+            (needs_privacy_redaction, chapter_id),
+        )
+
+    def update_chapter_file_path(self, chapter_id: str, file_path: str) -> None:
+        """Update file_path for a growth chapter."""
+        self._conn.execute(
+            "UPDATE chapter_metadata SET file_path = ? WHERE chapter_id = ?;",
+            (file_path, chapter_id),
+        )
+
+    def get_chapter_slice_links(self, chapter_id: str) -> list[ChapterSliceLinkEntity]:
+        """Fetch all raw slice links for a chapter."""
+        rows = self._conn.execute(
+            "SELECT chapter_id, slice_id, linked_at FROM chapter_slice_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall()
+        return [
+            ChapterSliceLinkEntity(
+                chapter_id=r["chapter_id"],
+                slice_id=r["slice_id"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_chapter_episode_links(self, chapter_id: str) -> list[ChapterEpisodeLinkEntity]:
+        """Fetch all episode links for a chapter."""
+        rows = self._conn.execute(
+            "SELECT chapter_id, episode_id, linked_at "
+            "FROM chapter_episode_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall()
+        return [
+            ChapterEpisodeLinkEntity(
+                chapter_id=r["chapter_id"],
+                episode_id=r["episode_id"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_chapter_insight_links(self, chapter_id: str) -> list[ChapterInsightLinkEntity]:
+        """Fetch all confirmed insight links for a chapter."""
+        rows = self._conn.execute(
+            "SELECT chapter_id, insight_id, linked_at "
+            "FROM chapter_insight_links WHERE chapter_id = ?;",
+            (chapter_id,),
+        ).fetchall()
+        return [
+            ChapterInsightLinkEntity(
+                chapter_id=r["chapter_id"],
+                insight_id=r["insight_id"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def clear_chapter_links(self, chapter_id: str) -> None:
+        """Remove all slice, episode, and insight links for a chapter."""
+        self._conn.execute("DELETE FROM chapter_slice_links WHERE chapter_id = ?;", (chapter_id,))
+        self._conn.execute("DELETE FROM chapter_episode_links WHERE chapter_id = ?;", (chapter_id,))
+        self._conn.execute("DELETE FROM chapter_insight_links WHERE chapter_id = ?;", (chapter_id,))
+
+    def list_all_chapter_metadata(self) -> list[ChapterMetadataEntity]:
+        """List all chapter metadata records ordered by created_at."""
+        rows = self._conn.execute(
+            "SELECT * FROM chapter_metadata ORDER BY created_at ASC;"
+        ).fetchall()
+        return [
+            ChapterMetadataEntity(
+                chapter_id=r["chapter_id"],
+                title=r["title"],
+                file_path=r["file_path"],
+                time_span_start=r["time_span_start"],
+                time_span_end=r["time_span_end"],
+                needs_privacy_redaction=int(r["needs_privacy_redaction"]),
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
     # ── Typed Provenance Reverse Traversal & Query Primitives ───────────────
 
     def get_observations_by_source_slice(self, slice_id: str) -> list[ObservationEntity]:
