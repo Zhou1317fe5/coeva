@@ -981,11 +981,12 @@ def test_s6_17_no_chapter_leakage(tmp_path: Path) -> None:
 
 
 def test_s6_18_no_wp7_wp8_changes() -> None:
-    """S6-18: Retrieval and Recall Gate untouched."""
-    # Ensure no retrieval package or recall gate files exist in this lane
+    """S6-18: In isolated Lane I, WP-7/8 were untouched; in integrated Lane L they are present."""
     root_src = Path("src/memory/v2")
-    assert not (root_src / "recall_gate.py").exists()
-    assert not (root_src / "retrieval").exists()
+    if (root_src / "recall_gate.py").exists():
+        assert (root_src / "retrieval").is_dir()
+    else:
+        assert not (root_src / "retrieval").exists()
 
 
 # ── S6-19: Production isolation ──────────────────────────────────────────────
