@@ -181,6 +181,37 @@ class ChronicleStoreV2:
             "foreign_key_violations": 0,
         }
 
+    # ── Legacy Compatibility Layer Primitives (WP-11) ────────────────────────
+
+    def install_compatibility_views(self) -> None:
+        """Explicitly install read-only legacy compatibility views."""
+        from src.memory.v2.compatibility import install_legacy_views
+
+        install_legacy_views(self._conn)
+
+    def drop_compatibility_views(
+        self,
+        *,
+        force: bool = False,
+        retirement_status: Any = None,
+    ) -> None:
+        """Explicitly drop read-only legacy compatibility views."""
+        from src.memory.v2.compatibility import drop_legacy_views
+
+        drop_legacy_views(self._conn, force=force, retirement_status=retirement_status)
+
+    def has_compatibility_views(self) -> bool:
+        """Return True if both legacy compatibility views exist."""
+        from src.memory.v2.compatibility import has_legacy_views
+
+        return has_legacy_views(self._conn)
+
+    def verify_compatibility_views_read_only(self) -> bool:
+        """Verify that legacy compatibility views are strictly read-only."""
+        from src.memory.v2.compatibility import verify_legacy_views_read_only
+
+        return verify_legacy_views_read_only(self._conn)
+
     # ── Transaction Context Manager ──────────────────────────────────────────
 
     @contextmanager

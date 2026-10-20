@@ -11,6 +11,24 @@ from src.memory.v2.candidate_extraction import (
     ProposalProvider,
     RuleBasedProposalProvider,
 )
+from src.memory.v2.compatibility import (
+    COMPATIBILITY_VIEW_NAMES,
+    CompatibilityError,
+    CompatibilityEvidenceViolationError,
+    CompatibilityObservability,
+    CompatibilityReader,
+    CompatibilityRetirementBlockedError,
+    CompatibilityRetirementEvaluator,
+    CompatibilityRetirementStatus,
+    CompatibilityViewReadOnlyViolationError,
+    LegacyEventRecord,
+    LegacySliceRecord,
+    assert_not_evidence_source,
+    drop_legacy_views,
+    has_legacy_views,
+    install_legacy_views,
+    verify_legacy_views_read_only,
+)
 from src.memory.v2.echo_guard import EchoGuard, EchoGuardResult
 from src.memory.v2.entities import (
     CalibrationEventEntity,
@@ -33,6 +51,14 @@ from src.memory.v2.entities import (
     ObservationSliceLinkEntity,
     RawSliceEntity,
     SemanticMemoryEntity,
+)
+from src.memory.v2.jsonl_export import (
+    ExportResult,
+    JsonlExportError,
+    JsonlSliceExporter,
+    ReverseImportForbiddenError,
+    assert_no_reverse_import,
+    read_exported_slices,
 )
 from src.memory.v2.lifecycle import (
     DependencyClosureError,
@@ -162,4 +188,26 @@ __all__ = [
     "MigrationBarrier",
     "MigrationInProgressError",
     "MigrationExecutor",
+    "COMPATIBILITY_VIEW_NAMES",
+    "CompatibilityError",
+    "CompatibilityViewReadOnlyViolationError",
+    "CompatibilityEvidenceViolationError",
+    "CompatibilityRetirementBlockedError",
+    "LegacySliceRecord",
+    "LegacyEventRecord",
+    "CompatibilityObservability",
+    "CompatibilityRetirementStatus",
+    "CompatibilityRetirementEvaluator",
+    "install_legacy_views",
+    "drop_legacy_views",
+    "has_legacy_views",
+    "verify_legacy_views_read_only",
+    "assert_not_evidence_source",
+    "CompatibilityReader",
+    "JsonlSliceExporter",
+    "JsonlExportError",
+    "ReverseImportForbiddenError",
+    "ExportResult",
+    "read_exported_slices",
+    "assert_no_reverse_import",
 ]
