@@ -45,6 +45,11 @@ from src.memory.v2.lifecycle import (
     MemoryLifecycleManager,
     TargetNotFoundError,
 )
+from src.memory.v2.migration import (
+    MigrationBarrier,
+    MigrationExecutor,
+    MigrationInProgressError,
+)
 from src.memory.v2.proposals import (
     AdmissionDecision,
     CandidateSemanticMemory,
@@ -154,4 +159,7 @@ __all__ = [
     "MutationPlan",
     "ReconciliationResult",
     "ReconciliationEngine",
+    "MigrationBarrier",
+    "MigrationInProgressError",
+    "MigrationExecutor",
 ]
