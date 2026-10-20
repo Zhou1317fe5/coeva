@@ -144,7 +144,7 @@ class MigrationExecutor:
             swap=swap_result,
             total_elapsed_seconds=elapsed,
             barrier_released=True,
-            status="SUCCESS",
+            status="SUCCESS" if execute_swap else "READY_TO_CUTOVER",
         )
 
     def rollback(

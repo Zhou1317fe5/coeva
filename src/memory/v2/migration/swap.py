@@ -41,6 +41,12 @@ class RollbackForbiddenDataLossError(SwapError):
     pass
 
 
+class ProductionCutoverNotAuthorizedError(SwapError):
+    """Raised when WP-10 migration tool is directed destructively at active production DB."""
+
+    pass
+
+
 @dataclass(frozen=True)
 class SwapPlan:
     """Pre-calculated atomic swap plan."""

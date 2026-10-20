@@ -47,6 +47,7 @@ from src.memory.v2.migration.snapshot import (
 )
 from src.memory.v2.migration.swap import (
     MidSwapRecoveryError,
+    ProductionCutoverNotAuthorizedError,
     RollbackForbiddenDataLossError,
     SwapError,
     SwapPlan,
@@ -85,6 +86,7 @@ __all__ = [
     "MigrationConflictError",
     "ReconciliationReport",
     "reconcile_canonical_sets",
+    "ProductionCutoverNotAuthorizedError",
     "SwapError",
     "WindowsFileLockError",
     "MidSwapRecoveryError",

@@ -232,3 +232,45 @@ def test_cli_dry_run_and_execution_modes(tmp_path: Path) -> None:
     bad_db.write_text("invalid sqlite", encoding="utf-8")
     code = main(["--source", str(bad_db), "--dry-run"])
     assert code == 3
+
+
+def test_cli_rejects_execute_swap_as_unknown_argument() -> None:
+    """P0-1 contract: --execute-swap is removed from WP-10 CLI and must be rejected."""
+    with pytest.raises(SystemExit):
+        main(["--source", "foo.db", "--execute-swap"])
+
+
+def test_production_destination_safety_guard(tmp_path: Path) -> None:
+    """P0-1 safety guard: destructive operation targeting production DB fails closed."""
+    src = create_v1_database(tmp_path / "fake_src.db", num_slices=2, num_events=2)
+    prod_path = Path("data") / "companion_chronicle.db"
+
+    # 1. Execute targeting production destination -> exit code 7
+    code_exec = main(["--source", str(src), "--target", str(prod_path), "--execute"])
+    assert code_exec == 7
+
+    # 2. Rollback targeting production destination -> exit code 7
+    code_rb = main(["--source", str(src), "--target", str(prod_path), "--rollback"])
+    assert code_rb == 7
+
+
+def test_wp10_shadow_contains_no_wp11_compatibility_views(tmp_path: Path) -> None:
+    """P1-1 scope: WP-10 shadow builder does not create WP-11 legacy compatibility views."""
+    src = create_v1_database(tmp_path / "prod.db", num_slices=3, num_events=3)
+    snap = tmp_path / "snap.db"
+    shadow = tmp_path / "shadow.db"
+
+    from src.memory.v2.migration.mapper import build_v2_shadow_db
+    from src.memory.v2.migration.snapshot import create_wal_snapshot
+
+    create_wal_snapshot(src, snap)
+    build_v2_shadow_db(snap, shadow)
+
+    conn = sqlite3.connect(str(shadow))
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='view';")
+    views = {r[0] for r in cur.fetchall()}
+    conn.close()
+
+    assert "legacy_slices_view" not in views
+    assert "legacy_events_view" not in views

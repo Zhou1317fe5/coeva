@@ -21,9 +21,27 @@ from src.memory.v2.migration.preflight import (
 )
 from src.memory.v2.migration.reconcile import MigrationConflictError
 from src.memory.v2.migration.swap import (
+    ProductionCutoverNotAuthorizedError,
     RollbackForbiddenDataLossError,
     WindowsFileLockError,
 )
+
+
+def check_destructive_destination_safety(destination: Path) -> None:
+    """Ensure destructive migration execution cannot target active production database (P0-1)."""
+    dest_resolved = destination.resolve()
+    repo_prod_db = (Path("data") / "companion_chronicle.db").resolve()
+    if dest_resolved == repo_prod_db or (
+        dest_resolved.name == "companion_chronicle.db"
+        and any(p.name == "data" for p in dest_resolved.parents)
+    ):
+        msg = (
+            f"Production cutover not authorized: destination '{destination}' points to "
+            "the active production companion_chronicle.db database. WP-10 provides "
+            "maintenance and rehearsal tooling only. Destructive production cutover "
+            "is strictly owned by WP-14."
+        )
+        raise ProductionCutoverNotAuthorizedError(msg)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -53,11 +71,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--execute",
         action="store_true",
         help="Execute the full migration pipeline to shadow database",
-    )
-    parser.add_argument(
-        "--execute-swap",
-        action="store_true",
-        help="Execute atomic swap replacing target database with migrated shadow DB",
     )
     parser.add_argument(
         "--rollback",
@@ -126,9 +139,16 @@ def main(argv: list[str] | None = None) -> int:
         print("=== COEVA MEMORY V2.1 MIGRATION: ROLLBACK ===")
         print(f"Target Database: {target}")
         try:
+            check_destructive_destination_safety(target)
             restored = executor.rollback(target, force_test_only=args.force_test_only)
             print(f"[ROLLBACK SUCCESS]: Restored {restored} from pre-V2 backup.")
             return 0
+        except ProductionCutoverNotAuthorizedError as e:
+            print(
+                f"[ROLLBACK FAILED - PRODUCTION CUTOVER NOT AUTHORIZED (OWNED BY WP-14)]: {e}",
+                file=sys.stderr,
+            )
+            return 7
         except RollbackForbiddenDataLossError as e:
             print(f"[ROLLBACK REJECTED - DATA LOSS FORBIDDEN (I-S02/I-S03)]: {e}", file=sys.stderr)
             return 4
@@ -137,18 +157,18 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     # Mode 3: Execute migration
-    if args.execute or args.execute_swap:
+    if args.execute:
         target = args.target or args.source
         print("=== COEVA MEMORY V2.1 MIGRATION: EXECUTION ===")
         print(f"Source: {args.source}")
         print(f"Target: {target}")
-        print(f"Execute Swap: {args.execute_swap}")
 
         try:
+            check_destructive_destination_safety(target)
             migration_report = executor.run_migration(
                 source_path=args.source,
                 target_path=target,
-                execute_swap=args.execute_swap,
+                execute_swap=False,
                 scratch_dir=args.scratch_dir,
             )
             print("\n[MIGRATION SUCCESS]")
@@ -160,10 +180,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  Audit Records:      {migration_report.mapping.audit_records_written}")
             print(f"  FK Violations:      {migration_report.mapping.foreign_key_violations}")
             print(f"  Parity Status:      {migration_report.reconciliation.status_message}")
-            if migration_report.swap:
-                swap_sec = migration_report.swap.duration_seconds
-                print(f"  Atomic Swap:        Completed in {swap_sec:.3f} s")
             return 0
+        except ProductionCutoverNotAuthorizedError as e:
+            print(
+                f"[EXECUTION FAILED - PRODUCTION CUTOVER NOT AUTHORIZED (OWNED BY WP-14)]: {e}",
+                file=sys.stderr,
+            )
+            return 7
         except InsufficientDiskSpaceError as e:
             print(f"[EXECUTION FAILED - INSUFFICIENT DISK SPACE]: {e}", file=sys.stderr)
             return 2

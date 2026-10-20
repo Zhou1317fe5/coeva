@@ -98,35 +98,6 @@ def initialize_v2_schema(dest_conn: sqlite3.Connection) -> None:
     schema_sql = SCHEMA_SQL_PATH.read_text(encoding="utf-8")
     dest_conn.executescript(schema_sql)
 
-    # Add compatibility views for legacy access
-    compatibility_views_sql = """
-    CREATE VIEW IF NOT EXISTS legacy_slices_view AS
-        SELECT
-            slice_id AS id,
-            occurred_at AS timestamp,
-            actor,
-            source,
-            content,
-            'neutral' AS mood_flag,
-            created_at
-        FROM raw_slices;
-
-    CREATE VIEW IF NOT EXISTS legacy_events_view AS
-        SELECT
-            event_id AS id,
-            occurred_at AS timestamp,
-            agent_id,
-            session_id,
-            event_type,
-            tool_name,
-            error_category AS error_message,
-            'agent_context' AS provenance,
-            retention_class,
-            created_at
-        FROM event_skeletons;
-    """
-    dest_conn.executescript(compatibility_views_sql)
-
 
 def build_v2_shadow_db(
     snapshot_path: Path,
