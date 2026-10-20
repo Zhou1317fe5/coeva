@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from src.memory.v2.consolidation_queue import ConsolidationJob, ConsolidationQueue
 
+from datetime import UTC
+
 from src.memory.v2.entities import (
     CalibrationEventEntity,
     ChapterEpisodeLinkEntity,
@@ -28,6 +30,7 @@ from src.memory.v2.entities import (
     ChapterMetadataEntity,
     ChapterSliceLinkEntity,
     ConfirmedInsightEntity,
+    ConfirmedInsightStatus,
     EpisodeEntity,
     EpisodeEventLinkEntity,
     EpisodeSliceLinkEntity,
@@ -35,12 +38,15 @@ from src.memory.v2.entities import (
     EvidenceReinforcementEntity,
     HypothesisEntity,
     HypothesisObservationLinkEntity,
+    HypothesisStatus,
     ObservationEntity,
     ObservationEpisodeLinkEntity,
     ObservationEventLinkEntity,
     ObservationMemoryLinkEntity,
     ObservationSliceLinkEntity,
+    ObservationStatus,
     RawSliceEntity,
+    Scope,
     SemanticMemoryEntity,
     ValidityStatus,
 )
@@ -1207,3 +1213,249 @@ class ChronicleStoreV2:
             )
             for r in rows
         ]
+
+    # ── WP-6: Observation, Hypothesis & Calibration Query Primitives ─────────
+
+    def list_observations(
+        self,
+        scope: Scope | None = None,
+        project_id: str | None = None,
+        status: ObservationStatus | None = None,
+    ) -> list[ObservationEntity]:
+        """List observations filtered by scope, project_id, or status."""
+        clauses: list[str] = []
+        params: list[Any] = []
+        if scope is not None:
+            clauses.append("scope = ?")
+            params.append(scope)
+        if project_id is not None:
+            clauses.append("project_id = ?")
+            params.append(project_id)
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+
+        sql = "SELECT * FROM observations"
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY created_at ASC;"
+
+        rows = self._conn.execute(sql, tuple(params)).fetchall()
+        return [
+            ObservationEntity(
+                observation_id=r["observation_id"],
+                scope=r["scope"],
+                project_id=r["project_id"],
+                statement=r["statement"],
+                proof_count=int(r["proof_count"]),
+                status=r["status"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
+            )
+            for r in rows
+        ]
+
+    def list_hypotheses(self, status: HypothesisStatus | None = None) -> list[HypothesisEntity]:
+        """List hypotheses, optionally filtered by status."""
+        if status is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM hypotheses WHERE status = ? ORDER BY created_at ASC;",
+                (status,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM hypotheses ORDER BY created_at ASC;"
+            ).fetchall()
+        return [
+            HypothesisEntity(
+                hypothesis_id=r["hypothesis_id"],
+                statement=r["statement"],
+                lenses=r["lenses"],
+                confidence_class=r["confidence_class"],
+                status=r["status"],
+                last_calibrated_at=r["last_calibrated_at"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def list_confirmed_insights(
+        self, status: ConfirmedInsightStatus | None = None
+    ) -> list[ConfirmedInsightEntity]:
+        """List confirmed insights, optionally filtered by status."""
+        if status is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM confirmed_insights WHERE status = ? ORDER BY valid_from ASC;",
+                (status,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM confirmed_insights ORDER BY valid_from ASC;"
+            ).fetchall()
+        return [
+            ConfirmedInsightEntity(
+                insight_id=r["insight_id"],
+                source_hypothesis_id=r["source_hypothesis_id"],
+                source_calibration_id=r["source_calibration_id"],
+                statement=r["statement"],
+                valid_from=r["valid_from"],
+                invalidated_at=r["invalidated_at"],
+                superseded_by=r["superseded_by"],
+                status=r["status"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def list_calibration_events(
+        self, hypothesis_id: str | None = None
+    ) -> list[CalibrationEventEntity]:
+        """List calibration events, optionally filtered by hypothesis_id."""
+        if hypothesis_id is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM calibration_events "
+                "WHERE hypothesis_id = ? ORDER BY calibrated_at ASC;",
+                (hypothesis_id,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM calibration_events ORDER BY calibrated_at ASC;"
+            ).fetchall()
+        return [
+            CalibrationEventEntity(
+                calibration_id=r["calibration_id"],
+                hypothesis_id=r["hypothesis_id"],
+                user_action=r["user_action"],
+                calibrated_at=r["calibrated_at"],
+                user_note=r["user_note"],
+            )
+            for r in rows
+        ]
+
+    def get_observation_slice_links(self, observation_id: str) -> list[ObservationSliceLinkEntity]:
+        """Return slice links for an observation."""
+        rows = self._conn.execute(
+            "SELECT * FROM observation_slice_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall()
+        return [
+            ObservationSliceLinkEntity(
+                observation_id=r["observation_id"],
+                slice_id=r["slice_id"],
+                role=r["role"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_observation_event_links(self, observation_id: str) -> list[ObservationEventLinkEntity]:
+        """Return event links for an observation."""
+        rows = self._conn.execute(
+            "SELECT * FROM observation_event_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall()
+        return [
+            ObservationEventLinkEntity(
+                observation_id=r["observation_id"],
+                event_id=r["event_id"],
+                role=r["role"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_observation_memory_links(
+        self, observation_id: str
+    ) -> list[ObservationMemoryLinkEntity]:
+        """Return semantic memory links for an observation."""
+        rows = self._conn.execute(
+            "SELECT * FROM observation_memory_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall()
+        return [
+            ObservationMemoryLinkEntity(
+                observation_id=r["observation_id"],
+                memory_id=r["memory_id"],
+                role=r["role"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_observation_episode_links(
+        self, observation_id: str
+    ) -> list[ObservationEpisodeLinkEntity]:
+        """Return episode links for an observation."""
+        rows = self._conn.execute(
+            "SELECT * FROM observation_episode_links WHERE observation_id = ?;",
+            (observation_id,),
+        ).fetchall()
+        return [
+            ObservationEpisodeLinkEntity(
+                observation_id=r["observation_id"],
+                episode_id=r["episode_id"],
+                role=r["role"],
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def get_hypothesis_observation_links(
+        self, hypothesis_id: str
+    ) -> list[HypothesisObservationLinkEntity]:
+        """Return observation links for a hypothesis."""
+        rows = self._conn.execute(
+            "SELECT * FROM hypothesis_observation_links WHERE hypothesis_id = ?;",
+            (hypothesis_id,),
+        ).fetchall()
+        return [
+            HypothesisObservationLinkEntity(
+                hypothesis_id=r["hypothesis_id"],
+                observation_id=r["observation_id"],
+                role=r["role"],
+                is_primary=int(r["is_primary"]),
+                linked_at=r["linked_at"],
+            )
+            for r in rows
+        ]
+
+    def update_hypothesis_status(
+        self,
+        hypothesis_id: str,
+        status: HypothesisStatus,
+        last_calibrated_at: str | None = None,
+    ) -> None:
+        """Update status and optionally last_calibrated_at for a hypothesis."""
+        if last_calibrated_at is not None:
+            self._conn.execute(
+                "UPDATE hypotheses SET status = ?, last_calibrated_at = ? WHERE hypothesis_id = ?;",
+                (status, last_calibrated_at, hypothesis_id),
+            )
+        else:
+            self._conn.execute(
+                "UPDATE hypotheses SET status = ? WHERE hypothesis_id = ?;",
+                (status, hypothesis_id),
+            )
+
+    def update_observation_proof_count(
+        self,
+        observation_id: str,
+        proof_count: int,
+        status: ObservationStatus | None = None,
+        updated_at: str = "",
+    ) -> None:
+        """Update proof_count and status on an observation."""
+        from datetime import datetime
+
+        ts = updated_at or datetime.now(UTC).isoformat()
+        if status is not None:
+            self._conn.execute(
+                "UPDATE observations SET proof_count = ?, status = ?, updated_at = ? "
+                "WHERE observation_id = ?;",
+                (proof_count, status, ts, observation_id),
+            )
+        else:
+            self._conn.execute(
+                "UPDATE observations SET proof_count = ?, updated_at = ? WHERE observation_id = ?;",
+                (proof_count, ts, observation_id),
+            )

@@ -6,6 +6,16 @@ Provides access to V2.1 entities, schema definitions, ChronicleStoreV2, and life
 from __future__ import annotations
 
 from src.memory.v2.admission import AdmissionFilter
+from src.memory.v2.calibration import (
+    CalibrationDecision,
+    CalibrationError,
+    CalibrationResponse,
+    CalibrationResult,
+    CalibrationService,
+    HypothesisNotFoundError,
+    IllegalCalibrationError,
+    ImmutableCalibrationError,
+)
 from src.memory.v2.candidate_extraction import (
     CandidateExtractor,
     ProposalProvider,
@@ -47,6 +57,12 @@ from src.memory.v2.entities import (
     RawSliceEntity,
     SemanticMemoryEntity,
 )
+from src.memory.v2.hypothesis import (
+    DevelopmentLens,
+    HypothesisEngine,
+    HypothesisProposal,
+    HypothesisValidationError,
+)
 from src.memory.v2.lifecycle import (
     DependencyClosureError,
     EventPinnedError,
@@ -57,6 +73,16 @@ from src.memory.v2.lifecycle import (
     LifecycleService,
     MemoryLifecycleManager,
     TargetNotFoundError,
+)
+from src.memory.v2.observation import (
+    EchoEvidenceError,
+    ObservationBuilder,
+    ObservationCandidate,
+    ObservationPipeline,
+    ObservationValidationError,
+    ScopeIsolationError,
+    SingleSlicePsychError,
+    TelemetryAuthorityError,
 )
 from src.memory.v2.proposals import (
     AdmissionDecision,
@@ -84,6 +110,11 @@ from src.memory.v2.reconciliation_validator import (
     normalize_content,
 )
 from src.memory.v2.router import RawEvidenceRouter
+from src.memory.v2.self_model import (
+    SlowPathConfig,
+    SlowPathRunReport,
+    SlowPathSelfModelService,
+)
 from src.memory.v2.store import (
     CANONICAL_TABLES,
     SCHEMA_VERSION,
@@ -176,4 +207,27 @@ __all__ = [
     "ConsolidationScheduler",
     "SchedulerConfig",
     "JobResult",
+    "ObservationCandidate",
+    "ObservationBuilder",
+    "ObservationPipeline",
+    "ObservationValidationError",
+    "ScopeIsolationError",
+    "TelemetryAuthorityError",
+    "SingleSlicePsychError",
+    "EchoEvidenceError",
+    "DevelopmentLens",
+    "HypothesisProposal",
+    "HypothesisValidationError",
+    "HypothesisEngine",
+    "CalibrationResponse",
+    "CalibrationDecision",
+    "CalibrationResult",
+    "CalibrationError",
+    "HypothesisNotFoundError",
+    "IllegalCalibrationError",
+    "ImmutableCalibrationError",
+    "CalibrationService",
+    "SlowPathConfig",
+    "SlowPathRunReport",
+    "SlowPathSelfModelService",
 ]
