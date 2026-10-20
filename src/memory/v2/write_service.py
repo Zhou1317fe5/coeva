@@ -20,7 +20,7 @@ import hashlib
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import uuid4
 
 from src.memory.v2.entities import (
@@ -31,6 +31,9 @@ from src.memory.v2.entities import (
     Scope,
 )
 from src.memory.v2.store import ChronicleStoreV2
+
+if TYPE_CHECKING:
+    from src.memory.v2.jsonl_export import JsonlSliceExporter
 
 
 class WriteConflictError(Exception):
@@ -95,8 +98,21 @@ class WriteEventResult:
 class RawEvidenceWriteService:
     """Durable write service for canonical raw evidence (V2.1 Storage)."""
 
-    def __init__(self, store: ChronicleStoreV2) -> None:
+    def __init__(
+        self,
+        store: ChronicleStoreV2,
+        *,
+        exporter: JsonlSliceExporter | None = None,
+    ) -> None:
         self._store = store
+        self._exporter = exporter
+
+    @property
+    def exporter(self) -> JsonlSliceExporter | None:
+        return self._exporter
+
+    def set_exporter(self, exporter: JsonlSliceExporter | None) -> None:
+        self._exporter = exporter
 
     # ── User Slice Write Pipeline ────────────────────────────────────────────
 
@@ -222,6 +238,17 @@ class RawEvidenceWriteService:
             raise WriteDurabilityError(
                 f"Failed to commit raw slice '{final_slice_id}' durably: {exc}"
             ) from exc
+
+        # 8. Single-Master Non-Canonical Export Boundary (WP-11: C-06, C-08, C-09)
+        # SQLite transaction has committed durably.
+        # Asynchronous/decoupled one-way export to JSONL occurs strictly AFTER commit.
+        # Export failure must NEVER invalidate or roll back the committed SQLite state.
+        if self._exporter is not None:
+            try:
+                self._exporter.export_slice(entity, raise_on_error=False)
+            except Exception:
+                # Isolation: log or ignore, preserving durable SQLite ACK
+                pass
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         return WriteSliceResult(
