@@ -1,0 +1,209 @@
+{
+  "holdout2_set": [
+    {
+      "id": "HOLD2_S1",
+      "category": "Sanctuary Task Continuity (P0)",
+      "query": "刚才那个 access violation 崩溃定位得怎么样了？",
+      "retrieval_mode": "TASK_CONTINUITY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": true,
+      "must_retrieve": [
+        "ep_current_error"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_past_frustration_01",
+        "insight_psych_autonomy"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "避风港激活状态下，当前报错任务连续性放行，情绪翻旧账与心理画像严格阻断"
+    },
+    {
+      "id": "HOLD2_S2",
+      "category": "Sanctuary Reflective Suppression (P0)",
+      "query": "我是不是特别容易对外部干预产生防御心理？",
+      "retrieval_mode": "REFLECTIVE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": true,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "insight_psych_autonomy",
+        "mem_past_frustration_01"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "避风港激活状态下，反思性心理画像与自模型严格阻断静默，返回空列表"
+    },
+    {
+      "id": "HOLD2_GEN_01",
+      "category": "Generic Programming QA Silence",
+      "query": "Rust 里的生命周期参数怎么标注？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_keyboard",
+        "mem_proj_coeva_gui"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "通用编程语法常识提问，快筛门拦截，严格静默"
+    },
+    {
+      "id": "HOLD2_GEN_02",
+      "category": "General Chit-chat Silence",
+      "query": "今天北京天气适合出门跑步吗？",
+      "retrieval_mode": "NO_MEMORY_NEEDED",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_fact_gpu"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "外部日常闲聊提问，严格返回空列表"
+    },
+    {
+      "id": "HOLD2_HIST_01",
+      "category": "Explicit History Beats Generic QA",
+      "query": "我们过去用的旧终端是什么？",
+      "retrieval_mode": "EXPLICIT_PAST_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_term_cmd_old"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "historical",
+      "no_memory_expected": false,
+      "notes": "显式过去意图查询，放行 superseded 历史事实 CMD"
+    },
+    {
+      "id": "HOLD2_CURR_01",
+      "category": "Current Terminal Preference (Supersession Guard)",
+      "query": "我现在主要在用什么终端开发？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_pref_term_pwsh7"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_pref_term_cmd_old"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "当前状态提问严格拒绝已废弃旧终端 CMD，仅召回 pwsh7"
+    },
+    {
+      "id": "HOLD2_RULE_01",
+      "category": "Relationship Rule Boundary",
+      "query": "关于说教和指导你还记得我们的约定原则吗？",
+      "retrieval_mode": "RELATIONSHIP_RULE",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_rule_no_preach"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "相处硬规则查询，+0.30 Rule Boost 召回平等相处拒绝说教原则"
+    },
+    {
+      "id": "HOLD2_XPROJ_01",
+      "category": "Cross-Project Contamination Guard",
+      "query": "Flutter 框架的配置在这个工程里有吗？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_proj_app_flutter"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "当前工程为伴生体项目，严禁越界召回移动端项目的 Flutter 事实"
+    },
+    {
+      "id": "HOLD2_PROJ_01",
+      "category": "Active Project Tech Stack",
+      "query": "我们目前这个项目的技术栈你都知道什么？",
+      "retrieval_mode": "PROJECT_HISTORY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_proj_coeva_gui"
+      ],
+      "acceptable_retrieve": [
+        "mem_proj_coeva_state_machine",
+        "mem_proj_qthread_async"
+      ],
+      "must_not_retrieve": [
+        "mem_proj_web_vue3",
+        "mem_proj_web_react"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "当前工程技术栈查询，精准召回当前项目 PySide6，隔离其他工程"
+    },
+    {
+      "id": "HOLD2_PRIV_01",
+      "category": "Privacy Redaction Pending Block (IMPL-3)",
+      "query": "请帮我看看第一章回忆录的草稿",
+      "retrieval_mode": "NARRATIVE_QUERY",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "chap_01_privacy_pending"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "待脱敏制品严格物理不可读，100% 阻断返回空列表"
+    },
+    {
+      "id": "HOLD2_UNRES_01",
+      "category": "Unresolved Scope Smuggling Guard",
+      "query": "在 crm-web-portal 里我们用什么测试框架？",
+      "retrieval_mode": "FACT_RECALL",
+      "current_project": "crm-web-portal",
+      "sanctuary_active": false,
+      "must_retrieve": [],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [
+        "mem_unresolved_pytest"
+      ],
+      "historical_or_current": "current",
+      "no_memory_expected": true,
+      "notes": "未决范围事实绝不偷渡升级为全局事实或污染明确工程项目"
+    },
+    {
+      "id": "HOLD2_AMBIG_01",
+      "category": "Ambiguous Preference Preservation",
+      "query": "Python 代码单双引号规范目前敲定了吗？",
+      "retrieval_mode": "PREFERENCE_RECALL",
+      "current_project": "co-evolving-companion",
+      "sanctuary_active": false,
+      "must_retrieve": [
+        "mem_ambiguous_quotes"
+      ],
+      "acceptable_retrieve": [],
+      "must_not_retrieve": [],
+      "historical_or_current": "current",
+      "no_memory_expected": false,
+      "notes": "歧义条目正常保留并返回，标记 is_ambiguous=True"
+    }
+  ]
+}

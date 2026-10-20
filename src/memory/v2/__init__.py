@@ -84,6 +84,11 @@ from src.memory.v2.hypothesis import (
     HypothesisProposal,
     HypothesisValidationError,
 )
+from src.memory.v2.injection_policy import (
+    InjectedMemoryItem,
+    InjectionContext,
+    MinimalInjectionPolicy,
+)
 from src.memory.v2.lifecycle import (
     DependencyClosureError,
     EventPinnedError,
@@ -116,6 +121,13 @@ from src.memory.v2.provenance import (
     ProvenanceRef,
     ProvenanceRepository,
     ProvenanceRole,
+)
+from src.memory.v2.recall_gate import (
+    RecallContext,
+    RecallDecision,
+    RecallDisposition,
+    RecallGate,
+    RecallReason,
 )
 from src.memory.v2.reconciliation import (
     MutationPlan,
@@ -268,4 +280,12 @@ __all__ = [
     "SlowPathConfig",
     "SlowPathRunReport",
     "SlowPathSelfModelService",
+    "RecallGate",
+    "RecallContext",
+    "RecallDecision",
+    "RecallDisposition",
+    "RecallReason",
+    "InjectionContext",
+    "InjectedMemoryItem",
+    "MinimalInjectionPolicy",
 ]

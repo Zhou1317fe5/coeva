@@ -255,8 +255,9 @@ def test_observation_and_hypothesis_calibration_crud(tmp_path: Path) -> None:
         # Check retrievals
         assert store.get_observation("obs_001") is not None
         assert store.get_hypothesis("hyp_001") is not None
-        assert store.get_confirmed_insight("ins_001") is not None
-        assert store.get_confirmed_insight("ins_001").status == "confirmed"
+        retrieved_ins = store.get_confirmed_insight("ins_001")
+        assert retrieved_ins is not None
+        assert retrieved_ins.status == "confirmed"
     finally:
         store.close()
 
