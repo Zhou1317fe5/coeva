@@ -251,6 +251,15 @@ class ChapterSourceBundle:
                         )
 
 
+@dataclass(frozen=True)
+class ChapterEligibilityContext:
+    """Explicit contextual signals for chapter eligibility evaluation."""
+
+    structural_transition_detected: bool = False
+    voluntary: bool = True
+    transition_description: str | None = None
+
+
 @dataclass
 class ChapterEligibilityGateV2:
     """Evaluates whether accumulated Chronicle evidence satisfies the 4 Chapter Gates."""
@@ -269,17 +278,26 @@ class ChapterEligibilityGateV2:
         slices: list[RawSliceEntity] | None = None,
         now: datetime | None = None,
         voluntary: bool = True,
+        structural_transition_detected: bool = False,
+        context: ChapterEligibilityContext | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Evaluate the 4 product gates for chapter generation eligibility.
 
         Gates:
         1. Sustained Gate: time span >= min_span_days (default 28 days / 4 weeks)
-        2. Structural Shift Gate: >= min_confirmed_insights (meaningful confirmed consensus)
+        2. Structural Shift Gate: explicit transition detected AND confirmed consensus
         3. Diversity Gate: multiple episodes/slices/sources (not single-session anecdote)
         4. Voluntary Gate: non-disturbing, voluntary timing
         """
-        # 4. Voluntary Gate
-        voluntary_ok = bool(voluntary)
+        # Resolve contextual signals
+        if context is not None:
+            voluntary_ok = context.voluntary and bool(voluntary)
+            transition_detected = (
+                context.structural_transition_detected or structural_transition_detected
+            )
+        else:
+            voluntary_ok = bool(voluntary)
+            transition_detected = structural_transition_detected
 
         # Gather sources if not explicitly supplied
         conn = store.connection
@@ -366,8 +384,10 @@ class ChapterEligibilityGateV2:
 
         sustained_ok = span_days >= self.min_span_days
 
-        # 2. Structural Shift Gate
-        structural_ok = len(insights) >= self.min_confirmed_insights
+        # 2. Structural Shift Gate: requires BOTH an explicit demonstrated transition
+        # AND supporting confirmed consensus. A Confirmed Insight alone is not the transition.
+        has_confirmed_insights = len(insights) >= self.min_confirmed_insights
+        structural_ok = transition_detected and has_confirmed_insights
 
         # 3. Evidence Diversity Gate: not a single-session or single-slice anecdote
         is_single_anecdote = len(episodes) <= 1 and len(slices) <= 1 and len(insights) <= 1
@@ -393,6 +413,7 @@ class ChapterEligibilityGateV2:
             },
             "structural": {
                 "passed": structural_ok,
+                "structural_transition_detected": transition_detected,
                 "confirmed_insights_count": len(insights),
                 "min_confirmed_insights": self.min_confirmed_insights,
             },

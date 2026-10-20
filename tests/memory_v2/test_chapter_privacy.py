@@ -2,7 +2,7 @@
 
 Formal verification of canonical test gates CH-01 through CH-20 and Stage-7 Exit Gate:
 - CH-01: time-span gate (< 4 weeks -> no chapter)
-- CH-02: structural-change gate (long duration alone without transition -> no chapter)
+- CH-02: structural-change gate (requires explicit transition + confirmed consensus)
 - CH-03: evidence-diversity gate (single slice/session anecdote -> no chapter)
 - CH-04: voluntary/non-disturbing gate (no forced chapter generation)
 - CH-05: confirmed insight allowed (valid confirmed insight enters ChapterSourceBundle)
@@ -12,6 +12,7 @@ Formal verification of canonical test gates CH-01 through CH-20 and Stage-7 Exit
 - CH-09: narrative never evidence (chapter cannot become ProvenanceRef / Observation / support)
 - CH-10: privacy mark immediate unreadable (needs_privacy_redaction=1 stops returning stale text)
 - CH-11: hard-delete impact (deleting linked slice marks chapter pending before destructive del)
+- CH-11b: hard-delete episode impact (deleting linked episode marks chapter pending)
 - CH-12: linked insight invalidation/privacy (retracting insight marks chapter privacy pending)
 - CH-13: redaction success (safe rewrite replaces file, updates links, clears flag)
 - CH-14: redaction failure (failure leaves flag=1 and stale chapter unreadable)
@@ -19,21 +20,25 @@ Formal verification of canonical test gates CH-01 through CH-20 and Stage-7 Exit
 - CH-16: missing/corrupt file (reader fails closed; does not fabricate content)
 - CH-17: Narrative Firewall (violating text cannot be persisted)
 - CH-18: no Agent private payload (source bundle excludes Agent prompts, CoT, tool dumps)
-- CH-19: no self-reinforcement (chapter text cannot re-enter memory pipeline)
+- CH-19a: automatic Chapter -> Evidence writes = 0
+- CH-19b: no core pipeline invocation during Chapter lifecycle
+- CH-19c: manual user re-entry of Chapter text accepted as new user evidence
+- CH-19d: narrative never provenance invariant
 - CH-20: production isolation (production DB, files, runtime, flags untouched)
 - Stage-7 Exit Gate: 100% unreadable rate, 0% stale reads, 0 orphan links
 """
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
+from typing import get_args
 from unittest.mock import patch
 
 import pytest
 
 from src.core.flags import MemoryFeatureFlags
 from src.memory.v2.chapter import (
+    ChapterEligibilityContext,
     ChapterEligibilityGateV2,
     ChapterError,
     ChapterGenerationResult,
@@ -51,8 +56,9 @@ from src.memory.v2.entities import (
     RawSliceEntity,
 )
 from src.memory.v2.lifecycle import LifecycleService
-from src.memory.v2.provenance import ProvenanceRef
+from src.memory.v2.provenance import ProvenanceKind, ProvenanceRef
 from src.memory.v2.store import ChronicleStoreV2
+from src.memory.v2.write_service import RawEvidenceWriteService, WriteSliceCommand
 
 # ── Fixtures & Test Helpers ───────────────────────────────────────────────────
 
@@ -107,7 +113,6 @@ def seed_insight(
     statement: str = "已确认的心智共识",
     status: str = "confirmed",
 ) -> ConfirmedInsightEntity:
-    # Need hypothesis and calibration for foreign key integrity
     hyp_id = f"hyp_{insight_id}"
     cal_id = f"cal_{insight_id}"
     conn = store.connection
@@ -149,7 +154,7 @@ def test_ch01_time_span_gate_rejects_under_4_weeks(tmp_path: Path) -> None:
     seed_episode(store, "ep_2", started_at="2026-06-11T10:00:00+00:00")
     seed_insight(store, "ins_1", valid_from="2026-06-05T10:00:00+00:00")
 
-    eligible, report = gate.evaluate(store)
+    eligible, report = gate.evaluate(store, structural_transition_detected=True)
     assert not eligible
     assert not report["sustained"]["passed"]
     assert report["sustained"]["span_days"] == 10
@@ -157,7 +162,7 @@ def test_ch01_time_span_gate_rejects_under_4_weeks(tmp_path: Path) -> None:
 
     # 2. Add an episode at day 30 (span = 30 days >= 28)
     seed_episode(store, "ep_3", started_at="2026-07-01T10:00:00+00:00")
-    eligible_now, report_now = gate.evaluate(store)
+    eligible_now, report_now = gate.evaluate(store, structural_transition_detected=True)
     assert eligible_now
     assert report_now["sustained"]["passed"]
     assert report_now["sustained"]["span_days"] >= 28
@@ -167,25 +172,60 @@ def test_ch01_time_span_gate_rejects_under_4_weeks(tmp_path: Path) -> None:
 
 
 def test_ch02_structural_change_gate_requires_confirmed_insight(tmp_path: Path) -> None:
-    """CH-02: Long duration alone without meaningful transition -> no chapter."""
+    """CH-02: Structural transition gate requires transition + confirmed consensus.
+
+    Regressions:
+    A: 35 days + diverse sources + >=1 confirmed insight + voluntary BUT transition=False
+       -> INELIGIBLE
+    B: 35 days + diverse sources + voluntary + transition=True
+       -> ELIGIBLE
+    C: transition=True but no grounded source diversity
+       -> INELIGIBLE
+    """
     store = create_test_store(tmp_path, "ch02.db")
     gate = ChapterEligibilityGateV2(min_span_days=28, min_confirmed_insights=1)
 
-    # 35-day duration with episodes, but ZERO confirmed insights
+    # Seed 35 days of history, diverse episodes, and confirmed insight
     seed_episode(store, "ep_1", started_at="2026-06-01T10:00:00+00:00")
     seed_episode(store, "ep_2", started_at="2026-07-06T10:00:00+00:00")
-
-    eligible, report = gate.evaluate(store)
-    assert not eligible
-    assert report["sustained"]["passed"] is True  # Time passed
-    assert report["structural"]["passed"] is False  # Structural shift missing
-    assert report["structural"]["confirmed_insights_count"] == 0
-
-    # Add confirmed insight
     seed_insight(store, "ins_1", valid_from="2026-06-15T10:00:00+00:00")
-    eligible_now, report_now = gate.evaluate(store)
-    assert eligible_now
-    assert report_now["structural"]["passed"] is True
+
+    # Regression A: 35 days + diverse sources + >=1 confirmed insight + voluntary
+    # BUT structural_transition_detected=False -> INELIGIBLE!
+    # Confirmed insight alone does not make a transition.
+    eligible_a, report_a = gate.evaluate(
+        store,
+        structural_transition_detected=False,
+        voluntary=True,
+    )
+    assert not eligible_a
+    assert report_a["sustained"]["passed"] is True
+    assert report_a["diversity"]["passed"] is True
+    assert report_a["voluntary"]["passed"] is True
+    assert report_a["structural"]["passed"] is False
+    assert report_a["structural"]["structural_transition_detected"] is False
+    assert report_a["structural"]["confirmed_insights_count"] >= 1
+
+    # Regression B: 35 days + diverse sources + voluntary + transition=True -> ELIGIBLE!
+    ctx_b = ChapterEligibilityContext(structural_transition_detected=True, voluntary=True)
+    eligible_b, report_b = gate.evaluate(store, context=ctx_b)
+    assert eligible_b
+    assert report_b["structural"]["passed"] is True
+    assert report_b["structural"]["structural_transition_detected"] is True
+
+    # Regression C: transition=True but no grounded source diversity -> INELIGIBLE
+    store_c = create_test_store(tmp_path, "ch02_c.db")
+    seed_slice(store_c, "sl_c1", occurred_at="2026-06-01T10:00:00+00:00")
+    seed_insight(store_c, "ins_c1", valid_from="2026-06-15T10:00:00+00:00")
+    # Only 1 slice and 0 episodes -> single anecdote fails diversity
+    eligible_c, report_c = gate.evaluate(
+        store_c,
+        structural_transition_detected=True,
+        voluntary=True,
+    )
+    assert not eligible_c
+    assert report_c["diversity"]["passed"] is False
+    assert report_c["diversity"]["is_single_anecdote"] is True
 
 
 # ── CH-03: Evidence-Diversity Gate ───────────────────────────────────────────
@@ -200,7 +240,7 @@ def test_ch03_evidence_diversity_gate_rejects_single_anecdote(tmp_path: Path) ->
     seed_slice(store, "sl_1", occurred_at="2026-06-01T10:00:00+00:00")
     seed_episode(store, "ep_1", started_at="2026-06-01T10:00:00+00:00")
 
-    eligible, report = gate.evaluate(store)
+    eligible, report = gate.evaluate(store, structural_transition_detected=True)
     assert not eligible
     assert report["diversity"]["is_single_anecdote"] is True
     assert report["diversity"]["passed"] is False
@@ -208,7 +248,7 @@ def test_ch03_evidence_diversity_gate_rejects_single_anecdote(tmp_path: Path) ->
     # Add second distinct episode and insight
     seed_episode(store, "ep_2", started_at="2026-06-10T10:00:00+00:00")
     seed_insight(store, "ins_1", valid_from="2026-06-05T10:00:00+00:00")
-    eligible_now, report_now = gate.evaluate(store)
+    eligible_now, report_now = gate.evaluate(store, structural_transition_detected=True)
     assert eligible_now
     assert report_now["diversity"]["passed"] is True
 
@@ -226,12 +266,16 @@ def test_ch04_voluntary_gate_blocks_forced_generation(tmp_path: Path) -> None:
     seed_insight(store, "ins_1", valid_from="2026-06-10T10:00:00+00:00")
 
     # Forced run (e.g. non-voluntary background tick)
-    eligible_forced, report_forced = gate.evaluate(store, voluntary=False)
+    eligible_forced, report_forced = gate.evaluate(
+        store, voluntary=False, structural_transition_detected=True
+    )
     assert not eligible_forced
     assert report_forced["voluntary"]["passed"] is False
 
     # Voluntary user-initiated run
-    eligible_voluntary, report_voluntary = gate.evaluate(store, voluntary=True)
+    eligible_voluntary, report_voluntary = gate.evaluate(
+        store, voluntary=True, structural_transition_detected=True
+    )
     assert eligible_voluntary
     assert report_voluntary["voluntary"]["passed"] is True
 
@@ -356,12 +400,10 @@ def test_ch08_no_pseudo_provenance_rejected(tmp_path: Path) -> None:
 
 def test_ch09_narrative_never_evidence_invariant() -> None:
     """CH-09: Chapter cannot become ProvenanceRef or observation/hypothesis support."""
-    # 1. Type level: "chapter" or "narrative" is not in ProvenanceKind
     allowed_kinds = ("slice", "event", "episode", "semantic_memory", "observation", "insight")
     assert "chapter" not in allowed_kinds
     assert "narrative" not in allowed_kinds
 
-    # 2. Schema level: Chapter cannot be passed as raw evidence or observation link
     ref = ProvenanceRef(kind="slice", target_id="sl_01", role="primary_source")
     assert str(ref.kind) != "chapter"
 
@@ -432,6 +474,39 @@ def test_ch11_hard_delete_slice_marks_chapter_privacy_pending(tmp_path: Path) ->
 
     # Hard delete slice with privacy_sensitive=True
     del_res = lifecycle.hard_delete_slice("sl_11", privacy_sensitive=True)
+    assert del_res.success is True
+    assert meta.chapter_id in del_res.privacy_redacted_chapters
+
+    # Chapter metadata in DB is immediately pending
+    updated_meta = store.get_chapter_metadata(meta.chapter_id)
+    assert updated_meta is not None
+    assert updated_meta.needs_privacy_redaction == 1
+
+    # Reader returns fail-closed placeholder
+    reader_view = repo.get_readable(meta.chapter_id)
+    assert reader_view is not None
+    assert reader_view.is_redacted is True
+
+
+def test_ch11b_hard_delete_episode_marks_chapter_privacy_pending(tmp_path: Path) -> None:
+    """CH-11b: Deleting a linked episode marks chapter pending before destructive lifecycle."""
+    store = create_test_store(tmp_path, "ch11b.db")
+    repo = ChapterRepository(store, chapters_dir=tmp_path / "chapters")
+    lifecycle = LifecycleService(store)
+
+    ep = seed_episode(store, "ep_11b", started_at="2026-06-01T10:00:00+00:00")
+    ins = seed_insight(store, "ins_11b", valid_from="2026-06-01T10:00:00+00:00")
+    bundle = ChapterSourceBundle(
+        time_span_start="2026-06-01",
+        time_span_end="2026-07-01",
+        confirmed_insights=(ins,),
+        episodes=(ep,),
+    )
+    res = ChapterGeneratorV2(store, repo=repo).generate(bundle, title="会话删除影响章")
+    meta = repo.publish_chapter(res)
+
+    # Hard delete episode with privacy_sensitive=True
+    del_res = lifecycle.hard_delete_episode("ep_11b", privacy_sensitive=True)
     assert del_res.success is True
     assert meta.chapter_id in del_res.privacy_redacted_chapters
 
@@ -696,30 +771,217 @@ def test_ch18_no_agent_private_payload_in_bundle() -> None:
         bundle.validate()
 
 
-# ── CH-19: No Self-Reinforcement ──────────────────────────────────────────────
+# ── CH-19: Narrative Firewall & Origin Boundary Invariant ────────────────────
 
 
-def test_ch19_no_self_reinforcement_invariant(tmp_path: Path) -> None:
-    """CH-19: Generated chapter text cannot re-enter memory/understanding pipeline."""
-    store = create_test_store(tmp_path, "ch19.db")
-    # In SQLite schema, raw_slices CHECK constraint mandates actor IN ('user')
-    with pytest.raises(sqlite3.IntegrityError):
-        store.connection.execute(
-            "INSERT INTO raw_slices "
-            "(slice_id, occurred_at, content, actor, source, scope, "
-            "ingestion_dedup_key, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
-            (
-                "sl_reinforce",
-                "2026-06-01T00:00:00+00:00",
-                "Chapter narrative",
-                "chapter_author",
-                "manual_feed",
-                "unresolved",
-                "k_r",
-                "2026-06-01T00:00:00+00:00",
-            ),
-        )
+def test_ch19a_automatic_chapter_to_evidence_writes_zero(tmp_path: Path) -> None:
+    """CH-19a: Application-level Narrative Firewall invariant.
+
+    Snapshot non-chapter row counts:
+    - raw_slices
+    - event_skeletons
+    - semantic_memories
+    - observations
+    - hypotheses
+    - confirmed_insights
+
+    Publish a Chapter and perform redaction/regeneration.
+    Assert all above counts remain strictly unchanged.
+    Only chapter_metadata, chapter_*_links, and Markdown file may change.
+    """
+    store = create_test_store(tmp_path, "ch19a.db")
+    repo = ChapterRepository(store, chapters_dir=tmp_path / "chapters")
+    privacy_svc = ChapterPrivacyService(store, repo=repo)
+
+    # Seed baseline evidence & understanding entities
+    sl1 = seed_slice(store, "sl_b1", "2026-06-01T10:00:00+00:00", "Baseline slice 1")
+    sl2 = seed_slice(store, "sl_b2", "2026-06-02T10:00:00+00:00", "Baseline slice 2")
+    ep1 = seed_episode(store, "ep_b1", "2026-06-01T10:00:00+00:00")
+    ins1 = seed_insight(store, "ins_b1", "2026-06-05T10:00:00+00:00", "Baseline insight")
+
+    # Seed an event skeleton
+    store.connection.execute(
+        "INSERT INTO event_skeletons "
+        "(event_id, occurred_at, agent_id, session_id, event_type, retention_class, created_at) "
+        "VALUES ('ev_b1', '2026-06-01T10:00:00+00:00', 'pi', 'sess_1', 'tool_use', "
+        "'durable', '2026-06-01T10:00:00+00:00');"
+    )
+    # Seed a semantic memory
+    store.connection.execute(
+        "INSERT INTO semantic_memories "
+        "(memory_id, category, statement, authority_class, scope, source_slice_id, "
+        "valid_from, validity_status, created_at) "
+        "VALUES ('mem_b1', 'preference', '用户偏好', 'user_asserted', 'global', "
+        "'sl_b1', '2026-06-01T10:00:00+00:00', 'active', '2026-06-01T10:00:00+00:00');"
+    )
+    # Seed an observation
+    store.connection.execute(
+        "INSERT INTO observations "
+        "(observation_id, scope, statement, proof_count, status, created_at, updated_at) "
+        "VALUES ('obs_b1', 'global', '观察事实', 1, 'active', "
+        "'2026-06-01T10:00:00+00:00', '2026-06-01T10:00:00+00:00');"
+    )
+
+    def get_non_chapter_counts() -> dict[str, int]:
+        conn = store.connection
+        return {
+            "raw_slices": conn.execute("SELECT COUNT(*) FROM raw_slices;").fetchone()[0],
+            "event_skeletons": conn.execute("SELECT COUNT(*) FROM event_skeletons;").fetchone()[0],
+            "semantic_memories": conn.execute("SELECT COUNT(*) FROM semantic_memories;").fetchone()[
+                0
+            ],
+            "observations": conn.execute("SELECT COUNT(*) FROM observations;").fetchone()[0],
+            "hypotheses": conn.execute("SELECT COUNT(*) FROM hypotheses;").fetchone()[0],
+            "confirmed_insights": conn.execute(
+                "SELECT COUNT(*) FROM confirmed_insights;"
+            ).fetchone()[0],
+        }
+
+    baseline_counts = get_non_chapter_counts()
+
+    # 1. Publish a Chapter
+    bundle = ChapterSourceBundle(
+        time_span_start="2026-06-01",
+        time_span_end="2026-07-01",
+        confirmed_insights=(ins1,),
+        episodes=(ep1,),
+        raw_slices=(sl1, sl2),
+    )
+    gen = ChapterGeneratorV2(store, repo=repo)
+    gen_res = gen.generate(bundle, title="防火墙基准章")
+    meta = repo.publish_chapter(gen_res)
+
+    counts_after_publish = get_non_chapter_counts()
+    # Invariant: No automatic chapter -> evidence writes during publish!
+    assert counts_after_publish == baseline_counts, (
+        f"Non-chapter tables changed during publish: {counts_after_publish} vs {baseline_counts}"
+    )
+
+    # Only chapter tables and markdown file changed
+    assert store.connection.execute("SELECT COUNT(*) FROM chapter_metadata;").fetchone()[0] == 1
+    assert store.connection.execute("SELECT COUNT(*) FROM chapter_slice_links;").fetchone()[0] == 2
+    assert (
+        store.connection.execute("SELECT COUNT(*) FROM chapter_episode_links;").fetchone()[0] == 1
+    )
+    assert (
+        store.connection.execute("SELECT COUNT(*) FROM chapter_insight_links;").fetchone()[0] == 1
+    )
+    assert Path(meta.file_path).is_file()
+
+    # 2. Mark privacy pending and perform redaction / regeneration
+    privacy_svc.mark_privacy_pending(meta.chapter_id)
+    redact_res = privacy_svc.redact_or_regenerate_chapter(meta.chapter_id)
+    assert redact_res.success is True
+
+    counts_after_redaction = get_non_chapter_counts()
+    # Invariant: No automatic chapter -> evidence writes during redaction/regeneration!
+    assert counts_after_redaction == baseline_counts, (
+        "Non-chapter tables changed during redaction: "
+        f"{counts_after_redaction} vs {baseline_counts}"
+    )
+
+    # Measured final proof: automatic Chapter -> Evidence writes = 0
+    automatic_chapter_to_evidence_writes = sum(
+        counts_after_redaction[k] - baseline_counts[k] for k in baseline_counts
+    )
+    assert automatic_chapter_to_evidence_writes == 0
+
+
+def test_ch19b_no_pipeline_invocation_during_chapter_lifecycle(tmp_path: Path) -> None:
+    """CH-19b: Verify Chapter publish/redaction code does not enqueue or invoke core pipelines."""
+    store = create_test_store(tmp_path, "ch19b.db")
+    repo = ChapterRepository(store, chapters_dir=tmp_path / "chapters")
+    privacy_svc = ChapterPrivacyService(store, repo=repo)
+
+    sl = seed_slice(store, "sl_b19", "2026-06-01T10:00:00+00:00")
+    ins = seed_insight(store, "ins_b19", "2026-06-01T10:00:00+00:00")
+    bundle = ChapterSourceBundle(
+        time_span_start="2026-06-01",
+        time_span_end="2026-07-01",
+        confirmed_insights=(ins,),
+        raw_slices=(sl,),
+    )
+    gen_res = ChapterGeneratorV2(store, repo=repo).generate(bundle, title="管道隔离章")
+
+    with (
+        patch(
+            "src.memory.v2.write_service.RawEvidenceWriteService.write_slice"
+        ) as mock_write_slice,
+        patch(
+            "src.memory.v2.write_service.RawEvidenceWriteService.write_event"
+        ) as mock_write_event,
+        patch("src.memory.v2.consolidation_queue.ConsolidationQueue.enqueue") as mock_enqueue,
+        patch("src.memory.v2.observation.ObservationPipeline.create_observation") as mock_obs,
+        patch("src.memory.v2.hypothesis.HypothesisEngine.propose_hypothesis") as mock_hyp,
+        patch("src.memory.v2.reconciliation.ReconciliationEngine.execute_plan") as mock_rec,
+    ):
+        # Publish chapter
+        meta = repo.publish_chapter(gen_res)
+
+        # Redact chapter
+        privacy_svc.mark_privacy_pending(meta.chapter_id)
+        privacy_svc.redact_or_regenerate_chapter(meta.chapter_id)
+
+        # Invariant: Zero invocations of upstream write/consolidation/observation pipelines
+        assert mock_write_slice.call_count == 0
+        assert mock_write_event.call_count == 0
+        assert mock_enqueue.call_count == 0
+        assert mock_obs.call_count == 0
+        assert mock_hyp.call_count == 0
+        assert mock_rec.call_count == 0
+
+
+def test_ch19c_user_manual_reentry_of_chapter_text_accepted(tmp_path: Path) -> None:
+    """CH-19c: User manually quoting/pasting Chapter text is accepted as new user-origin evidence.
+
+    Demonstrates Narrative Firewall is an origin/data-flow boundary, not a string content filter.
+    """
+    store = create_test_store(tmp_path, "ch19c.db")
+    repo = ChapterRepository(store, chapters_dir=tmp_path / "chapters")
+
+    sl = seed_slice(store, "sl_src", "2026-06-01T10:00:00+00:00", "初始会话切片")
+    ins = seed_insight(store, "ins_src", "2026-06-01T10:00:00+00:00", "初始心智共识")
+    bundle = ChapterSourceBundle(
+        time_span_start="2026-06-01",
+        time_span_end="2026-07-01",
+        confirmed_insights=(ins,),
+        raw_slices=(sl,),
+    )
+    gen_res = ChapterGeneratorV2(store, repo=repo).generate(bundle, title="用户复述章")
+    meta = repo.publish_chapter(gen_res)
+
+    readable = repo.get_readable(meta.chapter_id)
+    assert readable is not None
+    chapter_text = readable.content
+
+    # User explicitly submits identical text as a manual feed
+    write_svc = RawEvidenceWriteService(store)
+    cmd = WriteSliceCommand(
+        occurred_at="2026-07-02T10:00:00+00:00",
+        content=chapter_text,
+        source="manual_feed",
+        scope="global",
+        project_id="global",
+        ingestion_dedup_key="user_quote_chapter_01",
+    )
+    write_result = write_svc.write_slice(cmd)
+    assert write_result.status == "committed"
+    assert write_result.was_persisted is True
+    assert write_result.entity.slice_id is not None
+
+    # It is persisted as legitimate raw evidence with actor='user'
+    persisted_slice = store.get_raw_slice(write_result.entity.slice_id)
+    assert persisted_slice is not None
+    assert persisted_slice.content == chapter_text
+    assert persisted_slice.actor == "user"
+    assert persisted_slice.source == "manual_feed"
+
+
+def test_ch19d_narrative_never_provenance_invariant() -> None:
+    """CH-19d: ProvenanceKind strictly excludes chapter/narrative."""
+    kinds = get_args(ProvenanceKind)
+    assert "chapter" not in kinds
+    assert "narrative" not in kinds
 
 
 # ── CH-20: Production Isolation ───────────────────────────────────────────────
@@ -795,36 +1057,3 @@ def test_stage7_exit_gate_formal_assertions(tmp_path: Path) -> None:
     # 4. Check orphan links in DB: PRAGMA foreign_key_check = 0
     fk_check = store.connection.execute("PRAGMA foreign_key_check;").fetchall()
     assert fk_check == [], f"Orphan foreign key links detected: {fk_check}"
-
-
-def test_ch11b_hard_delete_episode_marks_chapter_privacy_pending(tmp_path: Path) -> None:
-    """CH-11b: Deleting a linked episode marks chapter pending before destructive lifecycle."""
-    store = create_test_store(tmp_path, "ch11b.db")
-    repo = ChapterRepository(store, chapters_dir=tmp_path / "chapters")
-    lifecycle = LifecycleService(store)
-
-    ep = seed_episode(store, "ep_11b", started_at="2026-06-01T10:00:00+00:00")
-    ins = seed_insight(store, "ins_11b", valid_from="2026-06-01T10:00:00+00:00")
-    bundle = ChapterSourceBundle(
-        time_span_start="2026-06-01",
-        time_span_end="2026-07-01",
-        confirmed_insights=(ins,),
-        episodes=(ep,),
-    )
-    res = ChapterGeneratorV2(store, repo=repo).generate(bundle, title="会话删除影响章")
-    meta = repo.publish_chapter(res)
-
-    # Hard delete episode with privacy_sensitive=True
-    del_res = lifecycle.hard_delete_episode("ep_11b", privacy_sensitive=True)
-    assert del_res.success is True
-    assert meta.chapter_id in del_res.privacy_redacted_chapters
-
-    # Chapter metadata in DB is immediately pending
-    updated_meta = store.get_chapter_metadata(meta.chapter_id)
-    assert updated_meta is not None
-    assert updated_meta.needs_privacy_redaction == 1
-
-    # Reader returns fail-closed placeholder
-    reader_view = repo.get_readable(meta.chapter_id)
-    assert reader_view is not None
-    assert reader_view.is_redacted is True

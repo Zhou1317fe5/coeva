@@ -22,6 +22,7 @@ from src.memory.v2.candidate_extraction import (
     RuleBasedProposalProvider,
 )
 from src.memory.v2.chapter import (
+    ChapterEligibilityContext,
     ChapterEligibilityGateV2,
     ChapterError,
     ChapterGenerationResult,
@@ -200,6 +201,7 @@ __all__ = [
     "EventPinnedError",
     "DependencyClosureError",
     "AdmissionFilter",
+    "ChapterEligibilityContext",
     "ChapterEligibilityGateV2",
     "ChapterError",
     "ChapterGenerationResult",
