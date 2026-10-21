@@ -1,0 +1,279 @@
+{
+  "production_audit": {
+    "files_before": {
+      "companion_chronicle.db": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
+        "size_bytes": 44171264,
+        "last_modified_utc": "2026-10-18T15:50:41.680998+00:00",
+        "sha256": "8b29f3c8714c1ae0ffc5db95a10e73cd299cf1ae74e01f5b8f402880a739df69"
+      },
+      "companion_chronicle.db-wal": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db-wal",
+        "size_bytes": 0,
+        "last_modified_utc": "2026-10-18T15:53:56.681328+00:00",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "companion_chronicle.db-shm": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db-shm",
+        "size_bytes": 32768,
+        "last_modified_utc": "2026-10-21T02:46:12.499161+00:00",
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+      },
+      "raw_slices.jsonl": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\raw_slices.jsonl",
+        "size_bytes": 8368,
+        "last_modified_utc": "2026-10-18T06:27:33.492625+00:00",
+        "sha256": "7f80bec3c8ca5bd4e214f470b132814f591b120e7c6174cd0700b1faf3639a6b"
+      },
+      "chapters/chapter_01_20261016.md": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\chapters\\chapter_01_20261016.md",
+        "size_bytes": 2867,
+        "last_modified_utc": "2026-10-16T16:45:38.358958+00:00",
+        "sha256": "9c4da8847a7be0647fa3cbe0928c7c1e83b6ef59f2a88e2f578285035e77d904"
+      }
+    },
+    "files_after": {
+      "companion_chronicle.db": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
+        "size_bytes": 44171264,
+        "last_modified_utc": "2026-10-18T15:50:41.680998+00:00",
+        "sha256": "8b29f3c8714c1ae0ffc5db95a10e73cd299cf1ae74e01f5b8f402880a739df69"
+      },
+      "companion_chronicle.db-wal": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db-wal",
+        "size_bytes": 0,
+        "last_modified_utc": "2026-10-18T15:53:56.681328+00:00",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "companion_chronicle.db-shm": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db-shm",
+        "size_bytes": 32768,
+        "last_modified_utc": "2026-10-21T02:48:11.412252+00:00",
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+      },
+      "raw_slices.jsonl": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\raw_slices.jsonl",
+        "size_bytes": 8368,
+        "last_modified_utc": "2026-10-18T06:27:33.492625+00:00",
+        "sha256": "7f80bec3c8ca5bd4e214f470b132814f591b120e7c6174cd0700b1faf3639a6b"
+      },
+      "chapters/chapter_01_20261016.md": {
+        "path": "D:\\CodeProjects\\co-evolving-companion\\data\\chapters\\chapter_01_20261016.md",
+        "size_bytes": 2867,
+        "last_modified_utc": "2026-10-16T16:45:38.358958+00:00",
+        "sha256": "9c4da8847a7be0647fa3cbe0928c7c1e83b6ef59f2a88e2f578285035e77d904"
+      }
+    },
+    "untouched": true
+  },
+  "source_counts": {
+    "slices": 44,
+    "events": 116625,
+    "hypotheses": 4
+  },
+  "timings": {
+    "snapshot_seconds": 1.2016445000190288,
+    "mapping_seconds": 4.336464199994225,
+    "reconciliation_seconds": 0.9443382999743335,
+    "validation_seconds": 0.7966904999921098,
+    "compatibility_install_seconds": 0.021886000002268702,
+    "swap_rehearsal_seconds": 3.7670699000009336,
+    "rollback_rehearsal_seconds": 3.0445378000149503,
+    "total_wall_clock_seconds": 52.04990969999926
+  },
+  "disk_plan": {
+    "prod_db_bytes": 44171264,
+    "prod_wal_bytes": 0,
+    "prod_shm_bytes": 32768,
+    "snapshot_bytes": 44171264,
+    "shadow_projected_bytes": 44171264,
+    "backup_bytes": 44171264,
+    "safety_margin_bytes": 52428800,
+    "dynamic_required_bytes": 229146624,
+    "floor_required_bytes": 157286400,
+    "final_required_bytes": 229146624,
+    "available_bytes": 12981071872,
+    "is_sufficient": true
+  },
+  "source_db_size_bytes": 44171264,
+  "shadow_db_size_bytes": 50352128,
+  "peak_temp_disk_bytes": 1187138565,
+  "ms_assertions_pass_count": 18,
+  "ms_assertions_total": 18,
+  "data_loss_count": 0,
+  "parity_message": "Final canonical source-set parity verified (no watermark)",
+  "raw_slice_fidelity_percent": 100.0,
+  "legacy_hypothesis_promotions": 0,
+  "foreign_key_violations": 0,
+  "retrieval_metrics": {
+    "dev": {
+      "total": 29,
+      "passed": 27,
+      "pass_rate": 0.9310344827586207,
+      "recall_at_3": 0.8695652173913043,
+      "candidate_precision_at_3": 0.6857142857142857,
+      "no_mem_acc": 0.875,
+      "must_hits": 20,
+      "must_expected": 23,
+      "total_retrieved": 35,
+      "relevant_retrieved": 24,
+      "no_mem_correct": 7,
+      "no_mem_expected": 8,
+      "forbidden_hits": 0,
+      "cross_proj_violations": 0,
+      "supersession_violations": 0,
+      "privacy_violations": 0
+    },
+    "holdout": {
+      "total": 15,
+      "passed": 15,
+      "pass_rate": 1.0,
+      "recall_at_3": 1.0,
+      "candidate_precision_at_3": 0.8,
+      "no_mem_acc": 1.0,
+      "must_hits": 10,
+      "must_expected": 10,
+      "total_retrieved": 15,
+      "relevant_retrieved": 12,
+      "no_mem_correct": 5,
+      "no_mem_expected": 5,
+      "forbidden_hits": 0,
+      "cross_proj_violations": 0,
+      "supersession_violations": 0,
+      "privacy_violations": 0
+    },
+    "holdout2": {
+      "total": 12,
+      "passed": 12,
+      "pass_rate": 1.0,
+      "recall_at_3": 1.0,
+      "candidate_precision_at_3": 0.5384615384615384,
+      "no_mem_acc": 1.0,
+      "must_hits": 6,
+      "must_expected": 6,
+      "total_retrieved": 13,
+      "relevant_retrieved": 7,
+      "no_mem_correct": 6,
+      "no_mem_expected": 6,
+      "forbidden_hits": 0,
+      "cross_proj_violations": 0,
+      "supersession_violations": 0,
+      "privacy_violations": 0
+    }
+  },
+  "semantic_smoke_results": {
+    "CNY-01_Retrieval": true,
+    "CNY-02_Sanctuary": true,
+    "CNY-03_Consolidation": true,
+    "CNY-04_Understanding": true,
+    "CNY-05_Chapter_Privacy": true,
+    "CNY-06_Narrative_Firewall": true,
+    "CNY-07_Single_Master": true,
+    "CNY-08_Compatibility": true
+  },
+  "crash_matrix_results": [
+    {
+      "scenario_name": "Crash after WAL-safe snapshot",
+      "injected_point": "after snapshot created, before mapping begins",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "source.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Snapshot discarded or retried; source untouched",
+      "manual_intervention_required": false,
+      "details": "Source V1 remained active canonical DB; zero data loss."
+    },
+    {
+      "scenario_name": "Crash during shadow mapping",
+      "injected_point": "midway through entity transformation to shadow DB",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "source.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Corrupt/incomplete shadow DB unlinked on retry",
+      "manual_intervention_required": false,
+      "details": "Source V1 untouched; partial shadow fails pre-swap integrity check."
+    },
+    {
+      "scenario_name": "Crash after shadow validation",
+      "injected_point": "shadow validated, before reconciliation starts",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "source.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Shadow DB retained for resume or re-run",
+      "manual_intervention_required": false,
+      "details": "Source V1 is active canonical DB; cutover not executed."
+    },
+    {
+      "scenario_name": "Crash before reconciliation completion",
+      "injected_point": "mid-reconciliation delta insertion",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "source.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Shadow transaction rolled back by SQLite WAL",
+      "manual_intervention_required": false,
+      "details": "Unfinished reconciliation safely discarded; source intact."
+    },
+    {
+      "scenario_name": "Crash before parity acceptance",
+      "injected_point": "reconciliation done, before swap authorization",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "source.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Parity not acknowledged; swap blocked",
+      "manual_intervention_required": false,
+      "details": "Without parity signoff, cutover does not proceed."
+    },
+    {
+      "scenario_name": "Crash after first rename in swap",
+      "injected_point": "target corrupted/missing before shadow placed",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "target.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Restored from .pre_v2_backup automatically",
+      "manual_intervention_required": false,
+      "details": "M-S08 verified: exactly one valid canonical DB restored."
+    },
+    {
+      "scenario_name": "Crash after backup creation before final placement",
+      "injected_point": "backup created, process terminated before os.replace",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "target.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Target verified valid; backup remains intact",
+      "manual_intervention_required": false,
+      "details": "Canonical target intact; no state mutation occurred."
+    },
+    {
+      "scenario_name": "Crash during rollback",
+      "injected_point": "process crash while restoring pre-v2 backup",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "target.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "Backup is read-only source; retry succeeds cleanly",
+      "manual_intervention_required": false,
+      "details": "Pre-V2 backup cannot be corrupted by crash during read."
+    },
+    {
+      "scenario_name": "Crash during JSONL post-commit export",
+      "injected_point": "SQLite committed, crash before JSONL export completed",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "v2.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "JSONL export replayed from canonical slice_id",
+      "manual_intervention_required": false,
+      "details": "Single master verified: SQLite commit is canonical truth."
+    },
+    {
+      "scenario_name": "Crash during chapter redaction",
+      "injected_point": "privacy pending marked, crash before rewrite complete",
+      "recovery_succeeded": true,
+      "canonical_db_selected": "v2.db",
+      "acked_writes_preserved": true,
+      "orphan_handling": "needs_privacy_redaction flag remains 1 (fail closed)",
+      "manual_intervention_required": false,
+      "details": "Fail closed verified: stale markdown is never served to reader."
+    }
+  ],
+  "rollback_safety_verified": true,
+  "flags_verified_false": true,
+  "status": "SUCCESS"
+}
