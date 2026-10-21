@@ -1,0 +1,209 @@
+{
+  "manifest_version": "2.2.0",
+  "created_at_utc": "2026-10-21T04:42:37.741356+00:00",
+  "upstream_canonical": {
+    "lane": "Lane M (parallel/wp13-full-canary)",
+    "wp13_commit": "8941dbd",
+    "wp13_status": "M-S01~M-S18 18/18 PASS, Data Loss=0, production untouched"
+  },
+  "release_target": {
+    "worktree": "D:\\CodeProjects\\coeva-lane-n",
+    "branch": "release/wp14-production-cutover",
+    "upstream_base": "8941dbd",
+    "deployed_commit": "79b55dad5d3f9d04d81be8cef2a0d91c973e6c9d",
+    "suggested_cutover_commit_message": "feat(memory-v2): complete staged production cutover"
+  },
+  "production_runtime_deployment": {
+    "production_runtime_code_root": "D:\\CodeProjects\\coeva-lane-n",
+    "production_runtime_commit": "79b55dad5d3f9d04d81be8cef2a0d91c973e6c9d",
+    "production_launch_command": "powershell -NoProfile -Command \"Set-Location D:\\CodeProjects\\coeva-lane-n; & ..\\co-evolving-companion\\.venv\\Scripts\\python.exe run_companion.py\"",
+    "production_data_root": "D:\\CodeProjects\\co-evolving-companion\\data",
+    "production_db_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
+    "production_settings_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\agent_settings.json",
+    "production_jsonl_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\raw_slices.jsonl",
+    "production_chapters_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\chapters",
+    "deployment_strategy": "Strategy A: Run production from validated release worktree explicitly bound to canonical production data root via src.core.paths.get_data_dir()",
+    "data_root_resolution_precedence": [
+      "1. CLI argument --data-dir <path>",
+      "2. Environment variable COEVA_DATA_DIR",
+      "3. Canonical production data directory D:/CodeProjects/co-evolving-companion/data",
+      "4. Local ./data (fallback)"
+    ],
+    "worktree_ambiguity_eliminated": true
+  },
+  "old_runtime_safety_behavior": {
+    "status": "FAIL-CLOSED / SAFE",
+    "application_guard": "ChronicleStore.__init__ in src/memory/store.py queries PRAGMA user_version. If >= 20261018, raises RuntimeError and closes connection before executing legacy _SCHEMA.",
+    "database_engine_guard": "Read-only compatibility views (slices, events) installed in V2 database cause unpatched legacy _SCHEMA execution to fail closed on CREATE INDEX ('views may not be indexed'), preventing legacy table recreation.",
+    "write_protection": "Direct legacy INSERT/UPDATE/DELETE attempts on slices or events views raise sqlite3.OperationalError ('cannot modify ... because it is a view').",
+    "dual_write_eliminated": true,
+    "rogue_writer_blocked": true
+  },
+  "stage10a_flag_validation": {
+    "status": "VALID",
+    "selected_path": "v2",
+    "flags": {
+      "memory_v2_storage": true,
+      "memory_v2_retrieval": false,
+      "memory_v2_consolidation": false,
+      "memory_v2_self_model": false,
+      "memory_v2_migration": false,
+      "memory_v2_backfill": false
+    },
+    "capabilities_declared": [
+      "storage_v2",
+      "retrieval_v2",
+      "consolidation_v2",
+      "self_model_v2"
+    ],
+    "dependency_check": "PASS (storage-only is valid base of frozen dependency hierarchy)"
+  },
+  "source_production_preflight": {
+    "db_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
+    "size_bytes": 44171264,
+    "sha256": "8b29f3c8714c1ae0ffc5db95a10e73cd299cf1ae74e01f5b8f402880a739df69",
+    "counts": {
+      "slices": 44,
+      "events": 116625,
+      "hypotheses": 4,
+      "insights": 0,
+      "growth_themes": 0
+    },
+    "integrity_check": "ok",
+    "journal_mode": "wal",
+    "user_version": 0,
+    "mutation_status": "UNTOUCHED_READONLY"
+  },
+  "shadow_v2_status": {
+    "db_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.shadow.db",
+    "size_bytes": 50348032,
+    "sha256": "2dcf0725db32216c3ec9dc3c40767f04049caa97765d6532350998866d26ac45",
+    "schema_version": 20261018,
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "counts": {
+      "raw_slices": 44,
+      "event_skeletons": 116625,
+      "hypotheses": 4,
+      "confirmed_insights": 0,
+      "legacy_hypothesis_audit": 4
+    },
+    "compatibility_views": {
+      "installed_views": [
+        "events",
+        "legacy_events_view",
+        "legacy_slices_view",
+        "slices"
+      ],
+      "write_triggers_detected": 0,
+      "views_read_only_verified": true,
+      "evidence_leak_checked": true
+    }
+  },
+  "parity_and_audits": {
+    "raw_slice_fidelity": {
+      "total_slices": 44,
+      "verified_slices": 44,
+      "fidelity_ratio": 1.0,
+      "content_sha256_match": true,
+      "status": "PASS"
+    },
+    "source_set_parity": {
+      "method": "Canonical ID Set Difference",
+      "watermark_used": false,
+      "status_message": "Final canonical source-set parity verified (no watermark)",
+      "status": "PASS"
+    },
+    "privacy_audit": {
+      "prompt_stripped": true,
+      "chain_of_thought_stripped": true,
+      "tool_output_stripped": true,
+      "stacktrace_stripped": true,
+      "secret_substring_scan": "CLEAN",
+      "status": "PASS"
+    },
+    "legacy_hypothesis_audit": {
+      "legacy_count": 4,
+      "candidate_count": 4,
+      "confirmed_insight_count": 0,
+      "auto_promoted_count": 0,
+      "status": "PASS (zero auto-promotion)"
+    }
+  },
+  "disk_space_plan": {
+    "prod_db_bytes": 44171264,
+    "snapshot_bytes": 44171264,
+    "shadow_projected_bytes": 50348032,
+    "backup_bytes": 44171264,
+    "final_required_bytes": 229146624,
+    "available_bytes": 11386867712,
+    "is_sufficient": true
+  },
+  "cutover_paths": {
+    "source_canonical_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
+    "backup_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db.pre_v2_backup",
+    "shadow_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.shadow.db",
+    "final_canonical_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db"
+  },
+  "staged_flag_sequence": [
+    {
+      "stage": "Stage 10A",
+      "description": "DB cutover + V2 canonical storage writer + compatibility views",
+      "flags": {
+        "memory_v2_storage": true,
+        "memory_v2_retrieval": false,
+        "memory_v2_consolidation": false,
+        "memory_v2_self_model": false,
+        "memory_v2_migration": false,
+        "memory_v2_backfill": false
+      }
+    },
+    {
+      "stage": "Stage 10B",
+      "description": "Enable technical retrieval + Recall Gate & Sanctuary policy",
+      "flags": {
+        "memory_v2_storage": true,
+        "memory_v2_retrieval": true,
+        "memory_v2_consolidation": false,
+        "memory_v2_self_model": false,
+        "memory_v2_migration": false,
+        "memory_v2_backfill": false
+      }
+    },
+    {
+      "stage": "Stage 10C",
+      "description": "Enable near-real-time consolidation scheduler",
+      "flags": {
+        "memory_v2_storage": true,
+        "memory_v2_retrieval": true,
+        "memory_v2_consolidation": true,
+        "memory_v2_self_model": false,
+        "memory_v2_migration": false,
+        "memory_v2_backfill": false
+      }
+    },
+    {
+      "stage": "Stage 10D",
+      "description": "Enable slow-path self-model understanding & chapter integration",
+      "flags": {
+        "memory_v2_storage": true,
+        "memory_v2_retrieval": true,
+        "memory_v2_consolidation": true,
+        "memory_v2_self_model": true,
+        "memory_v2_migration": false,
+        "memory_v2_backfill": false
+      }
+    }
+  ],
+  "rollback_boundaries": {
+    "pre_v2_ack_horizon": "Permitted: physical rollback to .pre_v2_backup allowed strictly prior to first post-cutover V2 write ACK.",
+    "post_v2_ack_horizon": "FORBIDDEN: Once first post-cutover V2 write is ACKed, blind restore of pre-V2 backup is strictly prohibited (I-S02/I-S03). Default recovery: forward-fix or non-lossy reverse merge.",
+    "wp12_backfill_status": "STRICTLY_OFF"
+  },
+  "phase_a_exit_gate": {
+    "status": "READY_FOR_COORDINATOR_AUTHORIZATION_REVIEW",
+    "phase_a5_proof": "PASSED",
+    "production_swapped": false,
+    "human_gate_required": "GO PRODUCTION CUTOVER"
+  }
+}
