@@ -40,6 +40,7 @@ from src.core.flags import (
     validate_memory_v2_configuration,
 )
 from src.core.cold_start import ColdStartPolicy
+from src.memory.v2.backfill import BackgroundBackfillEngine
 from src.memory.v2.chapter import ChapterRepository
 from src.memory.v2.compatibility import (
     CompatibilityReader,
@@ -204,6 +205,17 @@ class CompanionApp:
         else:
             self.self_model_service = None
             self.chapter_repo = None
+
+        # WP-12: Background Backfill Engine (OFF by default)
+        if self.flags.memory_v2_backfill and self.v2_store is not None:
+            self.backfill_engine: BackgroundBackfillEngine | None = BackgroundBackfillEngine(
+                store=self.v2_store,
+                db_path=db_path,
+                flags=self.flags,
+            )
+            self.backfill_engine.start()
+        else:
+            self.backfill_engine = None
 
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = self.window.feeder_bar
@@ -640,6 +652,8 @@ class CompanionApp:
 
     def _on_user_reply_to_bubble(self, reply_text: str, orig_pet_speech: str) -> None:
         """Handle user's direct reply to a message the pet said."""
+        if getattr(self, "backfill_engine", None) is not None:
+            self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(reply_text)
         mood = "frustrated" if is_distressed else "neutral"
 
@@ -709,6 +723,8 @@ class CompanionApp:
 
     def _on_slice_submitted(self, text: str) -> None:
         """Handle incoming slice from overlay."""
+        if getattr(self, "backfill_engine", None) is not None:
+            self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(text)
         mood = "frustrated" if is_distressed else "neutral"
 
@@ -799,6 +815,11 @@ class CompanionApp:
             self.controller.say(f"伴生体已切换为 {display_name}")
 
     def _on_quit(self) -> None:
+        if getattr(self, "backfill_engine", None) is not None:
+            try:
+                self.backfill_engine.stop()
+            except Exception:
+                pass
         if getattr(self, "consolidation_scheduler", None) is not None:
             try:
                 self.consolidation_scheduler.stop()

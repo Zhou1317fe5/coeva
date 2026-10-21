@@ -6,6 +6,19 @@ Provides access to V2.1 entities, schema definitions, ChronicleStoreV2, and life
 from __future__ import annotations
 
 from src.memory.v2.admission import AdmissionFilter
+from src.memory.v2.backfill import (
+    ALL_STAGES,
+    STAGE_DURABLE_EVENTS,
+    STAGE_OLDER_SLICES,
+    STAGE_RECENT_SLICES,
+    STAGE_TELEMETRY,
+    BackfillBatchResult,
+    BackfillConfig,
+    BackfillItemResult,
+    BackfillMetrics,
+    BackfillProgressStore,
+    BackgroundBackfillEngine,
+)
 from src.memory.v2.calibration import (
     CalibrationDecision,
     CalibrationError,
@@ -344,4 +357,15 @@ __all__ = [
     "ExportResult",
     "read_exported_slices",
     "assert_no_reverse_import",
+    "BackgroundBackfillEngine",
+    "BackfillConfig",
+    "BackfillProgressStore",
+    "BackfillMetrics",
+    "BackfillItemResult",
+    "BackfillBatchResult",
+    "STAGE_RECENT_SLICES",
+    "STAGE_OLDER_SLICES",
+    "STAGE_DURABLE_EVENTS",
+    "STAGE_TELEMETRY",
+    "ALL_STAGES",
 ]

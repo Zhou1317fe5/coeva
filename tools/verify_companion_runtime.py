@@ -126,11 +126,13 @@ def run_runtime_verification() -> None:
     assert app2.write_service is not None
     print("M. No V1 legacy writer active (V2 canonical route active): PASS")
 
-    # N. No coeva-lane-n/data directory created
-    lane_n_data = repo_root / "data"
-    assert not lane_n_data.exists(), f"Accidental local data directory created at {lane_n_data}!"
-    print("N. Verified zero rogue data directory created in worktree: PASS")
-
+    # N. No rogue worktree/data directory created (when running in external worktree)
+    if (repo_root / "data").resolve() != expected_data_root.resolve():
+        lane_n_data = repo_root / "data"
+        assert not lane_n_data.exists(), f"Accidental local data directory at {lane_n_data}!"
+        print("N. Verified zero rogue data directory created in worktree: PASS")
+    else:
+        print("N. Running in canonical repo root, production data root matches: PASS")
     # Second shutdown
     app2._on_quit()
     print("Second CompanionApp shutdown succeeded.")

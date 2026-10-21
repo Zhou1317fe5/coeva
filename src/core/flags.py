@@ -28,6 +28,7 @@ PRODUCTION_V2_CAPABILITIES: frozenset[str] = frozenset(
         "retrieval_v2",
         "consolidation_v2",
         "self_model_v2",
+        "backfill_v2",
     }
 )
 

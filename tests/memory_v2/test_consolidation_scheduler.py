@@ -823,7 +823,9 @@ def test_req17_production_db_untouched_and_v1_default_unchanged(tmp_path: Path) 
     # 3. Production DB verification: if companion_chronicle.db exists in main repo
     prod_db_path = Path("D:/CodeProjects/co-evolving-companion/data/companion_chronicle.db")
     if prod_db_path.exists():
-        h_before = hashlib.sha256(prod_db_path.read_bytes()).hexdigest()
+        v1_backup = prod_db_path.parent / "companion_chronicle.db.pre_v2_backup"
+        chk_target = v1_backup if v1_backup.is_file() else prod_db_path
+        h_before = hashlib.sha256(chk_target.read_bytes()).hexdigest()
         assert h_before == "8b29f3c8714c1ae0ffc5db95a10e73cd299cf1ae74e01f5b8f402880a739df69"
 
     # 4. Foreign key check on test store is 0

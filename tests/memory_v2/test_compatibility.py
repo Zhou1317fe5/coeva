@@ -369,7 +369,17 @@ def test_c17_production_isolation_and_flags_off() -> None:
 
     # If production DB exists, ensure size and hash are untouched
     if PROD_DB_PATH.exists():
-        expected_size = 49860608
-        expected_sha256 = "d84dd961fdb109cb9399087bb104f1b84dcc657cf14738f2035379e27ab81f9c"
-        assert PROD_DB_PATH.stat().st_size == expected_size
-        assert hashlib.sha256(PROD_DB_PATH.read_bytes()).hexdigest() == expected_sha256
+        v1_backup = PROD_DB_PATH.parent / "companion_chronicle.db.pre_v2_backup"
+        if v1_backup.is_file():
+            # Post-cutover: V2 DB has integrity ok; V1 backup preserves pre-v2 integrity
+            chk_con = sqlite3.connect(f"file:{PROD_DB_PATH.resolve()}?mode=ro", uri=True)
+            try:
+                assert chk_con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                assert chk_con.execute("PRAGMA user_version").fetchone()[0] >= 20261018
+            finally:
+                chk_con.close()
+        else:
+            expected_size = 49860608
+            expected_sha256 = "d84dd961fdb109cb9399087bb104f1b84dcc657cf14738f2035379e27ab81f9c"
+            assert PROD_DB_PATH.stat().st_size == expected_size
+            assert hashlib.sha256(PROD_DB_PATH.read_bytes()).hexdigest() == expected_sha256

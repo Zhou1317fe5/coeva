@@ -197,10 +197,12 @@ def test_hypotheses_on_real_chronicle_database() -> None:
     """Run pattern mining against the live database accumulated by real agents."""
     from src.memory.store import DEFAULT_DB_PATH
 
-    if not DEFAULT_DB_PATH.is_file():
+    v1_backup = DEFAULT_DB_PATH.parent / "companion_chronicle.db.pre_v2_backup"
+    target_db = v1_backup if v1_backup.is_file() else DEFAULT_DB_PATH
+    if not target_db.is_file():
         return
 
-    live_store = ChronicleStore(DEFAULT_DB_PATH)
+    live_store = ChronicleStore(target_db)
     builder = PatternBuilder(live_store)
     patterns = builder.build_patterns(min_episodes=2)
     hypotheses = HypothesisEngine().synthesize(patterns)

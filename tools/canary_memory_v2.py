@@ -958,10 +958,12 @@ def run_full_canary_rehearsal(
     sandbox_dir.mkdir(parents=True, exist_ok=True)
 
     prod_before = audit_production_directory(prod_data_dir)
-    prod_db_file = prod_data_dir / "companion_chronicle.db"
+    prod_v1_backup = prod_data_dir / "companion_chronicle.db.pre_v2_backup"
+    prod_db_file = (
+        prod_v1_backup if prod_v1_backup.is_file() else (prod_data_dir / "companion_chronicle.db")
+    )
     if not prod_db_file.is_file():
         raise FileNotFoundError(f"Production database not found: {prod_db_file}")
-
     source_snapshot_dir = sandbox_dir / "source_snapshot"
     working_v1_dir = sandbox_dir / "working_v1"
     shadow_v2_dir = sandbox_dir / "shadow_v2"

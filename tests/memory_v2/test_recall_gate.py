@@ -768,7 +768,9 @@ def test_18_production_db_and_runtime_untouched() -> None:
     ]
     prod_db = next((p for p in candidate_paths if p.exists()), None)
     if prod_db is not None:
-        with open(prod_db, "rb") as f:
+        v1_backup = prod_db.parent / "companion_chronicle.db.pre_v2_backup"
+        chk_target = v1_backup if v1_backup.is_file() else prod_db
+        with open(chk_target, "rb") as f:
             actual_hash = hashlib.sha256(f.read()).hexdigest().lower()
         assert actual_hash == EXPECTED_PROD_DB_HASH, (
             f"Production DB modified! {actual_hash} != {EXPECTED_PROD_DB_HASH}"

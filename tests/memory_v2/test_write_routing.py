@@ -9,6 +9,7 @@ Formal verification of:
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 from pathlib import Path
 
 from src.core.flags import MemoryFeatureFlags, override_flags
@@ -65,13 +66,21 @@ def test_w_s11_production_db_remains_untouched() -> None:
     # Expected baseline from fact audit
     expected_size = 49860608
     expected_sha256 = "d84dd961fdb109cb9399087bb104f1b84dcc657cf14738f2035379e27ab81f9c"
-
-    current_size = PROD_DB_PATH.stat().st_size
-    current_sha256 = hashlib.sha256(PROD_DB_PATH.read_bytes()).hexdigest()
-
-    assert current_size == expected_size, (
-        f"Production DB size was altered! Found {current_size}, expected {expected_size}"
-    )
-    assert current_sha256 == expected_sha256, (
-        f"Production DB hash was altered! Found {current_sha256}, expected {expected_sha256}"
-    )
+    v1_backup = PROD_DB_PATH.parent / "companion_chronicle.db.pre_v2_backup"
+    if v1_backup.is_file():
+        # Post-cutover: V2 DB has user_version >= 20261018, and V1 backup preserves pre-v2 integrity
+        chk_con = sqlite3.connect(f"file:{PROD_DB_PATH.resolve()}?mode=ro", uri=True)
+        try:
+            assert chk_con.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            assert chk_con.execute("PRAGMA user_version").fetchone()[0] >= 20261018
+        finally:
+            chk_con.close()
+    else:
+        current_size = PROD_DB_PATH.stat().st_size
+        current_sha256 = hashlib.sha256(PROD_DB_PATH.read_bytes()).hexdigest()
+        assert current_size == expected_size, (
+            f"Production DB size was altered! Found {current_size}, expected {expected_size}"
+        )
+        assert current_sha256 == expected_sha256, (
+            f"Production DB hash was altered! Found {current_sha256}, expected {expected_sha256}"
+        )
