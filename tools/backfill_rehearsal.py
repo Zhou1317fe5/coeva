@@ -208,8 +208,21 @@ def run_shadow_rehearsal(
         store.close()
 
     report = {
+        "accounting_table": {
+            "items_scanned": metrics.items_scanned,
+            "admission_rejected": metrics.admission_rejected,
+            "admission_accepted": metrics.admission_accepted,
+            "validator_NOOP": metrics.validator_noop,
+            "ADD": metrics.add_count,
+            "SUPERSEDE": metrics.supersede_count,
+            "REINFORCE": metrics.reinforce_count,
+            "AMBIGUOUS": metrics.ambiguous_count,
+            "duplicate_replay_suppressed": metrics.duplicate_replay_suppressions,
+            "failed": metrics.failed,
+            "deferred": metrics.deferred,
+        },
         "items_scanned": metrics.items_scanned,
-        "items_admitted": metrics.items_admitted,
+        "items_admitted": metrics.admission_accepted,
         "noop_count": metrics.noop_count,
         "add_count": metrics.add_count,
         "supersede_count": metrics.supersede_count,
@@ -315,8 +328,21 @@ def run_bounded_production_canary(prod_data_dir: Path) -> dict[str, Any]:
         )
 
         canary_report = {
+            "accounting_table": {
+                "items_scanned": canary_batch.items_scanned,
+                "admission_rejected": canary_batch.admission_rejected,
+                "admission_accepted": canary_batch.admission_accepted,
+                "validator_NOOP": canary_batch.validator_noop,
+                "ADD": canary_batch.add_count,
+                "SUPERSEDE": canary_batch.supersede_count,
+                "REINFORCE": canary_batch.reinforce_count,
+                "AMBIGUOUS": canary_batch.ambiguous_count,
+                "duplicate_replay_suppressed": canary_batch.duplicate_replay_suppressions,
+                "failed": canary_batch.failed,
+                "deferred": canary_batch.deferred,
+            },
             "items_scanned": canary_batch.items_scanned,
-            "items_admitted": canary_batch.items_admitted,
+            "items_admitted": canary_batch.admission_accepted,
             "noop_count": canary_batch.noop_count,
             "add_count": canary_batch.add_count,
             "supersede_count": canary_batch.supersede_count,
@@ -327,7 +353,6 @@ def run_bounded_production_canary(prod_data_dir: Path) -> dict[str, Any]:
             "retrieval_latency_after_ms": round(lat_after_ms, 2),
             "status": "PASS",
         }
-
     finally:
         # Revert backfill flag strictly to OFF
         settings_store.set_memory_v2_flag("memory_v2_backfill", False)

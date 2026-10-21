@@ -4,9 +4,10 @@ Post-cutover, non-blocking enhancement to backfill historical evidence into
 V2 semantic structures slowly and safely without blocking foreground use.
 
 Key Invariants & Constraints:
-- Flag Guard: `memory_v2_backfill` remains strictly OFF by default (BF-11).
-- Non-blocking: Low-priority worker thread, yields to foreground operations (BF-01).
-- CPU Budget: Target CPU usage < 5% average while active via adaptive batch yielding (BF-13).
+- Schema Freeze: Uses only existing canonical schema at commit 790ed5c (backfill_progress).
+- Process Isolation: Background backfill runs in an independent child process (BF-01/BF-10).
+- Foreground Priority: Foreground writes & retrieval always win, backfill yields immediately.
+- CPU Budget: Target CPU usage < 5% average/peak while active via adaptive batch yielding (BF-13).
 - Graceful Shutdown: Pauses / terminates cleanly within seconds (BF-10).
 - Idempotent Restart: Resumes from durable technical progress in SQLite (BF-02).
 - Zero Proof Inflation: Replay delta = 0, duplicates suppressed (BF-03).
@@ -16,7 +17,7 @@ Key Invariants & Constraints:
 - Scope Discipline: Unknown scope remains unresolved (BF-07).
 - Legacy Safety: Legacy hypotheses never auto-promoted (BF-08).
 - Narrative Firewall: Chapters / narratives never treated as evidence (BF-09).
-- Isolation: Worker failure leaves production runtime healthy (BF-12).
+- Isolation: Worker process crash or termination leaves companion healthy (BF-12).
 - Retrieval Stability: Foreground retrieval latency does not materially regress (BF-14).
 - Canonical Semantics: Backfilled memories support canonical invalidation / deletion (BF-15).
 """
@@ -24,12 +25,13 @@ Key Invariants & Constraints:
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import sqlite3
-import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
+from multiprocessing.connection import Connection
 from pathlib import Path
 from typing import Any
 
@@ -106,24 +108,34 @@ class BackfillItemResult:
 
 @dataclass(frozen=True)
 class BackfillBatchResult:
-    """Outcome of one execution batch."""
+    """Outcome of one execution batch with full counter reconciliation."""
 
     items_scanned: int
-    items_admitted: int
-    noop_count: int
+    admission_rejected: int
+    admission_accepted: int
+    validator_noop: int
     add_count: int
     supersede_count: int
     reinforce_count: int
     ambiguous_count: int
     duplicate_replay_suppressions: int
+    failed: int
+    deferred: int
     item_results: list[BackfillItemResult]
     stage: str
     stage_completed: bool
     all_completed: bool
     batch_duration_ms: float
 
+    @property
+    def noop_count(self) -> int:
+        """Total NOOP = admission rejected + replay suppressed + validator NOOP."""
+        return self.admission_rejected + self.duplicate_replay_suppressions + self.validator_noop
+
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["noop_count"] = self.noop_count
+        return d
 
 
 @dataclass
@@ -131,13 +143,16 @@ class BackfillMetrics:
     """Accumulated performance and audit metrics for backfill operations."""
 
     items_scanned: int = 0
-    items_admitted: int = 0
-    noop_count: int = 0
+    admission_rejected: int = 0
+    admission_accepted: int = 0
+    validator_noop: int = 0
     add_count: int = 0
     supersede_count: int = 0
     reinforce_count: int = 0
     ambiguous_count: int = 0
     duplicate_replay_suppressions: int = 0
+    failed: int = 0
+    deferred: int = 0
     cpu_average_pct: float = 0.0
     cpu_peak_pct: float = 0.0
     foreground_write_latency_ms: float = 0.0
@@ -149,12 +164,18 @@ class BackfillMetrics:
     scope_violations: int = 0
     proof_inflation_violations: int = 0
 
+    @property
+    def noop_count(self) -> int:
+        return self.admission_rejected + self.duplicate_replay_suppressions + self.validator_noop
+
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["noop_count"] = self.noop_count
+        return d
 
 
 class BackfillProgressStore:
-    """Thread-safe access to technical `backfill_progress` table."""
+    """Thread-safe and process-safe access to technical `backfill_progress` table."""
 
     def __init__(self, connection: sqlite3.Connection) -> None:
         self.connection = connection
@@ -229,8 +250,130 @@ class BackfillProgressStore:
         self.connection.commit()
 
 
+# ── Standalone Worker Process Function (Picklable for Windows spawn) ──────────
+
+
+def _backfill_worker_process_main(
+    db_path: Path,
+    config: BackfillConfig,
+    stop_event: Any,
+    yield_event: Any,
+    pause_event: Any,
+    status_pipe: Connection | None,
+) -> None:
+    """Worker loop executing inside an independent background process (P0-2).
+
+    Owns its own dedicated ChronicleStoreV2 connection.
+    Exchanges only minimal control and diagnostic signals over IPC.
+    Never transmits user content over IPC.
+    """
+    logger.info("Backfill worker process started (PID: %d)", multiprocessing.current_process().pid)
+    worker_store = ChronicleStoreV2(db_path, timeout=10.0)
+    admission_filter = AdmissionFilter()
+    extractor = CandidateExtractor(admission_filter=admission_filter)
+    worker_engine = ReconciliationEngine(worker_store, candidate_extractor=extractor)
+    worker_progress = BackfillProgressStore(worker_store.connection)
+
+    engine_helper = BackgroundBackfillEngine(
+        store=worker_store,
+        db_path=db_path,
+        config=config,
+        flags=MemoryFeatureFlags(
+            memory_v2_storage=True,
+            memory_v2_retrieval=True,
+            memory_v2_consolidation=True,
+            memory_v2_backfill=True,
+        ),
+    )
+
+    total_processed = 0
+
+    try:
+        while not stop_event.is_set():
+            # 1. Check pause state
+            if pause_event.is_set():
+                time.sleep(config.poll_interval_seconds)
+            if pause_event.is_set():
+                stop_event.wait(timeout=config.poll_interval_seconds)
+                continue
+
+            # 2. Check foreground yield signal
+            if yield_event.is_set():
+                yield_event.clear()
+                stop_event.wait(timeout=config.adaptive_yield_sleep_seconds)
+                continue
+
+            # 3. Execute one bounded batch
+            try:
+                batch_res = engine_helper.step(
+                    max_items=config.batch_size,
+                    store=worker_store,
+                    engine=worker_engine,
+                    progress_store=worker_progress,
+                )
+            except Exception as exc:
+                logger.warning("Backfill worker process batch error: %s", exc)
+                time.sleep(config.poll_interval_seconds)
+                continue
+
+            total_processed += batch_res.items_scanned
+
+            # Send minimal diagnostic heartbeat (no user content)
+            if status_pipe is not None and not getattr(status_pipe, "closed", False):
+                try:
+                    status_pipe.send(
+                        {
+                            "type": "heartbeat",
+                            "items_scanned": batch_res.items_scanned,
+                            "admission_rejected": batch_res.admission_rejected,
+                            "admission_accepted": batch_res.admission_accepted,
+                            "validator_noop": batch_res.validator_noop,
+                            "add_count": batch_res.add_count,
+                            "supersede_count": batch_res.supersede_count,
+                            "reinforce_count": batch_res.reinforce_count,
+                            "ambiguous_count": batch_res.ambiguous_count,
+                            "duplicate_replay_suppressed": batch_res.duplicate_replay_suppressions,
+                            "failed": batch_res.failed,
+                            "deferred": batch_res.deferred,
+                            "all_completed": batch_res.all_completed,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            if config.max_items_per_run is not None and total_processed >= config.max_items_per_run:
+                logger.info(
+                    "Reached max_items_per_run (%d). Exiting process.", config.max_items_per_run
+                )
+                break
+
+            if batch_res.all_completed:
+                logger.info("All backfill stages completed. Worker process idling.")
+                if config.auto_stop_on_completion:
+                    break
+                if stop_event.wait(timeout=config.poll_interval_seconds * 3):
+                    break
+                continue
+
+            # Yield sleep between batches to bound CPU usage < 5%
+            if stop_event.wait(timeout=config.yield_sleep_seconds):
+                break
+
+    finally:
+        try:
+            worker_store.close()
+        except Exception:
+            pass
+        if status_pipe is not None:
+            try:
+                status_pipe.close()
+            except Exception:
+                pass
+        logger.info("Backfill worker process exiting cleanly.")
+
+
 class BackgroundBackfillEngine:
-    """Low-priority, non-blocking historical evidence backfill engine."""
+    """Low-priority historical evidence backfill engine with independent process isolation."""
 
     def __init__(
         self,
@@ -247,7 +390,7 @@ class BackgroundBackfillEngine:
         sleep_provider: Callable[[float], None] | None = None,
     ) -> None:
         self.config = config or BackfillConfig()
-        self._db_path = db_path or (store.db_path if store else None)
+        self._db_path = Path(db_path) if db_path else (store.db_path if store else None)
         self.flags = flags if flags is not None else resolve_flags()
         self._foreground_detector = foreground_detector
         self._get_time = time_provider or time.perf_counter
@@ -259,7 +402,7 @@ class BackgroundBackfillEngine:
             admission_filter=self.admission_filter
         )
 
-        # Main / caller-thread store & engine for synchronous step() execution
+        # Synchronous store & engine for direct step() execution (tests & canary)
         self._sync_store = store
         self._sync_engine = reconciliation_engine or (
             ReconciliationEngine(store, candidate_extractor=self.extractor)
@@ -268,29 +411,37 @@ class BackgroundBackfillEngine:
         )
         self._sync_progress = BackfillProgressStore(store.connection) if store else None
 
-        # Thread state
-        self._thread: threading.Thread | None = None
-        self._stop_event = threading.Event()
-        self._wake_event = threading.Event()
-        self._foreground_active_event = threading.Event()
-        self._is_running = False
+        # Multiprocessing process state (P0-2)
+        self._process: Any = None
+        self._mp_ctx = multiprocessing.get_context("spawn")
+        self._stop_event = self._mp_ctx.Event()
+        self._yield_event = self._mp_ctx.Event()
+        self._pause_event = self._mp_ctx.Event()
+        self._parent_pipe: Any = None
+
         self._metrics = BackfillMetrics()
-        self._metrics_lock = threading.Lock()
 
     @property
     def is_running(self) -> bool:
-        """Return True if background worker thread is active."""
-        return self._is_running and (self._thread is not None and self._thread.is_alive())
+        """Return True if background worker process is alive."""
+        return self._process is not None and self._process.is_alive()
 
     @property
     def metrics(self) -> BackfillMetrics:
         """Return a copy of accumulated metrics."""
-        with self._metrics_lock:
-            return BackfillMetrics(**asdict(self._metrics))
+        return BackfillMetrics(**asdict(self._metrics))
 
     def notify_foreground_active(self) -> None:
-        """Signal that foreground activity has occurred (yields worker immediately)."""
-        self._foreground_active_event.set()
+        """Signal that foreground activity has occurred (yields worker process immediately)."""
+        self._yield_event.set()
+
+    def pause(self) -> None:
+        """Request worker process to pause execution."""
+        self._pause_event.set()
+
+    def resume(self) -> None:
+        """Resume worker process execution."""
+        self._pause_event.clear()
 
     # ── Progress and Cursor Mechanics ─────────────────────────────────────────
 
@@ -327,15 +478,10 @@ class BackgroundBackfillEngine:
         store: ChronicleStoreV2,
         now_utc: datetime,
     ) -> list[tuple[str, str, str]]:
-        """Fetch next batch of items for a given stage.
-
-        Returns list of tuples: (item_id, source_kind, occurred_at).
-        Ordered strictly by occurred_at DESC, item_id DESC.
-        """
+        """Fetch next batch of items for a given stage ordered occurred_at DESC, item_id DESC."""
         cutoff_date = (now_utc - timedelta(days=self.config.recent_slice_days)).isoformat()
 
         if stage == STAGE_RECENT_SLICES:
-            # User raw slices >= cutoff_date
             if cursor:
                 c_occ, c_id = cursor
                 query = """
@@ -358,7 +504,6 @@ class BackgroundBackfillEngine:
                 params = (cutoff_date, limit)
 
         elif stage == STAGE_OLDER_SLICES:
-            # User raw slices < cutoff_date
             if cursor:
                 c_occ, c_id = cursor
                 query = """
@@ -381,7 +526,6 @@ class BackgroundBackfillEngine:
                 params = (cutoff_date, limit)
 
         elif stage == STAGE_DURABLE_EVENTS:
-            # Durable external agent event skeletons
             if cursor:
                 c_occ, c_id = cursor
                 query = """
@@ -404,7 +548,6 @@ class BackgroundBackfillEngine:
                 params = (limit,)
 
         elif stage == STAGE_TELEMETRY:
-            # Remaining transient event skeletons
             if cursor:
                 c_occ, c_id = cursor
                 query = """
@@ -442,10 +585,9 @@ class BackgroundBackfillEngine:
         store: ChronicleStoreV2,
         engine: ReconciliationEngine,
     ) -> BackfillItemResult:
-        """Admit, extract candidates, and reconcile a single historical item."""
-        # 1. Epistemic Replay & Duplicate Transport Check (BF-02 / BF-03)
+        """Admit, extract candidates, and reconcile a single historical evidence item."""
         if source_kind == "slice":
-            # Check if this slice already has active semantic memory or evidence reinforcement
+            # 1. Epistemic Replay & Duplicate Transport Check (BF-02 / BF-03)
             existing_mem = store.connection.execute(
                 """
                 SELECT memory_id FROM semantic_memories
@@ -495,8 +637,7 @@ class BackgroundBackfillEngine:
             # Privacy Check on raw content (BF-06)
             for marker in PROHIBITED_PRIVACY_MARKERS:
                 if marker in slice_entity.content:
-                    with self._metrics_lock:
-                        self._metrics.privacy_violations += 1
+                    self._metrics.privacy_violations += 1
                     return BackfillItemResult(
                         item_id=item_id,
                         source_kind=source_kind,
@@ -537,8 +678,7 @@ class BackgroundBackfillEngine:
             for claim in proposal.proposed_claims:
                 for marker in PROHIBITED_PRIVACY_MARKERS:
                     if marker in claim.statement:
-                        with self._metrics_lock:
-                            self._metrics.privacy_violations += 1
+                        self._metrics.privacy_violations += 1
                         return BackfillItemResult(
                             item_id=item_id,
                             source_kind=source_kind,
@@ -550,8 +690,7 @@ class BackgroundBackfillEngine:
                         )
                 # Scope discipline (BF-07)
                 if not claim.project_id and claim.scope == "global":
-                    with self._metrics_lock:
-                        self._metrics.scope_violations += 1
+                    self._metrics.scope_violations += 1
                     return BackfillItemResult(
                         item_id=item_id,
                         source_kind=source_kind,
@@ -603,7 +742,6 @@ class BackgroundBackfillEngine:
             )
 
         elif source_kind == "event":
-            # External agent telemetry (BF-05)
             event_entity = store.get_event_skeleton(item_id)
             if not event_entity:
                 return BackfillItemResult(
@@ -648,21 +786,20 @@ class BackgroundBackfillEngine:
         progress_store: BackfillProgressStore | None = None,
         now_ts: datetime | None = None,
     ) -> BackfillBatchResult:
-        """Execute one bounded batch of backfill work.
-
-        Deterministic, bounded, and safe for canary and unit tests.
-        """
-        # Flag guard: if flag is OFF, do zero work (BF-11)
+        """Execute one bounded batch of backfill work with strict accounting."""
         if not self.flags.memory_v2_backfill:
             return BackfillBatchResult(
                 items_scanned=0,
-                items_admitted=0,
-                noop_count=0,
+                admission_rejected=0,
+                admission_accepted=0,
+                validator_noop=0,
                 add_count=0,
                 supersede_count=0,
                 reinforce_count=0,
                 ambiguous_count=0,
                 duplicate_replay_suppressions=0,
+                failed=0,
+                deferred=0,
                 item_results=[],
                 stage="",
                 stage_completed=False,
@@ -687,16 +824,18 @@ class BackgroundBackfillEngine:
         # 1. Determine active stage
         current_stage = self.get_current_stage(active_progress)
         if current_stage is None:
-            # All stages completed!
             return BackfillBatchResult(
                 items_scanned=0,
-                items_admitted=0,
-                noop_count=0,
+                admission_rejected=0,
+                admission_accepted=0,
+                validator_noop=0,
                 add_count=0,
                 supersede_count=0,
                 reinforce_count=0,
                 ambiguous_count=0,
                 duplicate_replay_suppressions=0,
+                failed=0,
+                deferred=0,
                 item_results=[],
                 stage="all_completed",
                 stage_completed=True,
@@ -719,18 +858,20 @@ class BackgroundBackfillEngine:
         )
 
         if not items:
-            # Stage completed!
             active_progress.mark_completed(current_stage, now_ts=now_utc.isoformat())
             next_stage = self.get_current_stage(active_progress)
             return BackfillBatchResult(
                 items_scanned=0,
-                items_admitted=0,
-                noop_count=0,
+                admission_rejected=0,
+                admission_accepted=0,
+                validator_noop=0,
                 add_count=0,
                 supersede_count=0,
                 reinforce_count=0,
                 ambiguous_count=0,
                 duplicate_replay_suppressions=0,
+                failed=0,
+                deferred=0,
                 item_results=[],
                 stage=current_stage,
                 stage_completed=True,
@@ -742,18 +883,20 @@ class BackgroundBackfillEngine:
         results: list[BackfillItemResult] = []
         scanned = 0
         admitted = 0
-        noop_c = 0
+        rejected = 0
+        v_noop = 0
         add_c = 0
         sup_c = 0
         reinf_c = 0
         amb_c = 0
         dup_c = 0
+        fail_c = 0
+        def_c = 0
 
         last_item_cursor: str | None = None
 
         for item_id, source_kind, occurred_at in items:
-            # Check for immediate foreground activity yield (BF-01)
-            if self._foreground_active_event.is_set():
+            if self._yield_event.is_set():
                 break
 
             scanned += 1
@@ -768,20 +911,29 @@ class BackgroundBackfillEngine:
             results.append(res)
             last_item_cursor = self._format_cursor(occurred_at, item_id)
 
+            if res.error is not None:
+                fail_c += 1
+
             if res.admission_decision == "ADMIT":
                 admitted += 1
-            if res.action == "NOOP":
-                noop_c += 1
+                if res.action == "ADD":
+                    add_c += 1
+                elif res.action == "SUPERSEDE":
+                    sup_c += 1
+                elif res.action == "REINFORCE":
+                    reinf_c += 1
+                elif res.action == "AMBIGUOUS":
+                    amb_c += 1
+                elif res.action == "NOOP":
+                    v_noop += 1
+            elif res.admission_decision == "DEFER":
+                def_c += 1
+            else:
+                # NOOP_LONG_TERM
                 if "replay" in res.rationale or "already" in res.rationale:
                     dup_c += 1
-            elif res.action == "ADD":
-                add_c += 1
-            elif res.action == "SUPERSEDE":
-                sup_c += 1
-            elif res.action == "REINFORCE":
-                reinf_c += 1
-            elif res.action == "AMBIGUOUS":
-                amb_c += 1
+                else:
+                    rejected += 1
 
         # 5. Update technical progress in one short write transaction
         if last_item_cursor:
@@ -794,27 +946,32 @@ class BackgroundBackfillEngine:
             )
 
         # Update metrics
-        with self._metrics_lock:
-            self._metrics.items_scanned += scanned
-            self._metrics.items_admitted += admitted
-            self._metrics.noop_count += noop_c
-            self._metrics.add_count += add_c
-            self._metrics.supersede_count += sup_c
-            self._metrics.reinforce_count += reinf_c
-            self._metrics.ambiguous_count += amb_c
-            self._metrics.duplicate_replay_suppressions += dup_c
+        self._metrics.items_scanned += scanned
+        self._metrics.admission_rejected += rejected
+        self._metrics.admission_accepted += admitted
+        self._metrics.validator_noop += v_noop
+        self._metrics.add_count += add_c
+        self._metrics.supersede_count += sup_c
+        self._metrics.reinforce_count += reinf_c
+        self._metrics.ambiguous_count += amb_c
+        self._metrics.duplicate_replay_suppressions += dup_c
+        self._metrics.failed += fail_c
+        self._metrics.deferred += def_c
 
         duration_ms = (self._get_time() - t0) * 1000.0
 
         return BackfillBatchResult(
             items_scanned=scanned,
-            items_admitted=admitted,
-            noop_count=noop_c,
+            admission_rejected=rejected,
+            admission_accepted=admitted,
+            validator_noop=v_noop,
             add_count=add_c,
             supersede_count=sup_c,
             reinforce_count=reinf_c,
             ambiguous_count=amb_c,
             duplicate_replay_suppressions=dup_c,
+            failed=fail_c,
+            deferred=def_c,
             item_results=results,
             stage=current_stage,
             stage_completed=False,
@@ -822,116 +979,84 @@ class BackgroundBackfillEngine:
             batch_duration_ms=duration_ms,
         )
 
-    # ── Background Worker Loop (Thread Ownership & Yielding) ──────────────────
+    # ── Independent Process Orchestration (P0-2) ───────────────────────────────
 
     def start(self) -> None:
-        """Start low-priority background backfill worker thread."""
+        """Start low-priority background backfill in an independent child process (P0-2)."""
         if not self.flags.memory_v2_backfill:
-            logger.info("memory_v2_backfill is False; worker will not start (BF-11).")
+            logger.info("memory_v2_backfill is False; worker process will not start (BF-11).")
             return
 
         if self.is_running:
             return
 
-        self._stop_event.clear()
-        self._foreground_active_event.clear()
-        self._is_running = True
+        if self._db_path is None:
+            raise ValueError("BackgroundBackfillEngine requires db_path for process launch.")
 
-        self._thread = threading.Thread(
-            target=self._worker_loop,
-            name="CoevaBackfillWorker",
+        self._stop_event.clear()
+        self._yield_event.clear()
+        self._pause_event.clear()
+
+        parent_conn, child_conn = self._mp_ctx.Pipe(duplex=False)
+        self._parent_pipe = parent_conn
+
+        self._process = self._mp_ctx.Process(
+            target=_backfill_worker_process_main,
+            args=(
+                self._db_path,
+                self.config,
+                self._stop_event,
+                self._yield_event,
+                self._pause_event,
+                child_conn,
+            ),
+            name="CoevaBackfillProcess",
             daemon=True,
         )
-        self._thread.start()
-        logger.info("BackgroundBackfillEngine worker thread started.")
+        self._process.start()
+        # Close child handle in parent process
+        child_conn.close()
+        logger.info("Backfill process spawned successfully (PID: %d).", self._process.pid)
 
     def stop(self, timeout: float = 2.0) -> float:
-        """Gracefully stop background backfill worker within timeout seconds (BF-10).
-
-        Returns shutdown latency in milliseconds.
-        """
+        """Gracefully stop background backfill process within timeout seconds (BF-10)."""
         t0 = self._get_time()
         self._stop_event.set()
-        self._wake_event.set()
 
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=timeout)
-
-        self._is_running = False
-        shutdown_latency = (self._get_time() - t0) * 1000.0
-        with self._metrics_lock:
-            self._metrics.shutdown_latency_ms = shutdown_latency
-        logger.info("BackgroundBackfillEngine stopped in %.2f ms.", shutdown_latency)
-        return shutdown_latency
-
-    def _worker_loop(self) -> None:
-        """Background worker thread run loop with dedicated connection ownership."""
-        if not self._db_path:
-            logger.error("No database path configured for background backfill worker.")
-            self._is_running = False
-            return
-
-        # Dedicated SQLite connection ownership for worker thread (Thread Ownership Invariant)
-        worker_store = ChronicleStoreV2(self._db_path)
-        worker_engine = ReconciliationEngine(worker_store, candidate_extractor=self.extractor)
-        worker_progress = BackfillProgressStore(worker_store.connection)
-
-        total_processed_items = 0
-
-        try:
-            while not self._stop_event.is_set():
-                # Check foreground priority yield (BF-01)
-                if self._foreground_active_event.is_set() or (
-                    self._foreground_detector and self._foreground_detector()
-                ):
-                    self._foreground_active_event.clear()
-                    # Sleep longer during foreground activity
-                    self._sleep(self.config.adaptive_yield_sleep_seconds)
-                    continue
-
-                # Execute one bounded batch
-                try:
-                    result = self.step(
-                        max_items=self.config.batch_size,
-                        store=worker_store,
-                        engine=worker_engine,
-                        progress_store=worker_progress,
-                    )
-                except Exception as exc:
-                    # Fail-closed isolation: worker error does not kill host runtime (BF-12)
-                    logger.warning("Backfill worker error in step(): %s", exc)
-                    self._sleep(self.config.poll_interval_seconds)
-                    continue
-
-                total_processed_items += result.items_scanned
-
-                # Check max items cap (used in canary runs)
-                if (
-                    self.config.max_items_per_run is not None
-                    and total_processed_items >= self.config.max_items_per_run
-                ):
-                    logger.info(
-                        "Backfill reached max_items_per_run cap (%d items). Stopping worker.",
-                        self.config.max_items_per_run,
-                    )
-                    break
-
-                if result.all_completed:
-                    logger.info("All backfill stages completed. Worker idling.")
-                    if self.config.auto_stop_on_completion:
-                        break
-                    # Wait for stop event or wake event
-                    self._wake_event.wait(timeout=self.config.poll_interval_seconds * 5)
-                    self._wake_event.clear()
-                    continue
-
-                # Adaptive sleep between batches to keep CPU < 5% (BF-13)
-                self._sleep(self.config.yield_sleep_seconds)
-
-        finally:
-            self._is_running = False
+        if self._parent_pipe is not None:
             try:
-                worker_store.close()
+                while self._parent_pipe.poll(timeout=0.05):
+                    msg = self._parent_pipe.recv()
+                    if isinstance(msg, dict) and msg.get("type") == "heartbeat":
+                        self._metrics.items_scanned += msg.get("items_scanned", 0)
+                        self._metrics.admission_rejected += msg.get("admission_rejected", 0)
+                        self._metrics.admission_accepted += msg.get("admission_accepted", 0)
+                        self._metrics.validator_noop += msg.get("validator_noop", 0)
+                        self._metrics.add_count += msg.get("add_count", 0)
+                        self._metrics.supersede_count += msg.get("supersede_count", 0)
+                        self._metrics.reinforce_count += msg.get("reinforce_count", 0)
+                        self._metrics.ambiguous_count += msg.get("ambiguous_count", 0)
+                        self._metrics.duplicate_replay_suppressions += msg.get(
+                            "duplicate_replay_suppressed", 0
+                        )
+                        self._metrics.failed += msg.get("failed", 0)
+                        self._metrics.deferred += msg.get("deferred", 0)
             except Exception:
                 pass
-            logger.info("BackgroundBackfillEngine worker loop exited.")
+            try:
+                self._parent_pipe.close()
+            except Exception:
+                pass
+            self._parent_pipe = None
+
+        if self._process is not None and self._process.is_alive():
+            self._process.join(timeout=timeout)
+            if self._process.is_alive():
+                logger.warning("Worker process did not exit within timeout. Terminating safely.")
+                self._process.terminate()
+                self._process.join(timeout=1.0)
+        self._process = None
+        shutdown_latency = (self._get_time() - t0) * 1000.0
+        self._metrics.shutdown_latency_ms = shutdown_latency
+        logger.info("BackgroundBackfillEngine process stopped in %.2f ms.", shutdown_latency)
+        return shutdown_latency

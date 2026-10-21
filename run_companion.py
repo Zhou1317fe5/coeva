@@ -8,6 +8,7 @@ import sys
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtGui import QAction, QIcon
@@ -652,7 +653,7 @@ class CompanionApp:
 
     def _on_user_reply_to_bubble(self, reply_text: str, orig_pet_speech: str) -> None:
         """Handle user's direct reply to a message the pet said."""
-        if getattr(self, "backfill_engine", None) is not None:
+        if getattr(self, "backfill_engine", None) is not None and self.backfill_engine is not None:
             self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(reply_text)
         mood = "frustrated" if is_distressed else "neutral"
@@ -722,8 +723,7 @@ class CompanionApp:
             )
 
     def _on_slice_submitted(self, text: str) -> None:
-        """Handle incoming slice from overlay."""
-        if getattr(self, "backfill_engine", None) is not None:
+        if getattr(self, "backfill_engine", None) is not None and self.backfill_engine is not None:
             self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(text)
         mood = "frustrated" if is_distressed else "neutral"
@@ -815,22 +815,22 @@ class CompanionApp:
             self.controller.say(f"伴生体已切换为 {display_name}")
 
     def _on_quit(self) -> None:
-        if getattr(self, "backfill_engine", None) is not None:
+        if getattr(self, "backfill_engine", None) is not None and self.backfill_engine is not None:
             try:
                 self.backfill_engine.stop()
             except Exception:
                 pass
-        if getattr(self, "consolidation_scheduler", None) is not None:
+        if getattr(self, "consolidation_scheduler", None) is not None and self.consolidation_scheduler is not None:
             try:
                 self.consolidation_scheduler.stop()
             except Exception:
                 pass
-        if getattr(self, "retrieval_repo", None) is not None:
+        if getattr(self, "retrieval_repo", None) is not None and self.retrieval_repo is not None:
             try:
                 self.retrieval_repo.close()
             except Exception:
                 pass
-        if getattr(self, "v2_store", None) is not None:
+        if getattr(self, "v2_store", None) is not None and self.v2_store is not None:
             try:
                 self.v2_store.close()
             except Exception:

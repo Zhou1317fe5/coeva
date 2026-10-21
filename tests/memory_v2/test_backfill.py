@@ -611,20 +611,44 @@ def test_bf12_worker_failure_leaves_production_runtime_healthy(tmp_path: Path) -
     store = ChronicleStoreV2(db_file)
     flags = _make_active_flags()
 
-    # Step execution with invalid input handles errors gracefully
+    # 1. Step execution with empty store handles gracefully
     engine = BackgroundBackfillEngine(
         store=store,
         db_path=db_file,
         flags=flags,
     )
-
-    # Step on empty store
     batch = engine.step(max_items=5)
     assert batch.items_scanned == 0
 
-    # DB integrity remains 100% ok
+    # 2. Worker process crash isolation (P0-2 requirement)
+    engine.start()
+    assert engine.is_running is True
+    # Forcefully kill the background worker process
+    if engine._process is not None:
+        engine._process.kill()
+        engine._process.join(timeout=1.0)
+    assert engine.is_running is False
+
+    # Companion and DB integrity remain 100% healthy
     row = store.connection.execute("PRAGMA integrity_check;").fetchone()
     assert row[0] == "ok"
+
+    # Foreground writes succeed with zero issue
+    store.insert_raw_slice(
+        RawSliceEntity(
+            slice_id="slice_post_crash",
+            occurred_at=datetime.now(UTC).isoformat(),
+            content="崩溃隔离后的正常写入",
+            actor="user",
+            source="manual_feed",
+            scope="unresolved",
+            project_id=None,
+            ingestion_dedup_key="dedup_post_crash",
+            created_at=datetime.now(UTC).isoformat(),
+        )
+    )
+    store.connection.commit()
+    assert store.get_raw_slice("slice_post_crash") is not None
 
     store.close()
 
