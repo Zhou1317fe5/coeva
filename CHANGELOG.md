@@ -6,6 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Memory V2.1: Final Mainline Integration & Consolidation
+
+### 🚀 Memory V2.1 Mainline Integration & Cutover Sign-off
+- **完整集成 Memory V2.1 体系（WP-0 ~ WP-14 全 15 阶段）**：
+  - **WP-0**: 基础 Feature Flags 矩阵与零功能闭环启动失败策略 (`src/core/flags.py`)；
+  - **WP-1 / WP-2**: 类型化 Provenance、Schema 迁移与生命周期基础设施 (`src/memory/v2/lifecycle.py`)；
+  - **WP-3**: Lane C 候选抽取与只读准入核心 (`src/memory/v2/admission.py`, `candidate_extraction.py`)；
+  - **WP-4**: 对账验证器与确定性对账引擎 (`src/memory/v2/reconciliation.py`)；
+  - **WP-5**: 记忆巩固调度器与近实时队列 (`src/memory/v2/consolidation_scheduler.py`)；
+  - **WP-6**: 慢路径自模型与观察/假设/校准流水线 (`src/memory/v2/self_model.py`, `observation.py`)；
+  - **WP-7**: 技术检索 V2.1 流水线 (`src/memory/v2/retrieval/`)；
+  - **WP-8**: 召回门禁与避风港模式集成 (`src/memory/v2/recall_gate.py`)；
+  - **WP-9**: 章节存储与隐私脱敏防护 (`src/memory/v2/chapter_privacy.py`, `chapter.py`)；
+  - **WP-10**: 生产迁移工具链与 MigrationBarrier (`src/memory/v2/migration/`)；
+  - **WP-11**: 兼容性视图与单主导出机制 (`src/memory/v2/compatibility.py`, `jsonl_export.py`)；
+  - **WP-12**: 独立子进程后台回填引擎与帧率门禁 (`src/memory/v2/backfill.py`)；
+  - **WP-13**: 全量演练验证与安全断言 (`tests/memory_v2/test_full_canary_rehearsal.py`)；
+  - **WP-14**: 生产运行时接线 (`run_companion.py`), 规范数据根目录 (`src/core/paths.py`), 部署前安全守护。
+- **完美融合本地 Vasu Native Idle 与桌面表现层**：
+  - 语义化合并 `run_companion.py`：同时保留 Native Idle scale 判断与 Memory V2.1 data-root 规范路径；
+  - 完整恢复 16 个已追踪用户修改与 16 个未追踪 Vasu 关键资产；
+  - 保持 `memory_v2_backfill = False` 默认值，生产 DB 未受意外变更影响（`PRAGMA user_version = 20261018`, `integrity_check = ok`, `foreign_key_check = 0`）。
+- **主干快速推进与全量回归**：
+  - 经由独立集成分支 `integration/memory-v2-mainline` 验证无误后，通过 `--ff-only` 安全并入 `main`；
+  - 350 项 Memory V2.1 回归测试与 48 项桌面表现测试全部 100% 通过；
+  - Ruff 代码检查与 Mypy strict 类型检查均保持无警告/无错误通过。
+
+---
+
 ## [Unreleased] - Memory V2.1 Stage 2: Raw Evidence Write Path (WP-2)
 
 ### ✍️ Memory V2.1 Raw Evidence Write Path (WP-2)

@@ -102,3 +102,4 @@ tags:
 5. **Invariant 5 (Minimal & Decaying Data)**: 原始切片与事件必须随时间衰减，长期档案只沉淀提炼后的高阶章节（Growth Chapters）。
 6. **Invariant 6 (Control & Data Plane Decoupling)**: 外部 Agent 数据流只进心智归因层，桌宠动作由心智控制面低频派发，严禁外部事件直通 UI 造成状态抽搐。
 7. **Invariant 7 (Clean Stage)**: 桌面常驻形态必须保持纯粹像素伴生状态，所有交互输入框必须满足“快捷键呼出、输入后即隐、无界面残留”的瞬态约束。
+8. **Invariant 8 (Memory V2.1 Canonical Single-Master Storage & Safe Retrieval)**: 长期记忆采用 Memory V2.1 体系架构（WP-0 ~ WP-14），统一使用 SQLite 作为唯一主持久源与严格外键完整性约束，提供基于召回门禁（Recall Gate）的上下文安全注入，并在后台执行受限子进程回填（默认保持关闭）。
