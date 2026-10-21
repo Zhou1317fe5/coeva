@@ -156,6 +156,7 @@ def test_listener_stop_releases_a_worker_that_has_not_started_yet() -> None:
     assert listener._listener is None
     assert listener._thread is None
 
+
 def test_feeder_bar_collapsed_and_expanded_modes() -> None:
     """SliceFeederBar starts in handle mode and expands/collapses properly."""
     bar = SliceFeederBar()
@@ -226,6 +227,7 @@ def test_feeder_bar_anchor_to_pet() -> None:
     bar.expand_input()
     assert bar.x() == 450 - 272 // 2  # 314
     bar.close()
+
 
 def test_pet_window_integration_with_feeder_bar(tmp_path: Path) -> None:
     """PetWindow owns a docked SliceFeederBar, handles submission and voice feedback."""

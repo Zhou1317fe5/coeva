@@ -1,0 +1,28 @@
+{
+  "validation_run_seconds": 1200.274,
+  "sample_interval_seconds": 30,
+  "sample_count": 38,
+  "sample_coverage_seconds": 1110.7,
+  "process": "V2.1 validation child Python process",
+  "working_set_mb": {
+    "min": 63.13,
+    "max": 115.73,
+    "last_sample": 63.13
+  },
+  "private_memory_mb": {
+    "min": 56.0,
+    "max": 58.42,
+    "last_sample": 57.03
+  },
+  "cpu_seconds": {
+    "min": 0.83,
+    "max": 1.58,
+    "last_sample": 1.58
+  },
+  "thread_count": {
+    "min": 2,
+    "max": 9,
+    "last_sample": 3
+  },
+  "assessment": "Stable for persistent desktop use during this validation run; no growth trend or CPU loop was observed."
+}

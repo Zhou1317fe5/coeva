@@ -104,6 +104,7 @@ def test_agent_settings_pet_preference(tmp_path: Path) -> None:
     reloaded.set_selected_pet("vasu")
     assert reloaded.selected_pet == "vasu"
 
+
 def _persisted_hotkey(settings_file: Path) -> object:
     """Read the hotkey straight off disk, bypassing the in-memory store."""
     return json.loads(settings_file.read_text(encoding="utf-8"))["feeder_hotkey"]

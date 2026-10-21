@@ -84,6 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **严格遵守范围红线**：零生产代码越级修改，零生产数据库改动，零 V2 权威写入开启。
 
 
+### 🦦 Desktop Body
+- Replaced Vasu's normal desktop idle presentation with the high-resolution native canonical
+  image and a sparse, irregular one-shot closed-eye swap.
+- Kept the existing Core atlas loaded for explicit states and fallback; no layered rig,
+  continuous breathing, whole-body scaling, or new life-state scheduler was added.
+- Tuned sparse blink timing to 8–18 seconds after review; the 160ms one-shot behavior is unchanged.
+- Repaired the blink asset so only the baked head/eye region changes; body and tail pixels remain fixed.
+- Added the V2.1 timing/config record and validation artifacts under
+  `assets/vasu/production/v2.1-native-desktop-idle/`.
+
 ## [Unreleased] - UI: 完全参照 Clawd on Desk 重构“打开足迹”记忆档案库界面
 
 ### 🎨 UI & UX Modernization（足迹档案库纯白轻量化）

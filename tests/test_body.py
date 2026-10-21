@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import pytest
+from PIL import Image, ImageChops
 from PySide6.QtGui import QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import QApplication
 
@@ -181,6 +182,22 @@ def test_builtin_pets_loading(tmp_path: Path) -> None:
     window.close()
 
 
+def test_vasu_blink_preserves_body_and_tail_pixels() -> None:
+    """The baked blink frame must change the head only, never shrink the body."""
+    neutral = Image.open(
+        Path("assets") / "vasu" / "reference" / "vasu-native-canonical-hires.png"
+    ).convert("RGBA")
+    blink = Image.open(
+        Path("assets") / "vasu" / "production" / "v2.1-native-desktop-idle" / "vasu-blink.png"
+    ).convert("RGBA")
+
+    assert neutral.size == blink.size == (1024, 1024)
+    body_region = (0, 560, 1024, 1024)
+    assert (
+        ImageChops.difference(neutral.crop(body_region), blink.crop(body_region)).getbbox() is None
+    )
+
+
 def test_calico_theme_apng_loading_and_interactions(tmp_path: Path) -> None:
     """Test that Calico APNG theme loads all 40+ rich behaviors and responds to drag/poke."""
     from src.body.animation import ThemeApngLoader
@@ -205,6 +222,7 @@ def test_calico_theme_apng_loading_and_interactions(tmp_path: Path) -> None:
     assert window._wave_timer.isActive()
 
     window.close()
+
 
 def test_docked_peek_keeps_artwork_visible_at_every_scale(tmp_path: Path) -> None:
     """A docked pet must show real artwork, not just transparent margin.
@@ -545,6 +563,7 @@ def test_calico_mini_mode_docking_and_flipping(tmp_path: Path) -> None:
 
     from PySide6.QtCore import QPointF
     from PySide6.QtGui import QEnterEvent
+
     window.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
     assert window._is_peek_expanded is True
     peek_sheet = window._player._sheet
@@ -602,16 +621,27 @@ def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
     assert window._autonomous_timer.isActive()
 
 
-def test_codex_aligned_vasu_interactions(tmp_path: Path) -> None:
-    """Test Codex-aligned Vasu behaviors: natural blink spacing, hover hop, directional drag."""
+def test_vasu_native_idle_and_core_interactions(tmp_path: Path) -> None:
+    """Test sparse native idle blink while keeping Core interaction states available."""
     from PySide6.QtCore import QPointF, Qt
     from PySide6.QtGui import QMouseEvent
 
     vasu_dir = Path("assets") / "pets" / "vasu"
     window = _isolated_window(vasu_dir, tmp_path, scale=1.0)
 
-    # 1. Natural idle loop delay
-    assert window._player._loop_delay_range_ms == (3000, 5500)
+    # Native idle is one static frame with an independent sparse blink timer.
+    assert window._native_idle_frames is not None
+    assert not window._player._timer.isActive()
+    assert window._native_blink_timer.isActive()
+    assert not window._autonomous_timer.isActive()
+
+    neutral, blink = window._native_idle_frames
+    window._start_native_blink()
+    current = window._label.pixmap()
+    assert current is not None and current.cacheKey() == blink.cacheKey()
+    window._finish_native_blink()
+    current = window._label.pixmap()
+    assert current is not None and current.cacheKey() == neutral.cacheKey()
 
     # 2. Hover jump on cursor enter
     assert "jumping" in window._loaded_sheets
@@ -669,6 +699,8 @@ def test_codex_aligned_vasu_interactions(tmp_path: Path) -> None:
     )
     window.mouseReleaseEvent(release_ev)
     assert window._current_drag_dir is None
-    assert window._player._sheet == window._loaded_sheets["idle"]
+    assert not window._player._timer.isActive()
+    current = window._label.pixmap()
+    assert current is not None and current.cacheKey() == neutral.cacheKey()
 
     window.close()

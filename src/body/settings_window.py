@@ -1,4 +1,5 @@
 """Modern multi-agent and companion settings window inspired by Clawd on Desk (Light Mode)."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -666,12 +667,13 @@ class SettingsWindow(QWidget):
         self.llm_enabled_cb.setChecked(self.llm_config.enabled)
         c_layout.addWidget(self.llm_enabled_cb)
 
-
         url_lbl = QLabel("接口地址 (Base URL):")
         url_lbl.setStyleSheet("font-size: 12px; color: #6b6b70;")
         c_layout.addWidget(url_lbl)
         self.llm_url_edit = QLineEdit(self.llm_config.base_url)
-        self.llm_url_edit.setPlaceholderText("https://api.openai.com/v1 或 http://localhost:11434/v1")
+        self.llm_url_edit.setPlaceholderText(
+            "https://api.openai.com/v1 或 http://localhost:11434/v1"
+        )
         c_layout.addWidget(self.llm_url_edit)
 
         key_lbl = QLabel("API Key (密码掩码):")
@@ -874,6 +876,7 @@ class SettingsWindow(QWidget):
                     if checked:
                         self.store.set_selected_pet(pid)
                         self.pet_changed.emit(pid)
+
                 return _handler
 
             radio.toggled.connect(_make_handler(pet_id))
@@ -918,6 +921,7 @@ class SettingsWindow(QWidget):
         def _make_scale_handler(val: float) -> Callable[[], None]:
             def _h() -> None:
                 self.scale_changed.emit(val)
+
             return _h
 
         scale_grid = QGridLayout()
@@ -1100,9 +1104,7 @@ class SettingsWindow(QWidget):
         )
         self.sanctuary_status = QLabel()
         self.sanctuary_status.setStyleSheet("font-size: 13px; font-weight: 600;")
-        sanc_desc = QLabel(
-            "激活时 100% 熔断一切分析、说教与 Agent 气泡，只保留安静陪伴。"
-        )
+        sanc_desc = QLabel("激活时 100% 熔断一切分析、说教与 Agent 气泡，只保留安静陪伴。")
         sanc_desc.setStyleSheet("color: #6b6b70; font-size: 12px;")
         sanc_desc.setWordWrap(True)
         sanc_layout.addWidget(sanc_title)
@@ -1136,9 +1138,7 @@ class SettingsWindow(QWidget):
         self.refresh_core_status()
         return self._wrap_scrollable(container)
 
-    def set_core_handles(
-        self, sanctuary: SanctuaryGuard, cold_start: ColdStartPolicy
-    ) -> None:
+    def set_core_handles(self, sanctuary: SanctuaryGuard, cold_start: ColdStartPolicy) -> None:
         """Attach live Growth Core instances for status reflection."""
         self._sanctuary = sanctuary
         self._cold_start = cold_start
@@ -1175,9 +1175,7 @@ class SettingsWindow(QWidget):
         stage = str(policy.stage)
         label = stage_labels.get(stage, stage)
         analysis = (
-            "允许"
-            if policy.allows_psychological_analysis
-            else "禁止（前两阶段严禁心理分析）"
+            "允许" if policy.allows_psychological_analysis else "禁止（前两阶段严禁心理分析）"
         )
         self.coldstart_status.setText(
             f"第 {policy.day_count} 天 · {label}\n"

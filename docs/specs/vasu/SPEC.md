@@ -77,3 +77,22 @@ hatch-pet 的固定图集为 1536×1872、8 列 × 9 行，每格 192×208，背
 - `idle`、观察、专注与困倦都偏安静，若姿态差异过小会难以辨认；玩耍与回应若幅度过大，又会破坏桌面陪伴的安宁。先用动作草图确认区别与强度。
 
 下一步先审定 Vasu 的右向站/走姿态、小尺寸像素比例，以及“观察、做事、休息、玩耍、回应”的动作草图；之后才用主图和 64×64 参照按 hatch-pet 规格制作完整的 `idle`、`running-right` 试验行。只有身份与步态试验通过后，才继续其余核心行及扩展动画。
+
+## 7. V2.1 Native Desktop Idle + Sparse Blink
+
+V2.1 supersedes the Core atlas `idle` row for Vasu's normal desktop presence only. It
+does not modify the frozen Core atlas or introduce a new animation architecture.
+
+- Runtime configuration: [`assets/pets/vasu/native_idle.json`](../../../assets/pets/vasu/native_idle.json).
+- Neutral image: [`vasu-native-canonical-hires.png`](../../../assets/vasu/reference/vasu-native-canonical-hires.png).
+- Blink image: [`vasu-blink.png`](../../../assets/vasu/production/v2.1-native-desktop-idle/vasu-blink.png), a full-canvas accepted closed-eye visual.
+- `PetWindow` displays the native neutral frame while `PetState.IDLE`; an independent one-shot
+  Qt timer swaps to the blink frame for the configured duration, then restores the exact neutral
+  frame and schedules a new irregular delay.
+- Vasu native idle does not run the autonomous activity scheduler. Existing Core atlas states
+  remain available for explicit interaction, Core control states, and fallback when the native
+  configuration is absent or invalid.
+- The baked blink asset may change only the registered head/eye region; body and tail pixels
+  must remain identical to the Native Canonical so the character never appears to shrink.
+- V2.1 explicitly excludes breathing, continuous scaling, tail loops, head-follow, gaze, and
+  new life states. Diagnostic previews are QA artifacts, not production idle assets.

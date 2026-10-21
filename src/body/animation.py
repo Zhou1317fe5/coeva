@@ -30,6 +30,63 @@ class MiniModeConfig:
     peek_offset_ratio: float = 0.08
 
 
+@dataclass(frozen=True)
+class NativeIdleConfig:
+    """Static native idle assets and sparse blink timing for one pet."""
+
+    neutral_path: Path
+    blink_path: Path
+    min_interval_ms: int
+    max_interval_ms: int
+    blink_duration_ms: int
+
+    @classmethod
+    def load(cls, pet_dir: Path) -> NativeIdleConfig | None:
+        """Load a validated native-idle config, or leave the atlas as fallback."""
+        config_path = pet_dir / "native_idle.json"
+        if not config_path.is_file():
+            return None
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+        if not isinstance(data, dict):
+            return None
+
+        neutral = data.get("neutral")
+        blink = data.get("blink")
+        min_interval = data.get("blink_interval_min_ms")
+        max_interval = data.get("blink_interval_max_ms")
+        duration = data.get("blink_duration_ms")
+        if (
+            not isinstance(neutral, str)
+            or not isinstance(blink, str)
+            or not isinstance(min_interval, int)
+            or isinstance(min_interval, bool)
+            or not isinstance(max_interval, int)
+            or isinstance(max_interval, bool)
+            or not isinstance(duration, int)
+            or isinstance(duration, bool)
+            or min_interval <= 0
+            or max_interval < min_interval
+            or duration <= 0
+            or duration >= min_interval
+        ):
+            return None
+
+        neutral_path = pet_dir / neutral
+        blink_path = pet_dir / blink
+        if not neutral_path.is_file() or not blink_path.is_file():
+            return None
+        return cls(
+            neutral_path=neutral_path,
+            blink_path=blink_path,
+            min_interval_ms=min_interval,
+            max_interval_ms=max_interval,
+            blink_duration_ms=duration,
+        )
+
+
 def measure_art_padding(image: QImage, *, cols: int, rows: int) -> tuple[int, int]:
     """Return (left_pad, right_pad) of the union of all non-empty frames.
 
@@ -99,6 +156,7 @@ class SpriteSheet:
         self.frame_height = frame_height
         self.default_fps = default_fps
         self.frame_durations_ms = frame_durations_ms
+
     @property
     def frame_count(self) -> int:
         return len(self.frames)
@@ -132,6 +190,7 @@ class SpriteSheet:
             sliced.append(QPixmap.fromImage(frame_image))
 
         return cls(sliced, frame_width=frame_width, frame_height=frame_height)
+
     def mirrored(self, *, horizontal: bool = True, vertical: bool = False) -> SpriteSheet:
         """Return a new SpriteSheet with all frames mirrored horizontally/vertically."""
         if not horizontal and not vertical:
@@ -325,9 +384,7 @@ class ThemeApngLoader:
             offset_ratio = float(mini_cfg.get("offsetRatio", 0.4))
             peek_cfg = mini_cfg.get("peek", {})
             peek_ratio = (
-                float(peek_cfg.get("offsetRatio", 0.08))
-                if isinstance(peek_cfg, dict)
-                else 0.08
+                float(peek_cfg.get("offsetRatio", 0.08)) if isinstance(peek_cfg, dict) else 0.08
             )
             return MiniModeConfig(
                 supported=supported,
@@ -523,7 +580,5 @@ class AnimationPlayer(QObject):
         else:
             self._current_index = next_index
 
-        self._timer.setInterval(
-            self._frame_interval_ms(self._current_index, self._effective_fps)
-        )
+        self._timer.setInterval(self._frame_interval_ms(self._current_index, self._effective_fps))
         self.frame_changed.emit(self._sheet.frames[self._current_index])

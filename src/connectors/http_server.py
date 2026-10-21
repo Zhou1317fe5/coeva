@@ -373,6 +373,7 @@ class CompanionHttpServer:
         raw terminal errors like '⚠️ 工具报错: Bash'.
         """
         self.bus.dispatch_json(data)
+
     def start(self) -> bool:
         """Start listening on the background thread."""
         handler_class = type(

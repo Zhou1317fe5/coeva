@@ -14,7 +14,7 @@ from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.menu_style import get_menu_stylesheet
 from src.body.settings_window import SettingsWindow
-from src.body.window import PetWindow
+from src.body.window import DEFAULT_SCALE, NATIVE_IDLE_DEFAULT_SCALE, PetWindow
 from src.connectors.hook_manager import AgentHookManager
 from src.connectors.settings import AgentSettingsStore
 from src.feeder.hotkey import GlobalHotkeyListener
@@ -45,7 +45,10 @@ def main() -> int:
     chronicle_store = ChronicleStore()
     hook_manager = AgentHookManager()
 
-    window = PetWindow(assets_root)
+    initial_scale = (
+        NATIVE_IDLE_DEFAULT_SCALE if (assets_root / "native_idle.json").is_file() else DEFAULT_SCALE
+    )
+    window = PetWindow(assets_root, scale=initial_scale)
     controller = BodyController(window)
 
     # Global hotkey for feeder input
@@ -69,7 +72,6 @@ def main() -> int:
             tray.setIcon(QIcon())
     tray_menu = QMenu(window)
     tray_menu.setStyleSheet(get_menu_stylesheet())
-
 
     # State Group
     sleep_action = QAction("休眠（免打扰）", window)
@@ -172,6 +174,7 @@ def main() -> int:
             window.show()
             window.raise_()
             vis_action.setText("隐藏桌宠")
+
     vis_action.triggered.connect(_toggle_visibility)
     tray_menu.addAction(vis_action)
 

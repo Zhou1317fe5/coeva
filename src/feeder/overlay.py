@@ -481,9 +481,7 @@ class SliceFeederBar(QWidget):
             self._morph_val = 1.0 - val
         elif self._current_mode == MODE_INPUT:
             self._morph_val = 0.0
-            self._input_widget.setGeometry(
-                SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
-            )
+            self._input_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT)
             self._input_widget.show()
 
         self.update()
@@ -497,9 +495,7 @@ class SliceFeederBar(QWidget):
 
         if mode == MODE_INPUT:
             self._morph_val = 0.0
-            self._input_widget.setGeometry(
-                SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT
-            )
+            self._input_widget.setGeometry(SHADOW_MARGIN, SHADOW_MARGIN, INPUT_WIDTH, INPUT_HEIGHT)
             self._input_widget.show()
         elif mode == MODE_PILL:
             self._input_widget.hide()
@@ -512,9 +508,7 @@ class SliceFeederBar(QWidget):
 
     def _re_anchor(self) -> None:
         if self._last_pet_pos is not None and self._last_pet_size is not None:
-            self.anchor_to_pet(
-                self._last_pet_pos, self._last_pet_size[0], self._last_pet_size[1]
-            )
+            self.anchor_to_pet(self._last_pet_pos, self._last_pet_size[0], self._last_pet_size[1])
 
     def anchor_to_pet(self, pet_pos: QPoint, pet_width: int, pet_height: int) -> None:
         """Dock the interaction bar centered directly beneath the pet's feet."""

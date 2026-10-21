@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget
 from src.body.animation import (
     AnimationPlayer,
     MiniModeConfig,
+    NativeIdleConfig,
     PetdexAtlasLoader,
     SpriteSheet,
     SpriteSheetError,
@@ -50,6 +51,7 @@ PEEK_VISIBLE_ART_PX = 24  # artwork pixels left on screen when docked
 # enough to feel intrusive on the desktop, so the companion starts small and the
 # user can scale it up (settings panel, tray menu, or Ctrl + wheel).
 DEFAULT_SCALE = 0.5
+NATIVE_IDLE_DEFAULT_SCALE = 0.3
 # Persisted window position and scale. Tests point this at tmp_path so they never
 # read or overwrite the user's real file while constructing a PetWindow.
 DEFAULT_POSITION_CONFIG_PATH = Path("data") / "body_position.json"
@@ -73,6 +75,7 @@ class PetWindow(QWidget):
     context_menu_requested = Signal(QPoint)
     slice_fed = Signal(str)
     user_replied_to_bubble = Signal(str, str)  # (reply_text, original_pet_speech)
+    native_blink_started = Signal(float)
 
     def __init__(
         self,
@@ -177,6 +180,16 @@ class PetWindow(QWidget):
         self._nap_timer = QTimer(self)
         self._nap_timer.setSingleShot(True)
         self._nap_timer.timeout.connect(self._wake_up)
+
+        self._native_idle_config: NativeIdleConfig | None = None
+        self._native_idle_frames: tuple[QPixmap, QPixmap] | None = None
+        self._native_idle_active = False
+        self._native_blink_timer = QTimer(self)
+        self._native_blink_timer.setSingleShot(True)
+        self._native_blink_timer.timeout.connect(self._start_native_blink)
+        self._native_blink_restore_timer = QTimer(self)
+        self._native_blink_restore_timer.setSingleShot(True)
+        self._native_blink_restore_timer.timeout.connect(self._finish_native_blink)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
         self._load_spritesheets()
@@ -196,10 +209,10 @@ class PetWindow(QWidget):
     @property
     def feeder_bar(self) -> SliceFeederBar:
         return self._feeder_bar
+
     @property
     def bubble(self) -> SpeechBubble:
         return self._bubble
-
 
     def open_feeder_input(self) -> None:
         """Open and focus the feeder input bar directly beneath the pet."""
@@ -251,8 +264,14 @@ class PetWindow(QWidget):
 
     def _load_spritesheets(self) -> None:
         """Preload sprite sheets from Clawd on Desk theme, Petdex, or legacy sprites."""
+        self._stop_native_idle()
+        self._native_idle_config = NativeIdleConfig.load(self.pet_dir)
+        self._native_idle_frames = None
         screen = self.screen() or QApplication.primaryScreen()
         dpr = screen.devicePixelRatio() if screen is not None else 1.0
+
+        if self._native_idle_config is not None:
+            self._load_native_idle_frames(dpr)
 
         # 0. Try Clawd on Desk APNG Theme (e.g. Calico with rich autonomous behaviors)
         theme_json = self.pet_dir / "theme.json"
@@ -344,6 +363,22 @@ class PetWindow(QWidget):
                     self._accumulate_art_padding(path, cols=frames, rows=1, factor=factor)
                 except SpriteSheetError:
                     pass
+
+    def _load_native_idle_frames(self, dpr: float) -> None:
+        config = self._native_idle_config
+        if config is None:
+            return
+        try:
+            neutral = SpriteSheet.load(config.neutral_path).scaled(self._scale, dpr=dpr)
+            blink = SpriteSheet.load(config.blink_path).scaled(self._scale, dpr=dpr)
+        except SpriteSheetError:
+            self._native_idle_config = None
+            return
+        if neutral.frame_width != blink.frame_width or neutral.frame_height != blink.frame_height:
+            self._native_idle_config = None
+            return
+        self._native_idle_frames = (neutral.frames[0], blink.frames[0])
+
     def _measure_art_padding(
         self, image_path: Path, *, cols: int, rows: int, factor: float
     ) -> None:
@@ -388,6 +423,7 @@ class PetWindow(QWidget):
         left_pad, right_pad = self._art_padding_px
         margin = right_pad if edge == "right" else left_pad
         return margin + PEEK_VISIBLE_ART_PX
+
     def _get_mini_sheet(self, state_name: str) -> SpriteSheet | None:
         """Get the sprite sheet for a mini state, applying edge flip if needed."""
         if self._mini_cfg.flip_assets:
@@ -416,6 +452,13 @@ class PetWindow(QWidget):
         if state == self._current_state and not force:
             return
         self._current_state = state
+        if state == PetState.IDLE and self._native_idle_frames is not None:
+            self._autonomous_timer.stop()
+            self._autonomous_done_timer.stop()
+            self._in_autonomous_routine = False
+            self._activate_native_idle()
+            return
+        self._stop_native_idle()
         # Any state change means something happened: restart the idle countdown,
         # and let a wake-up clear the doze. Sleeping is the only state that is
         # allowed to persist, so it must not re-arm its own timer.
@@ -487,6 +530,46 @@ class PetWindow(QWidget):
             loop_delay = (3000, 5500) if is_short_idle else None
             self._player.play(sheet, fps=fps, loop=loop, loop_delay_range_ms=loop_delay)
 
+    def _activate_native_idle(self) -> None:
+        frames = self._native_idle_frames
+        if frames is None:
+            return
+        self._player.stop()
+        self._native_idle_active = True
+        self._native_blink_restore_timer.stop()
+        self._native_blink_timer.stop()
+        self._on_frame_changed(frames[0])
+        self._schedule_native_blink()
+
+    def _stop_native_idle(self) -> None:
+        self._native_idle_active = False
+        self._native_blink_timer.stop()
+        self._native_blink_restore_timer.stop()
+
+    def _schedule_native_blink(self) -> None:
+        config = self._native_idle_config
+        if not self._native_idle_active or config is None:
+            return
+        self._native_blink_timer.start(
+            random.randint(config.min_interval_ms, config.max_interval_ms)
+        )
+
+    def _start_native_blink(self) -> None:
+        config = self._native_idle_config
+        frames = self._native_idle_frames
+        if not self._native_idle_active or config is None or frames is None:
+            return
+        self._on_frame_changed(frames[1])
+        self.native_blink_started.emit(time.time())
+        self._native_blink_restore_timer.start(config.blink_duration_ms)
+
+    def _finish_native_blink(self) -> None:
+        frames = self._native_idle_frames
+        if not self._native_idle_active or frames is None:
+            return
+        self._on_frame_changed(frames[0])
+        self._schedule_native_blink()
+
     def say(self, text: str, *, ttl_ms: int = 4000) -> None:
         """Display a speech bubble above the pet."""
         if self._current_state == PetState.SLEEPING:
@@ -526,6 +609,7 @@ class PetWindow(QWidget):
 
     def _get_config_path(self) -> Path:
         return self._position_config_path
+
     def _restore_position(self) -> None:
         cfg = self._get_config_path()
         screen = self.screen() or QApplication.primaryScreen()
@@ -600,6 +684,7 @@ class PetWindow(QWidget):
 
     def _clear_user_working(self) -> None:
         self._is_user_working = False
+
     def _wake_up(self) -> None:
         """Return to a resting, awake state after the pet had dozed off."""
         if self._current_state == PetState.SLEEPING:
@@ -613,18 +698,23 @@ class PetWindow(QWidget):
                 self._wave_timer.start(1600)
             else:
                 self.apply_state(PetState.IDLE, force=True)
+
     def _schedule_next_autonomous_routine(self, *, initial: bool = False) -> None:
         """Schedule the next spontaneous daily life activity using the circadian model."""
+        if self._native_idle_frames is not None:
+            return
         schedule = get_schedule_for_time()
         if initial and schedule.is_work_phase:
             pause = random.randint(3000, 8000)
         else:
             pause = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
         self._autonomous_timer.start(pause)
+
     def _start_autonomous_routine(self) -> None:
         """Spontaneously perform an independent daily life activity."""
         if (
-            self._current_state != PetState.IDLE
+            self._native_idle_frames is not None
+            or self._current_state != PetState.IDLE
             or self._docked_edge is not None
             or self._greeting_active
             or self._has_moved
@@ -642,26 +732,22 @@ class PetWindow(QWidget):
             # User is in deep flow working: companion accompanies with focused craft/work
             # Available work activities: covers Calico theme & Vasu Petdex atlas rows
             work_activities: list[tuple[str, int]] = [
-                ("working-typing", 60_000),    # Calico
+                ("working-typing", 60_000),  # Calico
                 ("working-building", 60_000),  # Calico
-                ("review", 55_000),            # Vasu 代码复盘/审查
-                ("waiting", 40_000),           # Vasu 专注凝视
-                ("running", 35_000),           # Vasu 敏捷奔跑
-                ("running-right", 30_000),     # Vasu
-                ("running-left", 30_000),      # Vasu
+                ("review", 55_000),  # Vasu 代码复盘/审查
+                ("waiting", 40_000),  # Vasu 专注凝视
+                ("running", 35_000),  # Vasu 敏捷奔跑
+                ("running-right", 30_000),  # Vasu
+                ("running-left", 30_000),  # Vasu
                 ("working-sweeping", 45_000),  # Calico
-                ("thinking", 40_000),          # Calico
+                ("thinking", 40_000),  # Calico
                 ("working-carrying", 35_000),  # Calico
             ]
-            available = [
-                (act, dur) for act, dur in work_activities if act in self._loaded_sheets
-            ]
+            available = [(act, dur) for act, dur in work_activities if act in self._loaded_sheets]
         else:
             # Use current circadian phase's natural human-like activities
             available = [
-                (act, dur)
-                for act, dur in schedule.allowed_activities
-                if act in self._loaded_sheets
+                (act, dur) for act, dur in schedule.allowed_activities if act in self._loaded_sheets
             ]
 
         if not available:
@@ -681,6 +767,8 @@ class PetWindow(QWidget):
 
     def _finish_autonomous_routine(self) -> None:
         """Finish the daily life activity and settle back to resting idle."""
+        if self._native_idle_frames is not None:
+            return
         self._in_autonomous_routine = False
         if (
             self._current_state == PetState.IDLE
@@ -694,6 +782,7 @@ class PetWindow(QWidget):
             schedule = get_schedule_for_time()
             interval = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
             self._autonomous_timer.start(interval)
+
     def play_poke_reaction(self) -> None:
         """Play short poke reaction if available, then return to current state."""
         if (
@@ -736,6 +825,7 @@ class PetWindow(QWidget):
         self.apply_state(PetState.IDLE, force=True)
         self._schedule_next_autonomous_routine()
         self.say("⏹ 已退出测试模式，恢复自主生活节律", ttl_ms=2000)
+
     def _trigger_hover_jump(self) -> bool:
         """Trigger a lively hop when cursor hovers over the pet (Codex behavior)."""
         if self._current_state == PetState.SLEEPING or self._docked_edge is not None:
@@ -778,6 +868,7 @@ class PetWindow(QWidget):
         else:
             self.apply_state(PetState.HAPPY)
         self._wave_timer.start(1400)
+
     def _finish_greeting(self) -> None:
         """End the hover wave and settle back to resting."""
         self._greeting_active = False
@@ -830,9 +921,8 @@ class PetWindow(QWidget):
             cursor_pos = QCursor.pos()
             in_pet = self.geometry().contains(cursor_pos)
             in_bubble = self._bubble.isVisible() and self._bubble.geometry().contains(cursor_pos)
-            in_feeder = (
-                self._feeder_bar.isVisible()
-                and self._feeder_bar.geometry().contains(cursor_pos)
+            in_feeder = self._feeder_bar.isVisible() and self._feeder_bar.geometry().contains(
+                cursor_pos
             )
             if not in_pet and not in_bubble and not in_feeder:
                 if not self._retract_timer.isActive():
@@ -1058,6 +1148,7 @@ class PetWindow(QWidget):
         self._nap_timer.stop()
         self._user_working_timer.stop()
         self._wave_timer.stop()
+        self._stop_native_idle()
         self._bubble.close()
         self._feeder_bar.close()
         self._player.stop()
@@ -1069,6 +1160,7 @@ class PetWindow(QWidget):
             self._feeder_bar.anchor_to_pet(self.pos(), self.width(), self.height())
             self._feeder_bar.show_handle()
             self._feeder_bar.show()
+
     def hideEvent(self, event: QHideEvent) -> None:  # noqa: N802
         self._feeder_bar.hide()
         self._bubble.hide()

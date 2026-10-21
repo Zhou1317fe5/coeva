@@ -1,0 +1,35 @@
+{
+  "neutral_asset": "assets/vasu/reference/vasu-native-canonical-hires.png",
+  "blink_asset": "assets/vasu/production/v2.1-native-desktop-idle/vasu-blink.png",
+  "canvas_size_px": [
+    1024,
+    1024
+  ],
+  "neutral_alpha_bbox": [
+    157,
+    232,
+    866,
+    952
+  ],
+  "blink_alpha_bbox": [
+    157,
+    232,
+    858,
+    952
+  ],
+  "neutral_vs_blink_diff_bbox": [
+    251,
+    232,
+    866,
+    560
+  ],
+  "body_region": [
+    0,
+    560,
+    1024,
+    1024
+  ],
+  "body_region_pixel_identical": true,
+  "runtime_layers_used": false,
+  "status": "pass"
+}

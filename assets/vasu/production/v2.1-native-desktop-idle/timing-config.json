@@ -1,0 +1,37 @@
+{
+  "phase": "V2.1",
+  "runtime_config": "assets/pets/vasu/native_idle.json",
+  "neutral_asset": "assets/vasu/reference/vasu-native-canonical-hires.png",
+  "blink_asset": "assets/vasu/production/v2.1-native-desktop-idle/vasu-blink.png",
+  "scale": 0.3,
+  "device_pixel_ratio": 1.5,
+  "window_size_logical_px": [
+    307,
+    307
+  ],
+  "screenshot_size_physical_px": [
+    461,
+    461
+  ],
+  "visible_art_height_estimate_logical_px": 216,
+  "configured_blink_interval_ms": [
+    8000,
+    18000
+  ],
+  "validation_run_configured_blink_interval_ms": [
+    18000,
+    42000
+  ],
+  "configured_blink_duration_ms": 160,
+  "validation_run_started": "2026-10-18T14:42:55.280+08:00",
+  "validation_run_finished": "2026-10-18T15:02:55.554+08:00",
+  "validation_run_seconds": 1200.274,
+  "blink_count": 38,
+  "observed_gap_seconds": {
+    "min": 18.489,
+    "median": 31.172,
+    "mean": 31.700,
+    "max": 66.435
+  },
+  "observed_gap_note": "The recorded 20-minute run used the previous 18–42s setting. It remains a visual/runtime stability record; the current production setting is tuned to 8–18s for more natural desktop presence."
+}

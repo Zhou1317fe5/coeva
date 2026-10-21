@@ -28,7 +28,7 @@ from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.menu_style import get_menu_stylesheet
 from src.body.settings_window import SettingsWindow
-from src.body.window import PetWindow
+from src.body.window import DEFAULT_SCALE, NATIVE_IDLE_DEFAULT_SCALE, PetWindow
 from src.connectors.contracts import AgentEvent, AgentEventType
 from src.connectors.event_bus import LocalEventBus
 from src.connectors.hermes_connector import HermesConnector
@@ -123,8 +123,14 @@ class CompanionApp:
             assets_dir = Path("assets") / "pets" / "vasu"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
+        initial_scale = (
+            NATIVE_IDLE_DEFAULT_SCALE
+            if (assets_dir / 'native_idle.json').is_file()
+            else DEFAULT_SCALE
+        )
         self.window = PetWindow(
             assets_dir,
+            scale=initial_scale,
             position_config_path=get_body_position_path(self.data_dir),
         )
         self.window._suppress_default_feedback = True

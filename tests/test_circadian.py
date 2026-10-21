@@ -35,6 +35,7 @@ def test_circadian_24_hour_phases() -> None:
 def test_circadian_schedules_pacing() -> None:
     """Verify pacing and activity durations across circadian schedule configs."""
     from src.core.circadian import SCHEDULE_CONFIGS
+
     for schedule in SCHEDULE_CONFIGS.values():
         assert schedule.min_pause_ms >= 25_000
         assert schedule.max_pause_ms >= schedule.min_pause_ms

@@ -69,8 +69,7 @@ class PersonalityFallback:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PersonalityFallback:
         return cls(
-            slice_normal=tuple(str(x) for x in data.get("sliceNormal", ()))
-            or cls().slice_normal,
+            slice_normal=tuple(str(x) for x in data.get("sliceNormal", ())) or cls().slice_normal,
             slice_distressed=tuple(str(x) for x in data.get("sliceDistressed", ()))
             or cls().slice_distressed,
             state_care_overwork=tuple(str(x) for x in data.get("stateCareOverwork", ()))
@@ -252,7 +251,6 @@ def build_system_prompt(
         )
         for mem in memories:
             sections.append(f"- {mem}")
-
 
     return "\n\n".join(sections)
 

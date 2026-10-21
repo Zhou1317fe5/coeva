@@ -1,0 +1,7 @@
+{
+  "neutral": "../../vasu/reference/vasu-native-canonical-hires.png",
+  "blink": "../../vasu/production/v2.1-native-desktop-idle/vasu-blink.png",
+  "blink_interval_min_ms": 8000,
+  "blink_interval_max_ms": 18000,
+  "blink_duration_ms": 160
+}

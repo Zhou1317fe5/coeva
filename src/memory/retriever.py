@@ -13,30 +13,135 @@ from src.core.personality import format_memory_snippet
 from src.memory.store import ChronicleStore, SliceRecord
 
 # Common non-informative conversational stop words in Chinese and English
-DEFAULT_STOP_WORDS: frozenset[str] = frozenset({
-    "你", "我", "他", "她", "它", "我们", "你们", "他们", "自己",
-    "的", "了", "吗", "呢", "吧", "啊", "呀", "哦", "嗯", "啦",
-    "在", "有", "是", "和", "就", "还", "这", "那", "个", "说",
-    "想", "做", "去", "吃", "看", "听", "到", "着", "过", "得",
-    "什么", "怎么", "怎样", "如何", "为什么", "哪里", "哪个",
-    "之前", "前天", "昨天", "今天", "明天", "后天", "大前天",
-    "聊了", "聊过", "讨论", "谈到", "提过", "说过", "关于",
-    "一下", "问你", "知道", "记得", "还记得", "了解", "认识",
-    "a", "an", "the", "is", "are", "was", "were", "to", "for", "in", "on",
-})
+DEFAULT_STOP_WORDS: frozenset[str] = frozenset(
+    {
+        "你",
+        "我",
+        "他",
+        "她",
+        "它",
+        "我们",
+        "你们",
+        "他们",
+        "自己",
+        "的",
+        "了",
+        "吗",
+        "呢",
+        "吧",
+        "啊",
+        "呀",
+        "哦",
+        "嗯",
+        "啦",
+        "在",
+        "有",
+        "是",
+        "和",
+        "就",
+        "还",
+        "这",
+        "那",
+        "个",
+        "说",
+        "想",
+        "做",
+        "去",
+        "吃",
+        "看",
+        "听",
+        "到",
+        "着",
+        "过",
+        "得",
+        "什么",
+        "怎么",
+        "怎样",
+        "如何",
+        "为什么",
+        "哪里",
+        "哪个",
+        "之前",
+        "前天",
+        "昨天",
+        "今天",
+        "明天",
+        "后天",
+        "大前天",
+        "聊了",
+        "聊过",
+        "讨论",
+        "谈到",
+        "提过",
+        "说过",
+        "关于",
+        "一下",
+        "问你",
+        "知道",
+        "记得",
+        "还记得",
+        "了解",
+        "认识",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "to",
+        "for",
+        "in",
+        "on",
+    }
+)
 
 # Low-entropy greetings and acknowledgments to skip when selecting memorable history
-DEFAULT_TRIVIAL_SLICES: frozenset[str] = frozenset({
-    "hi", "hello", "hey", "你好", "您好", "嗨", "早", "早安", "晚安",
-    "测试", "测试气泡", "测试发消息", "你是谁", "你是？", "你是",
-    "嗯", "嗯嗯", "好的", "嗯嗯好的", "行", "收到", "好嘞",
-})
+DEFAULT_TRIVIAL_SLICES: frozenset[str] = frozenset(
+    {
+        "hi",
+        "hello",
+        "hey",
+        "你好",
+        "您好",
+        "嗨",
+        "早",
+        "早安",
+        "晚安",
+        "测试",
+        "测试气泡",
+        "测试发消息",
+        "你是谁",
+        "你是？",
+        "你是",
+        "嗯",
+        "嗯嗯",
+        "好的",
+        "嗯嗯好的",
+        "行",
+        "收到",
+        "好嘞",
+    }
+)
 
 # Markers indicating the user is explicitly inquiring about companion's memory
 DEFAULT_MEMORY_INTENT_MARKERS: tuple[str, ...] = (
-    "还记得", "记得什么", "记得我", "你记得", "还记不记得",
-    "聊了什么", "聊过什么", "说了什么", "提过什么", "讨论了什么",
-    "了解我", "认识我", "关于我", "有什么记忆", "记忆库", "记得不",
+    "还记得",
+    "记得什么",
+    "记得我",
+    "你记得",
+    "还记不记得",
+    "聊了什么",
+    "聊过什么",
+    "说了什么",
+    "提过什么",
+    "讨论了什么",
+    "了解我",
+    "认识我",
+    "关于我",
+    "有什么记忆",
+    "记忆库",
+    "记得不",
 )
 
 
@@ -151,9 +256,7 @@ class MemoryRetriever:
             end_utc_iso = end_local.astimezone(UTC).isoformat()
 
             # Query database by exact UTC timestamp range
-            date_slices = self.store.get_slices_in_timerange(
-                start_utc_iso, end_utc_iso, limit=50
-            )
+            date_slices = self.store.get_slices_in_timerange(start_utc_iso, end_utc_iso, limit=50)
 
             # Fallback for slices recorded with date prefix if any
             if not date_slices:
@@ -226,7 +329,4 @@ class MemoryRetriever:
             exclude_ids=exclude_ids,
             now=now,
         )
-        return tuple(
-            format_memory_snippet(r.timestamp, r.content)
-            for r in records
-        )
+        return tuple(format_memory_snippet(r.timestamp, r.content) for r in records)
