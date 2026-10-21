@@ -78,3 +78,8 @@ def get_body_position_path(custom_data_dir: Path | str | None = None) -> Path:
 def get_feeder_position_path(custom_data_dir: Path | str | None = None) -> Path:
     """Resolve path to feeder_position.json."""
     return get_data_dir(custom_data_dir) / "feeder_position.json"
+
+
+def get_llm_config_path(custom_data_dir: Path | str | None = None) -> Path:
+    """Resolve path to llm_config.json."""
+    return get_data_dir(custom_data_dir) / "llm_config.json"

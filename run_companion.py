@@ -101,7 +101,7 @@ class CompanionApp:
         chapters_dir = get_chapters_dir(self.data_dir)
 
         self.agent_settings = AgentSettingsStore(file_path=settings_path)
-        self.flags = resolve_flags(self.agent_settings.to_dict())
+        self.flags = self.agent_settings.memory_v2_flags
         self.memory_v2_diag = validate_memory_v2_configuration(
             self.flags,
             capabilities=PRODUCTION_V2_CAPABILITIES,
@@ -824,6 +824,9 @@ class CompanionApp:
             pass
         self.chronicle_window.close()
         self.window.close()
+        from PySide6.QtCore import QThreadPool
+
+        QThreadPool.globalInstance().waitForDone(1500)
         self.app.quit()
 
     def _on_scale_changed(self, scale: float) -> None:

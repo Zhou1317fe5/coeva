@@ -1,6 +1,6 @@
 {
-  "manifest_version": "2.3.0",
-  "cutover_completed_at_utc": "2026-10-21T07:52:20.120020+00:00",
+  "manifest_version": "2.4.0",
+  "cutover_completed_at_utc": "2026-10-21T08:08:33.409858+00:00",
   "upstream_canonical": {
     "lane": "Lane M (parallel/wp13-full-canary)",
     "wp13_commit": "8941dbd",
@@ -10,12 +10,12 @@
     "worktree": "D:\\CodeProjects\\coeva-lane-n",
     "branch": "release/wp14-production-cutover",
     "upstream_base": "8941dbd",
-    "release_commit": "557fe98945915a2d55c50256ac19f718a2606875",
+    "release_commit": "b4993e03a204ea73ea3cc2d1bd0b510fdafd2d40",
     "commit_message": "feat(memory-v2): complete staged production cutover"
   },
   "production_runtime_deployment": {
     "production_runtime_code_root": "D:\\CodeProjects\\coeva-lane-n",
-    "production_runtime_commit": "557fe98945915a2d55c50256ac19f718a2606875",
+    "production_runtime_commit": "b4993e03a204ea73ea3cc2d1bd0b510fdafd2d40",
     "production_launch_command": "powershell -NoProfile -Command \"Set-Location D:\\CodeProjects\\coeva-lane-n; & ..\\co-evolving-companion\\.venv\\Scripts\\python.exe run_companion.py\"",
     "production_data_root": "D:\\CodeProjects\\co-evolving-companion\\data",
     "production_db_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\companion_chronicle.db",
@@ -24,7 +24,62 @@
     "production_jsonl_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\raw_slices.jsonl",
     "production_chapters_absolute_path": "D:\\CodeProjects\\co-evolving-companion\\data\\chapters",
     "deployment_strategy": "Strategy A: Run production from validated release worktree explicitly bound to canonical production data root via src.core.paths.get_data_dir()",
-    "worktree_ambiguity_eliminated": true
+    "worktree_ambiguity_eliminated": true,
+    "full_companion_runtime_verification": {
+      "startup": "PASS",
+      "graceful_shutdown": "PASS",
+      "restart": "PASS",
+      "reconnect_same_v2_db": "PASS",
+      "no_v1_legacy_writer": "PASS",
+      "no_worktree_data_created": "PASS",
+      "selected_path": "v2",
+      "final_feature_flags": {
+        "memory_v2_storage": true,
+        "memory_v2_retrieval": true,
+        "memory_v2_consolidation": true,
+        "memory_v2_self_model": true,
+        "memory_v2_migration": false,
+        "memory_v2_backfill": false
+      }
+    }
+  },
+  "frozen_retrieval_benchmark_canonical": {
+    "parameters": {
+      "confidence_threshold": 0.16,
+      "lexical_weight": 0.6,
+      "surface_weight": 0.4,
+      "boosts": {
+        "relationship_rule": 0.3,
+        "past_episode": 0.25,
+        "project_tech": 0.15,
+        "historical_superseded": 0.2
+      }
+    },
+    "dev_set": {
+      "query_pass": "27/29",
+      "recall_at_3": "20/23",
+      "candidate_precision_at_3": "24/35",
+      "no_memory_correct": "7/8",
+      "false_recall": "1/29",
+      "forbidden_hits": 0,
+      "cross_project_violations": 0,
+      "privacy_violations": 0,
+      "supersession_violations": 0
+    },
+    "original_holdout": {
+      "query_pass": "15/15",
+      "recall_at_3": "10/10",
+      "candidate_precision_at_3": "12/15",
+      "no_memory_correct": "5/5",
+      "false_recall": "0/15",
+      "all_violations": 0
+    },
+    "holdout2": {
+      "query_pass": "12/12",
+      "recall_at_3": "6/6",
+      "no_memory_correct": "6/6",
+      "all_violations": 0
+    }
   },
   "cutover_results": {
     "status": "COMPLETED_SUCCESSFULLY",
@@ -34,8 +89,8 @@
     "pre_cutover_db_size_bytes": 44171264,
     "pre_v2_backup_sha256": "8b29f3c8714c1ae0ffc5db95a10e73cd299cf1ae74e01f5b8f402880a739df69",
     "pre_v2_backup_size_bytes": 44171264,
-    "final_canonical_v2_db_sha256": "f89d9404f97da19807a6da0c3b72e3a962bd0c98ceb3e29ecfeaeb3e673ad2d4",
-    "final_canonical_v2_db_size_bytes": 50376704,
+    "final_canonical_v2_db_sha256": "0976b3a67e6d538e727a2423c54799ab40e3febf05519fb2fa17d10efa94888a",
+    "final_canonical_v2_db_size_bytes": 50380800,
     "first_v2_ack_id": "slice_eb8fce0508cb485ea660d46987446388",
     "first_v2_ack_timestamp_utc": "2026-10-21T07:48:22.048328+00:00",
     "first_v2_ack_latency_ms": 4.64,
@@ -62,10 +117,6 @@
     "stage_10b": {
       "name": "Technical Retrieval + Recall Gate & Sanctuary Policy",
       "status": "PASS",
-      "dev_passed": "27/27",
-      "holdout_passed": "15/15",
-      "holdout2_passed": "12/12",
-      "precision_at_3": 0.8,
       "sanctuary_reflective_block": "PASS",
       "task_continuity": "PASS",
       "retrieved_ne_injected_ne_spoken": "PASS"

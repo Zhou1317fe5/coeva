@@ -15,6 +15,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
+from src.core.paths import get_llm_config_path, get_settings_path
 from src.core.personality import (
     PersonalityProfile,
     build_system_prompt,
@@ -27,7 +28,8 @@ DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "qwen2.5:3b"
 DEFAULT_TIMEOUT_SECONDS = 25.0
 MAX_REPLY_LENGTH = 32
-DEFAULT_LLM_CONFIG_PATH = Path("data") / "llm_config.json"
+
+DEFAULT_LLM_CONFIG_PATH = get_llm_config_path()
 
 PRESET_PROVIDERS: dict[str, dict[str, str]] = {
     "Ollama (本地)": {
@@ -81,6 +83,7 @@ class LLMConfig:
             max_tokens=int(data.get("max_tokens", 80)),
             custom_prompt_suffix=str(data.get("custom_prompt_suffix", "")).strip(),
         )
+
     @classmethod
     def load(cls, path: Path | None = None) -> LLMConfig:
         """Load LLM config from disk, falling back to defaults if missing or broken."""
@@ -102,7 +105,7 @@ class LLMConfig:
                     return cls.from_dict(data)
             except (json.JSONDecodeError, OSError):
                 pass
-        agent_settings_file = Path("data") / "agent_settings.json"
+        agent_settings_file = get_settings_path()
         if agent_settings_file.is_file():
             try:
                 as_data = json.loads(agent_settings_file.read_text(encoding="utf-8"))
@@ -301,15 +304,15 @@ class _GenerateRunnable(QRunnable):
                 self.config,
                 timeout_seconds=self.config.timeout_seconds,
             )
-            if reply:
-                self.signals.finished.emit(reply, self.context_tag)
-            else:
-                fallback_text = self.fallback_fn()
-                self.signals.finished.emit(fallback_text, self.context_tag)
+            out_text = reply if reply else self.fallback_fn()
         except Exception as err:
             logger.debug("LLM query failed (%s); using fallback.", err)
-            fallback_text = self.fallback_fn()
-            self.signals.finished.emit(fallback_text, self.context_tag)
+            out_text = self.fallback_fn()
+
+        try:
+            self.signals.finished.emit(out_text, self.context_tag)
+        except RuntimeError:
+            pass  # GUI window or signals object deleted during shutdown
 
 
 class CompanionAIEngine(QObject):

@@ -714,10 +714,55 @@ class V2ChronicleStoreAdapter:
         return []
 
     def list_hypotheses(self, *args: Any, **kwargs: Any) -> list[Any]:
-        return list(self.v2_store.list_hypotheses())
+        from src.core.hypotheses import (
+            ConfidenceLevel,
+            DevelopmentHypothesis,
+            DevelopmentLens,
+            HypothesisStatus,
+        )
+
+        status_kw = kwargs.get("status")
+        v2_hyps = self.v2_store.list_hypotheses()
+        out: list[DevelopmentHypothesis] = []
+        for h in v2_hyps:
+            # Parse lenses
+            lenses_list: list[DevelopmentLens] = []
+            for item in h.lenses.split(","):
+                item_clean = item.strip()
+                if item_clean:
+                    try:
+                        lenses_list.append(DevelopmentLens(item_clean))
+                    except ValueError:
+                        pass
+            try:
+                conf = ConfidenceLevel(h.confidence_class)
+            except ValueError:
+                conf = ConfidenceLevel.MODERATE
+            try:
+                st = HypothesisStatus(h.status)
+            except ValueError:
+                st = HypothesisStatus.CANDIDATE
+
+            if status_kw and st != status_kw:
+                continue
+
+            out.append(
+                DevelopmentHypothesis(
+                    hypothesis_id=h.hypothesis_id,
+                    statement=h.statement,
+                    lenses=tuple(lenses_list),
+                    supporting_patterns=(),
+                    supporting_episodes=(),
+                    counter_episodes=(),
+                    confidence=conf,
+                    status=st,
+                    created_at=h.created_at,
+                )
+            )
+        return out
 
     def list_insights(self, *args: Any, **kwargs: Any) -> list[Any]:
-        return list(self.v2_store.list_confirmed_insights())
+        return []
 
     def prune(self, *args: Any, **kwargs: Any) -> int:
         return 0
