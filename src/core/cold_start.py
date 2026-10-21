@@ -26,7 +26,9 @@ def read_or_create_first_seen(path: Path | None = None, *, today: date | None = 
     a hardcoded day_count=1 and reset_day() had no production caller, so
     allows_psychological_analysis was permanently False.
     """
-    resolved_path = path or DEFAULT_FIRST_SEEN_PATH
+    from src.core.paths import get_first_seen_path
+
+    resolved_path = path or get_first_seen_path()
     current = today or date.today()
 
     if resolved_path.is_file():

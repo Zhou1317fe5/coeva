@@ -53,6 +53,36 @@ CREATE VIEW IF NOT EXISTS legacy_events_view AS
     FROM event_skeletons;
 """
 
+# Engine-level fail-closed views for legacy runtime compatibility
+LEGACY_SLICES_COMPAT_VIEW_SQL = """
+CREATE VIEW IF NOT EXISTS slices AS
+    SELECT
+        slice_id AS id,
+        occurred_at AS timestamp,
+        actor,
+        source,
+        content,
+        'neutral' AS mood_flag,
+        created_at
+    FROM raw_slices;
+"""
+
+LEGACY_EVENTS_COMPAT_VIEW_SQL = """
+CREATE VIEW IF NOT EXISTS events AS
+    SELECT
+        event_id AS id,
+        occurred_at AS timestamp,
+        agent_id,
+        session_id,
+        event_type,
+        tool_name,
+        error_category AS error_message,
+        'agent_context' AS provenance,
+        retention_class,
+        created_at
+    FROM event_skeletons;
+"""
+
 
 class CompatibilityError(RuntimeError):
     """Base exception for legacy compatibility layer errors."""
@@ -171,10 +201,13 @@ def install_legacy_views(target: sqlite3.Connection | ChronicleStoreV2) -> None:
     Strict Invariant:
     Views are NOT canonical entities and do not change CANONICAL_TABLES.
     NO INSTEAD OF triggers are created.
+    Installs both WP-11 legacy_* views and fail-safe slices/events views.
     """
     conn = _unwrap_conn(target)
     conn.execute(LEGACY_SLICES_VIEW_SQL)
     conn.execute(LEGACY_EVENTS_VIEW_SQL)
+    conn.execute(LEGACY_SLICES_COMPAT_VIEW_SQL)
+    conn.execute(LEGACY_EVENTS_COMPAT_VIEW_SQL)
     conn.commit()
 
 
@@ -202,6 +235,8 @@ def drop_legacy_views(
     conn = _unwrap_conn(target)
     conn.execute("DROP VIEW IF EXISTS legacy_slices_view;")
     conn.execute("DROP VIEW IF EXISTS legacy_events_view;")
+    conn.execute("DROP VIEW IF EXISTS slices;")
+    conn.execute("DROP VIEW IF EXISTS events;")
     conn.commit()
 
 
@@ -569,3 +604,162 @@ class CompatibilityRetirementEvaluator:
             safe_to_drop=safe_to_drop,
             reasons_blocking_drop=tuple(reasons),
         )
+
+
+class V2ChronicleStoreAdapter:
+    """Read-only compatibility adapter for legacy UI/HTTP readers wrapping CompatibilityReader.
+
+    Adheres to WP-11:
+    - Compatibility reads work via legacy_slices_view and legacy_events_view.
+    - Canonical writes directly to legacy views are rejected (read-only).
+    - Exposes stats(), list_slices(), search_slices(), list_events(), search_events().
+    """
+
+    def __init__(
+        self,
+        v2_store: ChronicleStoreV2,
+        reader: CompatibilityReader | None = None,
+    ) -> None:
+        self.v2_store = v2_store
+        self.reader = reader or CompatibilityReader(v2_store)
+
+    def stats(self) -> dict[str, int]:
+        return {
+            "slices": self.reader.count_slices(),
+            "events": self.reader.count_events(),
+            "episodes": 0,
+            "hypotheses": len(self.v2_store.list_hypotheses()),
+            "insights": len(self.v2_store.list_confirmed_insights()),
+        }
+
+    def list_slices(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        mood: str | None = None,
+    ) -> list[Any]:
+        from src.memory.store import SliceRecord
+
+        legacy_records = self.reader.list_slices(limit=limit, offset=offset, mood=mood)
+        return [
+            SliceRecord(
+                id=r.id,
+                timestamp=r.timestamp,
+                actor=r.actor,
+                source=r.source,
+                content=r.content,
+                mood_flag=r.mood_flag,
+            )
+            for r in legacy_records
+        ]
+
+    def search_slices(self, keyword: str, *, limit: int = 20) -> list[Any]:
+        from src.memory.store import SliceRecord
+
+        conn = _unwrap_conn(self.v2_store)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, timestamp, actor, source, content, mood_flag, created_at "
+            "FROM legacy_slices_view WHERE content LIKE ? "
+            "ORDER BY timestamp DESC LIMIT ?;",
+            (f"%{keyword}%", limit),
+        )
+        records = []
+        for row in cursor.fetchall():
+            records.append(
+                SliceRecord(
+                    id=str(row[0]),
+                    timestamp=str(row[1]),
+                    actor=str(row[2]),
+                    source=str(row[3]),
+                    content=str(row[4]),
+                    mood_flag=str(row[5]),
+                )
+            )
+        return records
+
+    def search_events(self, keyword: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        conn = _unwrap_conn(self.v2_store)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, timestamp, agent_id, session_id, event_type, tool_name, "
+            "error_message, provenance, retention_class, created_at "
+            "FROM legacy_events_view WHERE tool_name LIKE ? OR event_type LIKE ? "
+            "ORDER BY timestamp DESC LIMIT ?;",
+            (f"%{keyword}%", f"%{keyword}%", limit),
+        )
+        results = []
+        for row in cursor.fetchall():
+            results.append(
+                {
+                    "id": str(row[0]),
+                    "timestamp": str(row[1]),
+                    "agent_id": str(row[2]),
+                    "session_id": str(row[3]),
+                    "event_type": str(row[4]),
+                    "tool_name": str(row[5]),
+                    "error_message": str(row[6]),
+                    "provenance": str(row[7]),
+                    "retention_class": str(row[8]),
+                    "created_at": str(row[9]),
+                }
+            )
+        return results
+
+    def list_evidence(self, *args: Any, **kwargs: Any) -> list[Any]:
+        return []
+
+    def list_episodes(self, *args: Any, **kwargs: Any) -> list[Any]:
+        return []
+
+    def list_hypotheses(self, *args: Any, **kwargs: Any) -> list[Any]:
+        return list(self.v2_store.list_hypotheses())
+
+    def list_insights(self, *args: Any, **kwargs: Any) -> list[Any]:
+        return list(self.v2_store.list_confirmed_insights())
+
+    def prune(self, *args: Any, **kwargs: Any) -> int:
+        return 0
+
+    def close(self) -> None:
+        pass
+
+    # Reject direct writes to compatibility layer
+    def record_slice(self, *args: Any, **kwargs: Any) -> None:
+        raise sqlite3.OperationalError("cannot modify legacy_slices_view because it is a view")
+
+    def record_event(self, *args: Any, **kwargs: Any) -> bool:
+        raise sqlite3.OperationalError("cannot modify legacy_events_view because it is a view")
+
+    def save_hypothesis(self, *args: Any, **kwargs: Any) -> None:
+        raise sqlite3.OperationalError("cannot modify legacy hypotheses via compatibility view")
+
+    def save_insight(self, *args: Any, **kwargs: Any) -> None:
+        raise sqlite3.OperationalError("cannot modify legacy insights via compatibility view")
+
+
+class V2EventStoreAdapter:
+    """Directs AgentEvent from LocalEventBus to V2 RawEvidenceWriteService."""
+
+    def __init__(self, write_service: Any) -> None:
+        self._service = write_service
+
+    def record_event(self, event: Any) -> bool:
+        from src.memory.v2.write_service import WriteEventCommand
+
+        event_type_str = (
+            event.event_type.value if hasattr(event.event_type, "value") else str(event.event_type)
+        )
+        cmd = WriteEventCommand(
+            agent_id=str(event.agent_id),
+            session_id=str(event.session_id),
+            event_type=event_type_str,
+            occurred_at=str(event.timestamp) if hasattr(event, "timestamp") else None,
+            tool_name=str(getattr(event, "tool_name", "") or ""),
+            error_category=str(getattr(event, "error_message", "") or "")[:100],
+            retention_class="transient",
+            event_id=str(getattr(event, "id", None) or ""),
+        )
+        res = self._service.write_event(cmd)
+        return bool(res.was_persisted)

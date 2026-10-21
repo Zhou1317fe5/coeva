@@ -21,6 +21,16 @@ _FALSE_VALUES = frozenset({"0", "false", "no", "off", "disabled", ""})
 # Stage 0 default: zero V2 runtime capabilities are implemented
 STAGE_0_CAPABILITIES: frozenset[str] = frozenset()
 
+# Approved production capabilities available for V2 runtime routing
+PRODUCTION_V2_CAPABILITIES: frozenset[str] = frozenset(
+    {
+        "storage_v2",
+        "retrieval_v2",
+        "consolidation_v2",
+        "self_model_v2",
+    }
+)
+
 
 class InvalidFlagConfigurationError(ValueError):
     """Raised when an illegal or unsupported combination of feature flags is configured (I-S05)."""

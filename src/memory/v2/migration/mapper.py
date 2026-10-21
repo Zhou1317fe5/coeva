@@ -392,6 +392,7 @@ def build_v2_shadow_db(
                 """,
                 (now_iso, now_iso),
             )
+            dest_conn.execute("PRAGMA user_version = 20261018;")
             dest_conn.commit()
 
         finally:

@@ -129,11 +129,28 @@ class ChronicleStore:
     """Owns the Chronicle SQLite database: writes, queries and decay."""
 
     def __init__(self, db_path: Path | None = None) -> None:
-        self.db_path = db_path or DEFAULT_DB_PATH
+        from src.core.paths import get_db_path
+
+        self.db_path = db_path or get_db_path()
         if str(self.db_path) != ":memory:":
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+
+        # Startup Version Guard: Fail-Closed if DB has been migrated to Memory V2.1+
+        cur = self._conn.cursor()
+        cur.execute("PRAGMA user_version;")
+        v_row = cur.fetchone()
+        cur_version = int(v_row[0]) if v_row and v_row[0] is not None else 0
+        if cur_version >= 20261018:
+            self._conn.close()
+            raise RuntimeError(
+                f"Database at '{self.db_path}' has user_version={cur_version} "
+                "(Memory V2.1 canonical). "
+                "Legacy V1 ChronicleStore cannot write to Memory V2 database (FAIL-CLOSED). "
+                "Please run with Memory V2 runtime."
+            )
+
         # WAL keeps the telemetry writer from blocking reader queries (SPEC section 10.2).
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)

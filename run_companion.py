@@ -13,6 +13,15 @@ from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from src.core.paths import (
+    get_body_position_path,
+    get_chapters_dir,
+    get_data_dir,
+    get_db_path,
+    get_first_seen_path,
+    get_jsonl_path,
+    get_settings_path,
+)
 from src.body.chronicle_window import ChronicleViewerWindow
 from src.body.contracts import PetState
 from src.body.controller import BodyController
@@ -25,8 +34,29 @@ from src.connectors.hermes_connector import HermesConnector
 from src.connectors.hook_manager import AgentHookManager
 from src.connectors.http_server import CompanionHttpServer
 from src.connectors.settings import AgentSettingsStore
-from src.core.flags import validate_memory_v2_configuration
+from src.core.flags import (
+    PRODUCTION_V2_CAPABILITIES,
+    resolve_flags,
+    validate_memory_v2_configuration,
+)
 from src.core.cold_start import ColdStartPolicy
+from src.memory.v2.chapter import ChapterRepository
+from src.memory.v2.compatibility import (
+    CompatibilityReader,
+    V2ChronicleStoreAdapter,
+    V2EventStoreAdapter,
+)
+from src.memory.v2.consolidation_scheduler import ConsolidationScheduler
+from src.memory.v2.jsonl_export import JsonlSliceExporter
+from src.memory.v2.recall_gate import RecallContext, RecallGate
+from src.memory.v2.retrieval.config import RetrievalConfig
+from src.memory.v2.retrieval.models import RetrievalQueryContext
+from src.memory.v2.retrieval.pipeline import TechnicalRetrievalPipeline
+from src.memory.v2.retrieval.repository import RetrievalRepository
+from src.memory.v2.router import RawEvidenceRouter
+from src.memory.v2.self_model import SlowPathSelfModelService
+from src.memory.v2.store import ChronicleStoreV2
+from src.memory.v2.write_service import RawEvidenceWriteService, WriteSliceCommand
 from src.core.intervention import InterventionPolicy
 from src.core.llm_client import CompanionAIEngine, LLMConfig
 from src.core.personality import load_personality
@@ -50,7 +80,12 @@ _IN_FLIGHT_COOLDOWN_SECONDS = 30.0
 class CompanionApp:
     """Orchestrates Desktop Pet Body, Slice Feeder, and Growth Core in one process."""
 
-    def __init__(self) -> None:
+    def __init__(self, data_dir: Path | str | None = None) -> None:
+        # Guarantee current checkout is top-priority in sys.path
+        repo_root = Path(__file__).parent.resolve()
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+
         existing_app = QApplication.instance()
         if isinstance(existing_app, QApplication):
             self.app = existing_app
@@ -58,9 +93,19 @@ class CompanionApp:
             self.app = QApplication(sys.argv)
         self.app.setQuitOnLastWindowClosed(False)
 
-        # 0. Multi-Agent & Companion Settings
-        self.agent_settings = AgentSettingsStore()
-        self.memory_v2_diag = validate_memory_v2_configuration(self.agent_settings.memory_v2_flags)
+        # 0. Multi-Agent & Companion Settings (Unambiguous Data Root)
+        self.data_dir = get_data_dir(data_dir)
+        settings_path = get_settings_path(self.data_dir)
+        db_path = get_db_path(self.data_dir)
+        jsonl_path = get_jsonl_path(self.data_dir)
+        chapters_dir = get_chapters_dir(self.data_dir)
+
+        self.agent_settings = AgentSettingsStore(file_path=settings_path)
+        self.flags = resolve_flags(self.agent_settings.to_dict())
+        self.memory_v2_diag = validate_memory_v2_configuration(
+            self.flags,
+            capabilities=PRODUCTION_V2_CAPABILITIES,
+        )
         self.hook_manager = AgentHookManager()
         self.settings_window = SettingsWindow(self.agent_settings, self.hook_manager)
         self.settings_window.pet_changed.connect(self._on_pet_changed)
@@ -76,18 +121,90 @@ class CompanionApp:
             assets_dir = Path("assets") / "pets" / "vasu"
         if not assets_dir.is_dir():
             assets_dir = Path("assets") / "pets" / "calico"
-        self.window = PetWindow(assets_dir)
+        self.window = PetWindow(
+            assets_dir,
+            position_config_path=get_body_position_path(self.data_dir),
+        )
         self.window._suppress_default_feedback = True
         self.personality = load_personality(assets_dir)
         self.ai_engine = CompanionAIEngine(config=self.agent_settings.llm_config)
         self.ai_engine.reply_ready.connect(self._on_ai_reply_ready)
         self.controller = BodyController(self.window)
 
-        # 2. Slice Feeder & Chronicle Store
-        self.store = SliceStore(Path("data") / "raw_slices.jsonl")
-        self.chronicle = ChronicleStore()
-        self.chronicle.import_slices_jsonl()
-        self.retriever = MemoryRetriever(self.chronicle)
+        # 2. Slice Feeder & Chronicle Store (Storage & Retrieval Routing)
+        self.store = SliceStore(jsonl_path)
+
+        if self.flags.memory_v2_storage:
+            self.v2_store: ChronicleStoreV2 | None = ChronicleStoreV2(db_path)
+            self.exporter: JsonlSliceExporter | None = JsonlSliceExporter(jsonl_path)
+            self.write_service: RawEvidenceWriteService | None = RawEvidenceWriteService(
+                self.v2_store, exporter=self.exporter
+            )
+            self.router = RawEvidenceRouter(
+                flags=self.flags,
+                v1_store=None,
+                v2_service=self.write_service,
+            )
+            self.compat_reader = CompatibilityReader(self.v2_store)
+            self.chronicle: Any = V2ChronicleStoreAdapter(self.v2_store, self.compat_reader)
+        else:
+            self.v2_store = None
+            self.exporter = None
+            self.write_service = None
+            self.router = RawEvidenceRouter(
+                flags=self.flags,
+                v1_store=None,
+                v2_service=None,
+            )
+            self.chronicle = ChronicleStore(db_path)
+            self.chronicle.import_slices_jsonl()
+
+        # WP-7 & WP-8: Retrieval & Recall Gate
+        if self.flags.memory_v2_retrieval and self.v2_store is not None:
+            self.retrieval_repo: RetrievalRepository | None = RetrievalRepository(db_path)
+            retrieval_cfg = RetrievalConfig(
+                lexical_weight=0.6,
+                surface_weight=0.4,
+                confidence_threshold=0.16,
+                rule_intent_boost=0.30,
+                past_episode_boost=0.25,
+                project_tech_boost=0.15,
+                historical_superseded_boost=0.20,
+                top_k=3,
+            )
+            self.retrieval_pipeline: TechnicalRetrievalPipeline | None = TechnicalRetrievalPipeline(
+                self.retrieval_repo, config=retrieval_cfg
+            )
+            self.recall_gate: RecallGate | None = RecallGate(self.retrieval_pipeline)
+            self.retriever: MemoryRetriever | None = None
+        else:
+            self.retrieval_repo = None
+            self.retrieval_pipeline = None
+            self.recall_gate = None
+            self.retriever = MemoryRetriever(self.chronicle)
+
+        # WP-5: Consolidation Scheduler
+        if self.flags.memory_v2_consolidation and self.v2_store is not None:
+            self.consolidation_scheduler: ConsolidationScheduler | None = ConsolidationScheduler(
+                store=self.v2_store,
+                db_path=db_path,
+            )
+            self.consolidation_scheduler.start()
+        else:
+            self.consolidation_scheduler = None
+
+        # WP-6 / WP-9: Self-Model Slow Path & Chapter Repository
+        if self.flags.memory_v2_self_model and self.v2_store is not None:
+            self.self_model_service: SlowPathSelfModelService | None = SlowPathSelfModelService(
+                self.v2_store
+            )
+            self.chapter_repo: ChapterRepository | None = ChapterRepository(
+                self.v2_store, chapters_dir=chapters_dir
+            )
+        else:
+            self.self_model_service = None
+            self.chapter_repo = None
+
         self.chronicle_window = ChronicleViewerWindow(self.chronicle)
         self.overlay = self.window.feeder_bar
         self.window.slice_fed.connect(self._on_slice_submitted)
@@ -112,9 +229,14 @@ class CompanionApp:
         # Control Plane is decoupled: agent events NEVER directly drive pet body state,
         # preventing state thrashing and multi-agent posture collisions (AGENTS.md section 4).
         self._last_agent_active_at: datetime | None = None
+        event_sink = (
+            V2EventStoreAdapter(self.write_service)
+            if (self.flags.memory_v2_storage and self.write_service is not None)
+            else self.chronicle
+        )
         self.bus = LocalEventBus(
             on_event_received=self._on_agent_event_received,
-            store=self.chronicle,
+            store=event_sink,
         )
         self.hermes = HermesConnector(self.bus)
 
@@ -174,7 +296,8 @@ class CompanionApp:
     def _run_prune(self) -> None:
         """Drop transient events past the retention TTL. Never touches durable rows."""
         try:
-            self.chronicle.prune()
+            if hasattr(self, "chronicle") and hasattr(self.chronicle, "prune"):
+                self.chronicle.prune()
         except sqlite3.Error:
             # A locked database must not take the companion down; retry next interval.
             pass
@@ -272,6 +395,7 @@ class CompanionApp:
             ("🦦 Vasu (官方默认 · 小河獭)", "vasu"),
             ("🐱 Calico (三花小猫)", "calico"),
         ]
+
         def _make_switcher(pid: str) -> Callable[[], None]:
             def _switch() -> None:
                 self.agent_settings.set_selected_pet(pid)
@@ -344,14 +468,19 @@ class CompanionApp:
             for k in self.window._loaded_sheets
             if not k.endswith("-flipped")
             and not k.startswith("react-")
-            and k not in (
-                "wave", "work", "think", "sleep", "yawn", "poke", "drag", "jump", "failed"
-            )
+            and k
+            not in ("wave", "work", "think", "sleep", "yawn", "poke", "drag", "jump", "failed")
         ]
         # Ensure standard actions are present if in loaded sheets
         standard_candidates = (
-            "review", "waiting", "running", "running-right", "running-left",
-            "waving", "jumping", "failed",
+            "review",
+            "waiting",
+            "running",
+            "running-right",
+            "running-left",
+            "waving",
+            "jumping",
+            "failed",
         )
         for std in standard_candidates:
             if std in self.window._loaded_sheets and std not in clean_actions:
@@ -390,6 +519,7 @@ class CompanionApp:
             menu.addSeparator()
             sim_menu = menu.addMenu("开发者调试")
             sim_menu.setStyleSheet(menu.styleSheet())
+
             def _sim_prompt() -> None:
                 self.hermes.on_user_prompt("demo_session")
                 self.controller.say("🤔 思考中：正在分析你的问题...", ttl_ms=3000)
@@ -474,9 +604,38 @@ class CompanionApp:
         limit: int = 3,
         exclude_ids: set[str] | None = None,
     ) -> tuple[str, ...]:
-        """Extract relevant past memory snippets from ChronicleStore using MemoryRetriever."""
+        """Extract relevant past memory snippets from ChronicleStore using MemoryRetriever or V2 Pipeline."""
+        if (
+            hasattr(self, "flags")
+            and getattr(self.flags, "memory_v2_retrieval", False)
+            and getattr(self, "recall_gate", None) is not None
+            and getattr(self, "retrieval_pipeline", None) is not None
+        ):
+            from datetime import UTC, datetime
+
+            from src.memory.v2.recall_gate import RecallContext
+            from src.memory.v2.retrieval.models import RetrievalQueryContext
+
+            q_ctx = RetrievalQueryContext(
+                query_text=text,
+                sanctuary_active=getattr(self.guard, "is_active", False),
+                now=datetime.now(UTC),
+            )
+            retrieval_res = self.retrieval_pipeline.retrieve(q_ctx)
+            recall_ctx = RecallContext(
+                query_text=text,
+                sanctuary_active=getattr(self.guard, "is_active", False),
+                now=datetime.now(UTC),
+                store=getattr(self, "v2_store", None),
+            )
+            decision = self.recall_gate.evaluate(retrieval_res, recall_ctx)
+            return tuple(item.statement for item in decision.injection_context.items)
+
         if not hasattr(self, "retriever") or self.retriever is None:
-            self.retriever = MemoryRetriever(self.chronicle)
+            if hasattr(self, "chronicle") and self.chronicle is not None:
+                self.retriever = MemoryRetriever(self.chronicle)
+            else:
+                return ()
         return self.retriever.recall(text, limit=limit, exclude_ids=exclude_ids)
 
     def _on_user_reply_to_bubble(self, reply_text: str, orig_pet_speech: str) -> None:
@@ -485,26 +644,34 @@ class CompanionApp:
         mood = "frustrated" if is_distressed else "neutral"
 
         # 1. Save to chronicle
-        slice_item = RawSlice.create(reply_text, mood_flag=mood)
-        self.store.save(slice_item)
-        self.chronicle.record_slice(
-            SliceRecord(
-                id=slice_item.id,
-                timestamp=slice_item.timestamp,
-                content=slice_item.content,
-                mood_flag=slice_item.mood_flag,
+        if hasattr(self, "write_service") and self.write_service is not None:
+            write_res = self.write_service.write_slice(
+                WriteSliceCommand(
+                    content=reply_text,
+                    source="manual_feed",
+                    scope="unresolved",
+                )
             )
-        )
+            exclude_ids = {write_res.entity.slice_id}
+        else:
+            slice_item = RawSlice.create(reply_text, mood_flag=mood)
+            self.store.save(slice_item)
+            self.chronicle.record_slice(
+                SliceRecord(
+                    id=slice_item.id,
+                    timestamp=slice_item.timestamp,
+                    content=slice_item.content,
+                    mood_flag=slice_item.mood_flag,
+                )
+            )
+            exclude_ids = {slice_item.id}
 
         # 2. Asynchronous reply with full two-way dialogue context
-        memories = self._recall_memories(
-            reply_text, limit=3, exclude_ids={slice_item.id}
-        )
+        memories = self._recall_memories(reply_text, limit=3, exclude_ids=exclude_ids)
         if is_distressed:
             self.controller.perform_action("rest")
             prompt_ctx = (
-                f"伴生体刚才对用户说：'{orig_pet_speech}'\n"
-                f"用户心烦或受挫并回答：'{reply_text}'"
+                f"伴生体刚才对用户说：'{orig_pet_speech}'\n用户心烦或受挫并回答：'{reply_text}'"
             )
             self.ai_engine.request_reply(
                 prompt_ctx,
@@ -515,10 +682,7 @@ class CompanionApp:
             )
         else:
             self.controller.perform_action("jump")
-            prompt_ctx = (
-                f"伴生体刚才对用户说：'{orig_pet_speech}'\n"
-                f"用户回答道：'{reply_text}'"
-            )
+            prompt_ctx = f"伴生体刚才对用户说：'{orig_pet_speech}'\n用户回答道：'{reply_text}'"
             self.ai_engine.request_reply(
                 prompt_ctx,
                 self.personality,
@@ -542,27 +706,37 @@ class CompanionApp:
                 category="poke",
                 context_tag="poke",
             )
+
     def _on_slice_submitted(self, text: str) -> None:
         """Handle incoming slice from overlay."""
         is_distressed = self.guard.evaluate_text(text)
         mood = "frustrated" if is_distressed else "neutral"
 
         # 1. Save to disk
-        slice_item = RawSlice.create(text, mood_flag=mood)
-        self.store.save(slice_item)
-        self.chronicle.record_slice(
-            SliceRecord(
-                id=slice_item.id,
-                timestamp=slice_item.timestamp,
-                content=slice_item.content,
-                mood_flag=slice_item.mood_flag,
+        if hasattr(self, "write_service") and self.write_service is not None:
+            write_res = self.write_service.write_slice(
+                WriteSliceCommand(
+                    content=text,
+                    source="manual_feed",
+                    scope="unresolved",
+                )
             )
-        )
+            exclude_ids = {write_res.entity.slice_id}
+        else:
+            slice_item = RawSlice.create(text, mood_flag=mood)
+            self.store.save(slice_item)
+            self.chronicle.record_slice(
+                SliceRecord(
+                    id=slice_item.id,
+                    timestamp=slice_item.timestamp,
+                    content=slice_item.content,
+                    mood_flag=slice_item.mood_flag,
+                )
+            )
+            exclude_ids = {slice_item.id}
 
         # 2. Check Sanctuary mode
-        memories = self._recall_memories(
-            text, limit=3, exclude_ids={slice_item.id}
-        )
+        memories = self._recall_memories(text, limit=3, exclude_ids=exclude_ids)
         if is_distressed:
             # AC-4: Enter Sanctuary mode with a gentle, non-preaching acknowledgment bubble
             self.controller.perform_action("rest")
@@ -593,6 +767,7 @@ class CompanionApp:
                 context_tag="slice_normal",
                 memories=memories,
             )
+
     def _open_settings(self) -> None:
         """Open the modern multi-agent and companion settings window."""
         self.settings_window.refresh_agents()
@@ -624,6 +799,21 @@ class CompanionApp:
             self.controller.say(f"伴生体已切换为 {display_name}")
 
     def _on_quit(self) -> None:
+        if getattr(self, "consolidation_scheduler", None) is not None:
+            try:
+                self.consolidation_scheduler.stop()
+            except Exception:
+                pass
+        if getattr(self, "retrieval_repo", None) is not None:
+            try:
+                self.retrieval_repo.close()
+            except Exception:
+                pass
+        if getattr(self, "v2_store", None) is not None:
+            try:
+                self.v2_store.close()
+            except Exception:
+                pass
         try:
             self.hotkey.stop()
         except Exception:
@@ -654,8 +844,18 @@ class CompanionApp:
         return self.app.exec()
 
 
-def main() -> int:
-    companion = CompanionApp()
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Coeva Co-evolving AI Companion")
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=None,
+        help="Explicit production data directory (overrides default/env)",
+    )
+    args, _ = parser.parse_known_args(argv)
+    companion = CompanionApp(data_dir=args.data_dir)
     return companion.run()
 
 
