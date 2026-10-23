@@ -14,15 +14,6 @@ from PySide6.QtCore import QPoint, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from src.core.paths import (
-    get_body_position_path,
-    get_chapters_dir,
-    get_data_dir,
-    get_db_path,
-    get_first_seen_path,
-    get_jsonl_path,
-    get_settings_path,
-)
 from src.body.chronicle_window import ChronicleViewerWindow
 from src.body.contracts import PetState
 from src.body.controller import BodyController
@@ -35,12 +26,29 @@ from src.connectors.hermes_connector import HermesConnector
 from src.connectors.hook_manager import AgentHookManager
 from src.connectors.http_server import CompanionHttpServer
 from src.connectors.settings import AgentSettingsStore
+from src.core.cold_start import ColdStartPolicy
 from src.core.flags import (
     PRODUCTION_V2_CAPABILITIES,
-    resolve_flags,
     validate_memory_v2_configuration,
 )
-from src.core.cold_start import ColdStartPolicy
+from src.core.intervention import InterventionPolicy
+from src.core.llm_client import CompanionAIEngine, LLMConfig
+from src.core.paths import (
+    get_body_position_path,
+    get_chapters_dir,
+    get_data_dir,
+    get_db_path,
+    get_jsonl_path,
+    get_settings_path,
+)
+from src.core.personality import load_personality
+from src.core.sanctuary import SanctuaryGuard
+from src.core.state_watcher import StateWatcher
+from src.feeder.contracts import RawSlice
+from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, GlobalHotkeyListener, hotkey_display
+from src.feeder.storage import SliceStore
+from src.memory.retriever import MemoryRetriever
+from src.memory.store import ChronicleStore, SliceRecord
 from src.memory.v2.backfill import BackgroundBackfillEngine
 from src.memory.v2.chapter import ChapterRepository
 from src.memory.v2.compatibility import (
@@ -50,25 +58,14 @@ from src.memory.v2.compatibility import (
 )
 from src.memory.v2.consolidation_scheduler import ConsolidationScheduler
 from src.memory.v2.jsonl_export import JsonlSliceExporter
-from src.memory.v2.recall_gate import RecallContext, RecallGate
+from src.memory.v2.recall_gate import RecallGate
 from src.memory.v2.retrieval.config import RetrievalConfig
-from src.memory.v2.retrieval.models import RetrievalQueryContext
 from src.memory.v2.retrieval.pipeline import TechnicalRetrievalPipeline
 from src.memory.v2.retrieval.repository import RetrievalRepository
 from src.memory.v2.router import RawEvidenceRouter
 from src.memory.v2.self_model import SlowPathSelfModelService
 from src.memory.v2.store import ChronicleStoreV2
 from src.memory.v2.write_service import RawEvidenceWriteService, WriteSliceCommand
-from src.core.intervention import InterventionPolicy
-from src.core.llm_client import CompanionAIEngine, LLMConfig
-from src.core.personality import load_personality
-from src.core.sanctuary import SanctuaryGuard
-from src.core.state_watcher import StateWatcher
-from src.feeder.contracts import RawSlice
-from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY, GlobalHotkeyListener, hotkey_display
-from src.feeder.storage import SliceStore
-from src.memory.retriever import MemoryRetriever
-from src.memory.store import ChronicleStore, SliceRecord
 
 # Evidence decay runs at startup and once a day thereafter.
 _PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000
@@ -623,7 +620,7 @@ class CompanionApp:
         limit: int = 3,
         exclude_ids: set[str] | None = None,
     ) -> tuple[str, ...]:
-        """Extract relevant past memory snippets from ChronicleStore using MemoryRetriever or V2 Pipeline."""
+        """Extract relevant past memory snippets from ChronicleStore via MemoryRetriever or V2."""
         if (
             hasattr(self, "flags")
             and getattr(self.flags, "memory_v2_retrieval", False)
@@ -826,7 +823,10 @@ class CompanionApp:
                 self.backfill_engine.stop()
             except Exception:
                 pass
-        if getattr(self, "consolidation_scheduler", None) is not None and self.consolidation_scheduler is not None:
+        if (
+            getattr(self, "consolidation_scheduler", None) is not None
+            and self.consolidation_scheduler is not None
+        ):
             try:
                 self.consolidation_scheduler.stop()
             except Exception:
