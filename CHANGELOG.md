@@ -6,6 +6,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] - Phase 2.5 WP-6: Circadian & Context Modulation
+
+### 🌗 Phase 2.5 WP-6: Circadian & Context Modulation（环境情境调制层）
+- **建立 Context Modulation 规范 (`docs/specs/phase-2.5-autonomous-life/WP-6-SPEC.md)`**：
+  - 确立「Context ≠ Direct Body Command」铁律：Circadian / StateWatcher / Sanctuary 仅产出只读倾向数据，彻底切断环境代码直呼 `set_state()` 的旁路隐患；
+  - 规范 6 大昼夜区间（`NIGHT_SLEEP` / `MORNING_WAKE` / `MORNING_WORK` / `MIDDAY_SIESTA` / `AFTERNOON_FOCUS` / `EVENING_LEISURE`）调制矩阵；
+  - 规范确定性正交组合法则：乘数相乘并安全限幅（silence `[0.3, 5.0]`、category `[0.0, 3.0]`），类别限制取保守交集，静默永远合法；
+  - 规范自主 SLEEP 边界（P1_AUTONOMOUS + UNPROTECTED，可被交互自然打断，绝不授予 PROTECTED_SLEEP）与 Confirmed-Only 洞察防护（偏置严格有界 `[0.85, 1.2]`）。
+- **实现强类型纯领域调制模块 (`src/core/behavior/context.py`)**：
+  - `LifeContext`：只读运行时环境快照（昼夜相位、Agent 活跃、避风港、停靠、投喂/气泡、已确认洞察）；
+  - `ContextModulator.modulate()`：纯函数编译 `LifeContext` → `SchedulerModulation`，基准 `SchedulerConfig` 保持绝对不可变；
+  - 覆盖 Agent Active 低扰动伴读、Sanctuary 高能动作全禁、Mini Mode 停靠禁 MOVE、Feeder/Bubble 输入静默、洞察关键词微偏置。
+- **Life Scheduler 情境接入 (`src/core/behavior/scheduler.py`)**：
+  - `consider()` 新增 `context` 参数，动态应用静默偏置、类别乘数、允许类别交集与 `allow_autonomous_sleep` 候选扩展。
+- **表现层快照聚合与 Sanctuary 接线 (`src/body/window.py` + `run_companion.py`)**：
+  - `_start_autonomous_routine()` 每轮考虑前构建实时 `LifeContext` 快照（昼夜相位、Agent 活跃、停靠、投喂/气泡）；
+  - 新增 `notify_sanctuary_state()` 只读通知通道，`run_companion.py` 在两处 `SanctuaryGuard.evaluate_text()` 状态变更点同步避风港标志，修复调制规则在生产运行时永不触发的接线缺口。
+- **新增 WP-6 专用测试套件 (`tests/test_context_modulation.py`)**：
+  - 12 项测试覆盖无 Context 基线、6 大昼夜区间、Vasu/Calico 晚间睡眠跨宠物对比（Calico 真入睡、Vasu 诚实降级 IDLE）、Agent Active、Sanctuary 高能全禁、Mini Mode/Feeder 禁 MOVE、多上下文正交组合限幅、Confirmed-Only 洞察安全（Candidate/Rejected 零影响）、优先级不提升、PROTECTED_SLEEP 不可被自主考虑打断与架构零 Body 调用扫描；
+  - 新增窗口级 Sanctuary 快照接线测试 (`tests/test_body.py`)，并以确定性调度器替身根治 `test_autonomous_life_routine_and_nap_waking` 概率性静默导致的 flaky 失败。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-5: Life Scheduler & Silence-First Autonomous Cadence
+
+### ⏳ Phase 2.5 WP-5: Life Scheduler & Silence-First Autonomous Cadence（轻量自主生命调度器）
+- **建立统一 Life Scheduler 规范 (`docs/specs/phase-2.5-autonomous-life/WP-5-SPEC.md`)**：
+  - 确立“静默在场优先（Silence First）”原则，将静默决策设为最高权重（3.5），强制动作后最小静默窗口（10 秒）；
+  - 规范自主行为类别范围，严格限定在 `OBSERVE`, `WORK`, `REST`, `PLAY`, `MOVE` 五大基础类别，不产生社交与事件响应动作；
+  - 规范反重复策略（禁止连续相同类别、限制高频位移）与不可变 `SchedulerConfig`；
+  - 规范内存易失 `BehaviorHistory` 与确定性测试（支持外部 Clock 与随机数生成器注入）。
+- **实现强类型纯领域调度模块 (`src/core/behavior/scheduler.py`)**：
+  - `LifeScheduler`：负责在无人交互时产生通用 `BehaviorIntent` 或 `None`（Silence），源码 100% 零宠物名称与动作硬编码；
+  - `SchedulerConfig`：时间范围与类别权重配置模型；
+  - `AutonomousHistoryEntry`：内存轻量行为记录。
+- **表现层旧系统改造与 Vasu 生命阻断破除 (`src/body/window.py`)**：
+  - 彻底删除 `window.py` 内部硬编码的 `work_activities` 动作名列表（如 `review`, `working-typing`, `waiting` 等）；
+  - 彻底移除 `if self._native_idle_frames is not None: return` 守卫，使得 Vasu 在维持高精原画与微眨眼的同时，也拥有偶尔自主观察与思考的生动律动；
+  - `_autonomous_timer` 统一由 `LifeScheduler.consider()` 驱动，动作完成后平滑 settle 回 Native Idle。
+- **新增 WP-5 专用测试套件 (`tests/test_life_scheduler.py`)**：
+  - 10 项测试覆盖静默窗口、随机种子确定性、反重复抑制、位移限频、繁忙拦截、Vasu/Calico 跨宠物调度、无持久历史依赖与架构零污染扫描；
+  - 全量 116 项测试 100% 通过。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-4: Behavior Arbiter & Interruption Safety
+
+### ⚖️ Phase 2.5 WP-4: Behavior Arbiter & Interruption Safety（统一行为仲裁器与时序保护）
+- **建立统一 Behavior Arbiter 规范 (`docs/specs/phase-2.5-autonomous-life/WP-4-SPEC.md`)**：
+  - 规范控制平面唯一准入仲裁中枢，彻底消除 `timer -> set_state()` 与后发覆盖（Last-Write-Wins）；
+  - 制定 5 级清晰语义优先级（`P4_EXPLICIT_USER`, `P3_SAFETY`, `P2_DIRECT_INTERACTION`, `P1_AUTONOMOUS`, `P0_AMBIENT`）；
+  - 制定 `PROTECTED_SLEEP` 保护态（防止光标掠过或猫打盹定时器破坏免打扰休眠）与 `complete(request_id)` 过期定时器防护规则；
+  - 规范单层挂起与恢复契约（`ArbiterAction.RESUME`）与无挂起时平滑 settle 到 IDLE。
+- **实现强类型纯领域仲裁模块 (`src/core/behavior/arbiter.py`)**：
+  - `BehaviorArbiter`：集中管理活跃状态、挂起状态、集中式冷却键集合与环形转换追踪（Trace）；
+  - `BehaviorRequest` & `BehaviorDecision`：强类型不可变请求与裁决报告；
+  - 源码绝对零宠物专属名称侵入，且 Arbiter 本身不主动生成自主行为。
+- **表现层核心时序接管 (`src/body/window.py`)**：
+  - 接管鼠标拖拽（P4）、显式休眠（P4+PROTECTED_SLEEP）、显式唤醒（P4）、光标悬停（P2+cooldown）、切片投喂（P3）与轻戳反应；
+  - 将波浪与跳跃定时器接入完成闭环，过期旧定时器（Stale Timer）安全空转（`NO_OP`），根治状态踩踏。
+- **全量冲突回归与套件测试 (`tests/test_behavior_arbiter.py`)**：
+  - 11 项涵盖 12 核心冲突场景（休眠防破坏、拖拽抢占、旧定时器失效、冷却拦截、恢复挂起等）测试全部通过；
+  - 全量 106 项关联测试持续 100% 通过。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-3: Activity Registry & Fallback Resolution
+
+### 🗂️ Phase 2.5 WP-3: Activity Registry & Fallback Resolution（活动注册表与动态降级解析器）
+- **建立 Activity Registry 与 Fallback 规范 (`docs/specs/phase-2.5-autonomous-life/WP-3-SPEC.md`)**：
+  - 规范纯领域无副作用的 `ActivityRegistry` 与强类型 `ActivityResolution` 契约结构；
+  - 严格复用 WP-0 `SEMANTIC_FALLBACK_CHAINS` 作为降级依据，确立 MOVE 缺失保持原地（no-op）规则；
+  - 定义方向精确匹配与原生镜像映射（`mirror_required=True`）适配算法；
+  - 定义确定性候选评分（`match_score`，无随机性）与排序机制。
+- **实现强类型领域模块 (`src/core/behavior/registry.py`)**：
+  - `ActivityRegistry`：基于不可变 `PetManifest` 建立按类别索引的高效注册表；
+  - `ActivityResolution`：包含请求类别、实际解析类别、候选列表、降级路径、no_op 标识与原因说明；
+  - `ResolvedCandidate`：封装选定活动、镜像需求标志与浮点匹配评分；
+  - 绝对零宠物专属代码污染（源码无 `vasu`、`calico` 或文件路径等字样）。
+- **跨宠物交叉多态验证与测试套件 (`tests/test_activity_registry.py`)**：
+  - 10 项测试涵盖索引构建、Trait 偏好排名、左右镜像适配、单步与多步降级、MOVE no-op 保护、纯函数幂等性与架构防污染扫描；
+  - 证实相同的 `BehaviorIntent(WORK)` 在 Vasu 上确定解析出 `pondering`，在 Calico 上确定解析出 `calico_working/typing/sweeping`，解析器内部零 `if pet_id` 分支。
+  - 全量 95 项关联测试 100% 通过，mypy 与 ruff 保持完全合规。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-2: Vasu v2 Reference Pet
+
+### 🦦 Phase 2.5 WP-2: Vasu v2 Reference Pet（首只契约参考宠物迁移）
+- **建立 Vasu v2 Reference Pet 设计规范 (`docs/specs/phase-2.5-autonomous-life/WP-2-SPEC.md`)**：
+  - 验证 WP-0 / WP-1 在生产宠物身上的真实可用性，确立 Vasu 为首只符合 Manifest v2 规范的 Reference Pet；
+  - 完成 9 行 Atlas 与 Native Idle 资产逐项语义审计：将过去废弃的 Row 6 盘活为 `OBSERVE`（`look_around`），将 Row 8 确立为伴生体独立做工 `WORK`（`pondering`）；
+  - 重新定位 Native Idle 为 Ambient IDLE baseline（与 Row 0 像素呼吸并存于 IDLE 动作池）；
+  - 诚实声明当前原生支持的 7 大类别（`IDLE`, `MOVE`, `WORK`, `OBSERVE`, `PLAY`, `GREET`, `REACT`），明确记录 `SLEEP` 与 `REST` 资产缺口并在运行时经由 WP-0 契约安全降级到 `IDLE`。
+- **正式迁移 Vasu Canonical Manifest (`assets/pets/vasu/pet.json`)**：
+  - 升级为 `schema_version: 2`；
+  - 显式声明 7 大 Capabilities 与 10 个标准 PetActivity 项；
+  - 双轨保留 `spritesheetPath` 与 `spritesheet_path`，确保表现层 Loader 零破坏。
+- **新增 Vasu v2 专用测试套件 (`tests/test_vasu_v2_reference_pet.py`)**：
+  - 涵盖直接加载（绕过 V1 适配器）、所有物理视觉引用校验、Activity 语义匹配、诊断告警验证以及桌面运行 Smoke 测试；
+  - 全量 85 项跨表现与核心测试通过。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-1: Pet Manifest & Capability Contract
+
+### 📜 Phase 2.5 WP-1: Pet Manifest & Capability Contract（宠物配置清单与能力契约）
+- **建立 Coeva 官方统一 Pet Manifest / Capability 规范 (`docs/specs/phase-2.5-autonomous-life/WP-1-SPEC.md`)**：
+  - 确立 `pet.json` V2 规范与显式 `schema_version: 2`，彻底解耦 Scheduler 与具体宠物资产；
+  - 制定 Required（`IDLE`, `SLEEP`, `MOVE`）基线安全约束与 Optional 扩展能力合法性；
+  - 制定 Capability 与 PetActivity 双向一致性法则及 Activity ID 宠物局部作用域准则；
+  - 定义 `LoopMode`（`once`, `loop`, `hold_last`）与 `VisualBinding` 间接引用表现边界。
+- **实现强类型不可变领域模型 (`src/core/behavior/manifest.py`)**：
+  - `PetActivity`：定义宠物如何表达行为大类，包含原子特征、方向、循环模式、权重、时长与视觉绑定；
+  - `PetManifest`：包含版本、ID、名称、能力集合、活动列表与可选视觉路径；
+  - `VisualBinding`：解除模型与物理资产解析强耦合，支持原生镜像（`mirror=True`）参数；
+  - `validate_pet_manifest()` & `validate_pet_directory()`：提供精准、人类可读的宠物配置诊断器；
+  - `adapt_v1_pet_dict()`：提供无缝、双轨透明的 V1 向后兼容适配器（原生产生支持 Vasu 9 行图集与 Calico Clawd-on-Desk 主题）。
+- **新增验证命令行与开发者工具 (`src/core/behavior/validate_pet.py`)**：
+  - 提供 `python -m src.core.behavior.validate_pet <pet_dir>` CLI 诊断工具。
+- **新增自动化测试套件 (`tests/test_pet_manifest.py`)**：
+  - 14 项测试全面覆盖极简/丰富宠物、Required 缺失拦截、一致性不匹配、重复 ID、非法权重/时长/标签、视觉引用校验、V1 兼容以及架构防污染扫描；
+  - 全量 80 项相关测试通过，并通过 strict mypy 与 ruff 检查。
+
+---
+
+## [Unreleased] - Phase 2.5 WP-0: Pet Behavior Semantics
+
+### 🐾 Phase 2.5 WP-0: Pet Behavior Semantics（宠物行为语义层）
+- **建立 Coeva 通用行为语义层契约 (`docs/specs/phase-2.5-autonomous-life/WP-0-SPEC.md`)**：
+  - 确立 `BehaviorIntent` (WHAT/WHY) → `PetActivity` (HOW) → `Animation/Asset` (视觉渲染) 三层物理隔离拓扑；
+  - 冻结 6 大核心不变量（INV-B1 ~ INV-B6），明确行为语义彻底解耦于具体宠物与具体动画资产；
+  - 明确 Required（`IDLE`, `SLEEP`, `MOVE`）与 Optional（`REST`, `WORK`, `OBSERVE`, `PLAY`, `GREET`, `REACT`）语义边界；
+  - 规范第一版语义 Fallback 原则（如 `WORK` → `OBSERVE` → `IDLE`），并确立 MOVE 保持位置不回退原地假走。
+- **实现原生轻量强类型领域模型 (`src/core/behavior/`)**：
+  - `BehaviorCategory`：9 大顶层行为类别枚举；
+  - `ActivityTrait`：5 对 11 个原子风格与能量特征标签；
+  - `BehaviorDirection`：`NONE`, `LEFT`, `RIGHT` 方向枚举；
+  - `BehaviorIntent`：不可变（frozen）意图数据模型，内置合法强度与 INV-B1 资产文件名过滤校验；
+  - `resolve_semantic_fallback()`：基于标准 Fallback 矩阵的纯函数降级解析器。
+- **新增 WP-0 行为语义自动化测试套件 (`tests/test_behavior_semantics.py`)**：
+  - 11 项针对枚举覆盖、不可变性、类型边界、INV-B1 资产侵入防御与 Fallback 链纯逻辑测试全部通过；
+  - 遵循 strict mypy 与 ruff 代码纪律。
+
+---
+
 ## [Unreleased] - Memory V2.1: Final Mainline Integration & Consolidation
 
 ### 🚀 Memory V2.1 Mainline Integration & Cutover Sign-off
