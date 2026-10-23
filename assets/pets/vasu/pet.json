@@ -1,6 +1,156 @@
 {
+  "schema_version": 2,
   "id": "vasu",
+  "name": "Vasu",
   "displayName": "Vasu",
   "description": "A calm, curious, independent river-otter companion that lives alongside the user.",
-  "spritesheetPath": "spritesheet.webp"
+  "format": "atlas",
+  "spritesheet_path": "spritesheet.webp",
+  "spritesheetPath": "spritesheet.webp",
+  "native_idle_path": "native_idle.json",
+  "capabilities": [
+    "idle",
+    "move",
+    "work",
+    "observe",
+    "play",
+    "greet",
+    "react"
+  ],
+  "activities": [
+    {
+      "id": "idle_native",
+      "category": "idle",
+      "visual": {
+        "ref": "idle",
+        "format": "native_idle"
+      },
+      "traits": ["quiet", "stationary", "solitary", "low_energy"],
+      "direction": "none",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 2.0
+    },
+    {
+      "id": "idle_breathing",
+      "category": "idle",
+      "visual": {
+        "ref": "idle",
+        "format": "spritesheet"
+      },
+      "traits": ["quiet", "stationary", "solitary", "low_energy"],
+      "direction": "none",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 1.0
+    },
+    {
+      "id": "run_right",
+      "category": "move",
+      "visual": {
+        "ref": "running-right",
+        "format": "spritesheet"
+      },
+      "traits": ["active", "locomotive", "solitary", "medium_energy"],
+      "direction": "right",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 1.0
+    },
+    {
+      "id": "run_left",
+      "category": "move",
+      "visual": {
+        "ref": "running-left",
+        "format": "spritesheet"
+      },
+      "traits": ["active", "locomotive", "solitary", "medium_energy"],
+      "direction": "left",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 1.0
+    },
+    {
+      "id": "trot",
+      "category": "move",
+      "visual": {
+        "ref": "running",
+        "format": "spritesheet"
+      },
+      "traits": ["active", "locomotive", "casual", "medium_energy"],
+      "direction": "none",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 0.5
+    },
+    {
+      "id": "wave",
+      "category": "greet",
+      "visual": {
+        "ref": "waving",
+        "format": "spritesheet"
+      },
+      "traits": ["social", "stationary", "casual", "medium_energy"],
+      "direction": "none",
+      "loop": "once",
+      "interruptible": true,
+      "duration_ms": 1400,
+      "weight": 1.0
+    },
+    {
+      "id": "hop",
+      "category": "play",
+      "visual": {
+        "ref": "jumping",
+        "format": "spritesheet"
+      },
+      "traits": ["active", "stationary", "casual", "medium_energy"],
+      "direction": "none",
+      "loop": "once",
+      "interruptible": true,
+      "duration_ms": 700,
+      "weight": 1.0
+    },
+    {
+      "id": "stumble",
+      "category": "react",
+      "visual": {
+        "ref": "failed",
+        "format": "spritesheet"
+      },
+      "traits": ["stationary", "casual", "low_energy"],
+      "direction": "none",
+      "loop": "once",
+      "interruptible": true,
+      "duration_ms": 1200,
+      "weight": 1.0,
+      "tags": ["clumsy", "negative"]
+    },
+    {
+      "id": "look_around",
+      "category": "observe",
+      "visual": {
+        "ref": "waiting",
+        "format": "spritesheet"
+      },
+      "traits": ["quiet", "stationary", "casual", "low_energy"],
+      "direction": "none",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 1.0
+    },
+    {
+      "id": "pondering",
+      "category": "work",
+      "visual": {
+        "ref": "review",
+        "format": "spritesheet"
+      },
+      "traits": ["quiet", "stationary", "focused", "low_energy"],
+      "direction": "none",
+      "loop": "loop",
+      "interruptible": true,
+      "weight": 1.0
+    }
+  ]
 }
