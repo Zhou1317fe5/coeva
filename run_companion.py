@@ -660,6 +660,9 @@ class CompanionApp:
             self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(reply_text)
         mood = "frustrated" if is_distressed else "neutral"
+        window = getattr(self, "window", None)
+        if window is not None and hasattr(window, "notify_sanctuary_state"):
+            window.notify_sanctuary_state(self.guard.is_active)
 
         # 1. Save to chronicle
         if hasattr(self, "write_service") and self.write_service is not None:
@@ -730,6 +733,9 @@ class CompanionApp:
             self.backfill_engine.notify_foreground_active()
         is_distressed = self.guard.evaluate_text(text)
         mood = "frustrated" if is_distressed else "neutral"
+        window = getattr(self, "window", None)
+        if window is not None and hasattr(window, "notify_sanctuary_state"):
+            window.notify_sanctuary_state(self.guard.is_active)
 
         # 1. Save to disk
         if hasattr(self, "write_service") and self.write_service is not None:

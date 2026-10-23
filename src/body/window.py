@@ -34,7 +34,27 @@ from src.body.animation import (
 )
 from src.body.contracts import PetState
 from src.body.speech_bubble import SpeechBubble
-from src.core.circadian import CircadianPhase, get_schedule_for_time
+from src.core.behavior import (
+    ActivityRegistry,
+    ActivityTrait,
+    ArbiterAction,
+    BehaviorArbiter,
+    BehaviorCategory,
+    BehaviorDirection,
+    BehaviorIntent,
+    BehaviorPriority,
+    BehaviorRequest,
+    BehaviorSource,
+    LifeContext,
+    LifeScheduler,
+    LoopMode,
+    PetActivity,
+    PetManifest,
+    ProtectionLevel,
+    VisualBinding,
+    load_pet_manifest,
+)
+from src.core.circadian import get_schedule_for_time
 from src.feeder.contracts import RawSlice
 from src.feeder.overlay import SliceFeederBar
 from src.feeder.storage import SliceStore
@@ -166,6 +186,8 @@ class PetWindow(QWidget):
         self._user_working_timer.setSingleShot(True)
         self._user_working_timer.setInterval(120_000)  # 2 minutes of active tool working vibe
         self._user_working_timer.timeout.connect(self._clear_user_working)
+        # Ambient awareness of emotional sanctuary (meltdown protection) mode
+        self._sanctuary_active = False
         # Autonomous daily life routine: the pet occasionally does its own activities
         self._autonomous_timer = QTimer(self)
         self._autonomous_timer.setSingleShot(True)
@@ -179,7 +201,7 @@ class PetWindow(QWidget):
         # Nap timer: a sleeping pet takes a catnap, then naturally wakes up with a stretch
         self._nap_timer = QTimer(self)
         self._nap_timer.setSingleShot(True)
-        self._nap_timer.timeout.connect(self._wake_up)
+        self._nap_timer.timeout.connect(self._on_nap_timeout)
 
         self._native_idle_config: NativeIdleConfig | None = None
         self._native_idle_frames: tuple[QPixmap, QPixmap] | None = None
@@ -192,6 +214,7 @@ class PetWindow(QWidget):
         self._native_blink_restore_timer.timeout.connect(self._finish_native_blink)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._loaded_sheets: dict[str, SpriteSheet] = {}
+        self._init_arbiter()
         self._load_spritesheets()
         self.apply_state(PetState.IDLE, force=True)  # first paint of the sprite
         self._restore_position()
@@ -201,6 +224,41 @@ class PetWindow(QWidget):
     @property
     def current_state(self) -> PetState:
         return self._current_state
+    @property
+    def arbiter(self) -> BehaviorArbiter:
+        return self._arbiter
+
+    @property
+    def scheduler(self) -> LifeScheduler:
+        return self._scheduler
+
+    def _init_arbiter(self) -> None:
+        """Initialize ActivityRegistry and BehaviorArbiter for current pet directory."""
+        try:
+            manifest = load_pet_manifest(self.pet_dir)
+        except Exception:
+            manifest = PetManifest(
+                schema_version=2,
+                id=self.pet_dir.name or "unknown",
+                name=self.pet_dir.name or "Unknown",
+                capabilities=frozenset({BehaviorCategory.IDLE}),
+                activities=(
+                    PetActivity(
+                        id="fallback_idle",
+                        category=BehaviorCategory.IDLE,
+                        visual=VisualBinding(ref="idle"),
+                    ),
+                ),
+            )
+        self._registry = ActivityRegistry(manifest)
+        self._arbiter = BehaviorArbiter(self._registry)
+        self._scheduler = LifeScheduler()
+        self._active_request_id: str | None = None
+        self._wave_timer_req_id: str | None = None
+        self._jump_settle_req_id: str | None = None
+        self._drag_req_id: str | None = None
+        self._autonomous_req_id: str | None = None
+        self._drag_active: bool = False
 
     @property
     def scale_factor(self) -> float:
@@ -227,7 +285,25 @@ class PetWindow(QWidget):
     def _on_slice_submitted(self, content: str) -> None:
         slice_item = RawSlice.create(content)
         self._slice_store.save(slice_item)
-        self.apply_state(PetState.HAPPY)
+        req_id = f"req_slice_{time.monotonic()}"
+        intent = BehaviorIntent(
+            category=BehaviorCategory.GREET,
+            preferred_traits=(ActivityTrait.SOCIAL,),
+        )
+        resolution = self._registry.resolve(intent)
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.DIRECT_INTERACTION,
+            priority=BehaviorPriority.P3_SAFETY,
+            duration_ms=2500,
+            resumable=False,
+        )
+        decision = self._arbiter.submit(request)
+        if decision.accepted:
+            self._active_request_id = req_id
+            self.apply_state(PetState.HAPPY)
         if not self._suppress_default_feedback:
             feedbacks = ["记下啦~", "存进成长抽屉了", "好灵感！已记录", "已沉淀到记忆库~"]
             self.say(random.choice(feedbacks), ttl_ms=2500)
@@ -258,6 +334,7 @@ class PetWindow(QWidget):
     def load_pet(self, pet_dir: Path) -> None:
         """Switch to another pet directory dynamically and refresh animation."""
         self.pet_dir = pet_dir
+        self._init_arbiter()
         self._loaded_sheets.clear()
         self._load_spritesheets()
         self.apply_state(self._current_state, force=True)  # sheets were replaced
@@ -675,19 +752,62 @@ class PetWindow(QWidget):
         """Manually put the pet to sleep (e.g., from DND/tray menu)."""
         if self._greeting_active:
             return
-        self.apply_state(PetState.SLEEPING)
+        req_id = f"req_explicit_sleep_{time.monotonic()}"
+        intent = BehaviorIntent(category=BehaviorCategory.SLEEP)
+        resolution = self._registry.resolve(intent)
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.EXPLICIT_USER,
+            priority=BehaviorPriority.P4_EXPLICIT_USER,
+            protection=ProtectionLevel.PROTECTED_SLEEP,
+            interruptible=False,
+            resumable=False,
+        )
+        decision = self._arbiter.submit(request)
+        if decision.accepted:
+            self._active_request_id = req_id
+            self.apply_state(PetState.SLEEPING)
 
     def notify_user_working(self) -> None:
         """Ambiently record that user is actively working with tools/agents."""
         self._is_user_working = True
         self._user_working_timer.start()
 
+    def notify_sanctuary_state(self, active: bool) -> None:
+        """Ambiently record whether emotional sanctuary (meltdown) mode is active."""
+        self._sanctuary_active = active
+
     def _clear_user_working(self) -> None:
         self._is_user_working = False
+
+    def _on_nap_timeout(self) -> None:
+        """Handle catnap timer timeout: only wake if sleep is NOT protected DND sleep."""
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
+            return
+        self._wake_up()
 
     def _wake_up(self) -> None:
         """Return to a resting, awake state after the pet had dozed off."""
         if self._current_state == PetState.SLEEPING:
+            req_id = f"req_wake_{time.monotonic()}"
+            intent = BehaviorIntent(category=BehaviorCategory.IDLE)
+            resolution = self._registry.resolve(intent)
+            request = BehaviorRequest(
+                request_id=req_id,
+                intent=intent,
+                resolution=resolution,
+                source=BehaviorSource.EXPLICIT_USER,
+                priority=BehaviorPriority.P4_EXPLICIT_USER,
+                protection=ProtectionLevel.UNPROTECTED,
+                interruptible=True,
+            )
+            decision = self._arbiter.submit(request)
+            if not decision.accepted:
+                return
+
+            self._active_request_id = req_id
             self._nap_timer.stop()
             self._in_autonomous_routine = False
             self._schedule_next_autonomous_routine()
@@ -695,96 +815,147 @@ class PetWindow(QWidget):
             waking_sheet = self._loaded_sheets.get("waking")
             if waking_sheet is not None:
                 self._player.play(waking_sheet, loop=False)
+                self._wave_timer_req_id = req_id
                 self._wave_timer.start(1600)
             else:
                 self.apply_state(PetState.IDLE, force=True)
-
-    def _schedule_next_autonomous_routine(self, *, initial: bool = False) -> None:
-        """Schedule the next spontaneous daily life activity using the circadian model."""
-        if self._native_idle_frames is not None:
-            return
-        schedule = get_schedule_for_time()
-        if initial and schedule.is_work_phase:
-            pause = random.randint(3000, 8000)
+                self._arbiter.complete(req_id)
+    def _schedule_next_autonomous_routine(
+        self, *, initial: bool = False, delay_ms: int | None = None
+    ) -> None:
+        """Schedule the next consideration for autonomous daily life activities."""
+        if delay_ms is not None:
+            pause = delay_ms
+        elif initial:
+            pause = int(self._scheduler.config.consideration_min_sec * 1000)
         else:
-            pause = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
+            pause = int(
+                random.uniform(
+                    self._scheduler.config.consideration_min_sec,
+                    self._scheduler.config.consideration_max_sec,
+                )
+                * 1000
+            )
         self._autonomous_timer.start(pause)
 
     def _start_autonomous_routine(self) -> None:
-        """Spontaneously perform an independent daily life activity."""
+        """Consider and potentially perform an independent daily life activity."""
         if (
-            self._native_idle_frames is not None
-            or self._current_state != PetState.IDLE
+            self._current_state != PetState.IDLE
             or self._docked_edge is not None
             or self._greeting_active
             or self._has_moved
             or self._in_autonomous_routine
         ):
-            return
-
-        schedule = get_schedule_for_time()
-        # If in Night Sleep phase, companion stays peaceful
-        # In Night Sleep phase without user working, allow gentle rest activities if available
-        if schedule.phase == CircadianPhase.NIGHT_SLEEP and not self._is_user_working:
-            pass
-
-        if self._is_user_working:
-            # User is in deep flow working: companion accompanies with focused craft/work
-            # Available work activities: covers Calico theme & Vasu Petdex atlas rows
-            work_activities: list[tuple[str, int]] = [
-                ("working-typing", 60_000),  # Calico
-                ("working-building", 60_000),  # Calico
-                ("review", 55_000),  # Vasu 代码复盘/审查
-                ("waiting", 40_000),  # Vasu 专注凝视
-                ("running", 35_000),  # Vasu 敏捷奔跑
-                ("running-right", 30_000),  # Vasu
-                ("running-left", 30_000),  # Vasu
-                ("working-sweeping", 45_000),  # Calico
-                ("thinking", 40_000),  # Calico
-                ("working-carrying", 35_000),  # Calico
-            ]
-            available = [(act, dur) for act, dur in work_activities if act in self._loaded_sheets]
-        else:
-            # Use current circadian phase's natural human-like activities
-            available = [
-                (act, dur) for act, dur in schedule.allowed_activities if act in self._loaded_sheets
-            ]
-
-        if not available:
-            # Fallback to any loaded autonomous activity for the pet
-            available = [
-                (act, 40_000) for act in self._loaded_sheets if act not in ("idle", "sleep")
-            ]
-        if not available:
             self._schedule_next_autonomous_routine()
             return
-        chosen_act, dur_ms = random.choice(available)
-        sheet = self._loaded_sheets.get(chosen_act)
+
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
+            return
+
+        active_req = self._arbiter.active_request if hasattr(self, "_arbiter") else None
+        phase = get_schedule_for_time().phase
+        ctx = LifeContext(
+            circadian_phase=phase,
+            hour=time.localtime().tm_hour,
+            agent_active=getattr(self, "_is_user_working", False),
+            sanctuary_active=self._sanctuary_active,
+            mini_mode_docked=(self._docked_edge is not None),
+            feeder_active=self._feeder_bar.isVisible(),
+            bubble_active=self._bubble.isVisible(),
+        )
+        intent, next_delay_sec = self._scheduler.consider(
+            self._registry, active_request=active_req, context=ctx
+        )
+        next_delay_ms = max(4000, int(next_delay_sec * 1000))
+
+        if intent is None:
+            # Silence first: remain peacefully in quiet presence
+            self._schedule_next_autonomous_routine(delay_ms=next_delay_ms)
+            return
+
+        resolution = self._registry.resolve(intent)
+        if not resolution.candidates or resolution.no_op:
+            self._schedule_next_autonomous_routine(delay_ms=next_delay_ms)
+            return
+
+        candidate = resolution.candidates[0]
+        dur_sec = self._scheduler.sample_duration_sec()
+        dur_ms = int(dur_sec * 1000)
+        req_id = f"req_auto_{time.monotonic()}"
+
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.AUTONOMOUS,
+            priority=BehaviorPriority.P1_AUTONOMOUS,
+            duration_ms=dur_ms,
+            interruptible=True,
+            resumable=False,
+        )
+        decision = self._arbiter.submit(request)
+        if not decision.accepted:
+            self._schedule_next_autonomous_routine(delay_ms=next_delay_ms)
+            return
+
+        self._active_request_id = req_id
+        self._autonomous_req_id = req_id
+        self._in_autonomous_routine = True
+        self._stop_native_idle()
+        self._scheduler.record_activity_started(
+            intent.category, intent.direction, dur_sec, candidate.activity.id
+        )
+
+        visual_ref = candidate.activity.visual.ref
+        sheet = self._loaded_sheets.get(visual_ref)
         if sheet is not None:
-            self._in_autonomous_routine = True
-            self._player.play(sheet, loop=True)
+            if candidate.mirror_required:
+                sheet = sheet.mirrored(horizontal=True)
+            self._player.play(sheet, loop=(candidate.activity.loop == LoopMode.LOOP))
             self._autonomous_done_timer.start(dur_ms)
+        else:
+            self._finish_autonomous_routine()
 
     def _finish_autonomous_routine(self) -> None:
         """Finish the daily life activity and settle back to resting idle."""
-        if self._native_idle_frames is not None:
-            return
         self._in_autonomous_routine = False
-        if (
-            self._current_state == PetState.IDLE
-            and not self._greeting_active
-            and not self._has_moved
-            and self._docked_edge is None
-        ):
-            idle_sheet = self._loaded_sheets.get("idle")
-            if idle_sheet is not None:
-                self._player.play(idle_sheet, loop=True)
-            schedule = get_schedule_for_time()
-            interval = random.randint(schedule.min_pause_ms, schedule.max_pause_ms)
-            self._autonomous_timer.start(interval)
+        auto_req_id = getattr(self, "_autonomous_req_id", None)
+        if auto_req_id and hasattr(self, "_arbiter"):
+            self._arbiter.complete(auto_req_id)
+        if hasattr(self, "_scheduler"):
+            self._scheduler.record_activity_finished()
+
+        if self._docked_edge is None and not self._has_moved:
+            self.apply_state(PetState.IDLE, force=True)
+        self._schedule_next_autonomous_routine()
 
     def play_poke_reaction(self) -> None:
         """Play short poke reaction if available, then return to current state."""
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
+            return
+
+        req_id = f"req_poke_{time.monotonic()}"
+        intent = BehaviorIntent(
+            category=BehaviorCategory.REACT,
+            preferred_traits=(ActivityTrait.CASUAL,),
+        )
+        resolution = self._registry.resolve(intent)
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.DIRECT_INTERACTION,
+            priority=BehaviorPriority.P2_DIRECT_INTERACTION,
+            cooldown_key="poke_reaction",
+            duration_ms=1200,
+        )
+        decision = self._arbiter.submit(request)
+        if not decision.accepted:
+            return
+
+        self._active_request_id = req_id
+        self._wave_timer_req_id = req_id
         if (
             self._docked_edge is not None
             and self._mini_cfg.supported
@@ -804,7 +975,6 @@ class PetWindow(QWidget):
         if sheet is not None:
             self._player.play(sheet, loop=False)
             self._wave_timer.start(1200)
-
     def test_action(self, action_name: str) -> bool:
         """Manually trigger and continuously play an action for smoothness testing."""
         sheet = self._loaded_sheets.get(action_name)
@@ -828,15 +998,35 @@ class PetWindow(QWidget):
 
     def _trigger_hover_jump(self) -> bool:
         """Trigger a lively hop when cursor hovers over the pet (Codex behavior)."""
-        if self._current_state == PetState.SLEEPING or self._docked_edge is not None:
+        if self._docked_edge is not None:
             return False
-        now_ms = time.monotonic() * 1000
-        # 5 second cooldown so it doesn't jump obsessively
-        if (now_ms - self._last_hover_jump_timestamp) < 5000:
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
             return False
+
+        req_id = f"req_jump_{time.monotonic()}"
+        intent = BehaviorIntent(
+            category=BehaviorCategory.PLAY,
+            preferred_traits=(ActivityTrait.ACTIVE,),
+        )
+        resolution = self._registry.resolve(intent)
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.DIRECT_INTERACTION,
+            priority=BehaviorPriority.P2_DIRECT_INTERACTION,
+            cooldown_key="hover_jump",
+            duration_ms=700,
+            resumable=False,
+        )
+        decision = self._arbiter.submit(request)
+        if not decision.accepted:
+            return False
+
         jump_sheet = self._loaded_sheets.get("jumping") or self._loaded_sheets.get("jump")
         if jump_sheet is not None:
-            self._last_hover_jump_timestamp = now_ms
+            self._active_request_id = req_id
+            self._jump_settle_req_id = req_id
             self._player.play(jump_sheet, fps=8, loop=False)
             dur_ms = max(400, int((jump_sheet.frame_count / 8.0) * 1000) + 80)
             self._jump_settle_timer.start(dur_ms)
@@ -845,17 +1035,47 @@ class PetWindow(QWidget):
 
     def _finish_hover_jump(self) -> None:
         """Settle back into current state after hover jump finishes."""
+        timer_req_id = getattr(self, "_jump_settle_req_id", None)
+        if timer_req_id and hasattr(self, "_arbiter"):
+            decision = self._arbiter.complete(timer_req_id)
+            if not decision.accepted or decision.action == ArbiterAction.NO_OP:
+                return
+
         if self._docked_edge is None and not self._has_moved:
             self.apply_state(self._current_state, force=True)
 
     def _start_greeting(self, *, force: bool = False) -> None:
         """Wave hello once when the user's cursor reaches the pet, with measured cooldown."""
-        if self._greeting_active or self._current_state == PetState.SLEEPING:
+        if self._greeting_active:
             return
-        now_ms = time.monotonic() * 1000
-        if not force and (now_ms - self._last_greet_timestamp) < GREETING_COOLDOWN_MS:
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
             return
-        self._last_greet_timestamp = now_ms
+
+        req_id = f"req_greet_{time.monotonic()}"
+        intent = BehaviorIntent(
+            category=BehaviorCategory.GREET,
+            preferred_traits=(ActivityTrait.SOCIAL,),
+        )
+        resolution = self._registry.resolve(intent)
+        priority = (
+            BehaviorPriority.P4_EXPLICIT_USER if force else BehaviorPriority.P2_DIRECT_INTERACTION
+        )
+        request = BehaviorRequest(
+            request_id=req_id,
+            intent=intent,
+            resolution=resolution,
+            source=BehaviorSource.EXPLICIT_USER if force else BehaviorSource.DIRECT_INTERACTION,
+            priority=priority,
+            cooldown_key="hover_greet" if not force else None,
+            duration_ms=1400,
+            resumable=False,
+        )
+        decision = self._arbiter.submit(request)
+        if not decision.accepted:
+            return
+
+        self._active_request_id = req_id
+        self._wave_timer_req_id = req_id
         self._greeting_active = True
         if (
             self._docked_edge is not None
@@ -872,6 +1092,10 @@ class PetWindow(QWidget):
     def _finish_greeting(self) -> None:
         """End the hover wave and settle back to resting."""
         self._greeting_active = False
+        timer_req_id = getattr(self, "_wave_timer_req_id", None)
+        if timer_req_id and hasattr(self, "_arbiter"):
+            self._arbiter.complete(timer_req_id)
+
         if (
             self._docked_edge is not None
             and self._mini_cfg.supported
@@ -885,6 +1109,11 @@ class PetWindow(QWidget):
 
     def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802
         """Mouse hover: peek out if docked, wake up if sleeping, wave hello."""
+        if hasattr(self, "_arbiter") and self._arbiter.is_protected_sleep():
+            # Protected sleep (DND) must NEVER be interrupted by hover!
+            event.accept()
+            return
+
         if self._in_autonomous_routine:
             self._autonomous_done_timer.stop()
             self._in_autonomous_routine = False
@@ -1025,7 +1254,28 @@ class PetWindow(QWidget):
             dist = (cur_pos - self._press_pos).manhattanLength()
             if dist >= CLICK_DRAG_THRESHOLD_PX:
                 desired_pos = cur_pos - self._drag_offset
-
+                if not getattr(self, "_drag_active", False):
+                    self._drag_active = True
+                    req_id = f"req_drag_{time.monotonic()}"
+                    intent = BehaviorIntent(
+                        category=BehaviorCategory.MOVE,
+                        direction=BehaviorDirection.NONE,
+                    )
+                    resolution = self._registry.resolve(intent)
+                    request = BehaviorRequest(
+                        request_id=req_id,
+                        intent=intent,
+                        resolution=resolution,
+                        source=BehaviorSource.EXPLICIT_USER,
+                        priority=BehaviorPriority.P4_EXPLICIT_USER,
+                        protection=ProtectionLevel.PROTECTED_INTERACTION,
+                        interruptible=True,
+                        resumable=False,
+                    )
+                    decision = self._arbiter.submit(request)
+                    if decision.accepted:
+                        self._active_request_id = req_id
+                        self._drag_req_id = req_id
                 # Directional running / drag animation (Codex running-right/left behavior)
                 dx = cur_pos.x() - self._last_drag_x
                 if dx > 1 and self._current_drag_dir != "right":
@@ -1101,6 +1351,11 @@ class PetWindow(QWidget):
             self.setCursor(Qt.CursorShape.PointingHandCursor)
             self._current_drag_dir = None
             self._drag_offset = None
+            if getattr(self, "_drag_active", False):
+                self._drag_active = False
+                drag_req_id = getattr(self, "_drag_req_id", None)
+                if drag_req_id and hasattr(self, "_arbiter"):
+                    self._arbiter.complete(drag_req_id)
             if self._has_moved:
                 screen = self.screen() or QApplication.primaryScreen()
                 if screen is not None:

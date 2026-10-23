@@ -15,6 +15,11 @@ from src.body.contracts import PetState
 from src.body.controller import BodyController
 from src.body.settings_window import SettingsWindow
 from src.body.window import PetWindow
+from src.core.behavior.arbiter import BehaviorRequest
+from src.core.behavior.context import LifeContext
+from src.core.behavior.registry import ActivityRegistry
+from src.core.behavior.scheduler import LifeScheduler
+from src.core.behavior.semantics import BehaviorCategory, BehaviorIntent
 from src.feeder.hotkey import DEFAULT_FEEDER_HOTKEY
 
 # Ensure QApplication is initialized for offscreen tests
@@ -589,6 +594,26 @@ def test_calico_mini_mode_docking_and_flipping(tmp_path: Path) -> None:
     window.close()
 
 
+class _DeterministicScheduler(LifeScheduler):
+    """Scheduler double whose every consideration deterministically yields WORK.
+
+    The real LifeScheduler treats silence as a legitimate weighted outcome, so a
+    single _start_autonomous_routine() call cannot guarantee that a routine
+    starts. This double keeps the window lifecycle assertions deterministic at
+    any hour; the scheduler's own randomness stays covered by
+    test_life_scheduler.py and test_context_modulation.py.
+    """
+
+    def consider(
+        self,
+        registry: ActivityRegistry,
+        *,
+        active_request: BehaviorRequest | None = None,
+        context: LifeContext | None = None,
+    ) -> tuple[BehaviorIntent | None, float]:
+        return BehaviorIntent(category=BehaviorCategory.WORK), 20.0
+
+
 def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
     """Test that Calico has autonomous daily life activities and wakes from naps."""
     calico_dir = Path("assets") / "pets" / "calico"
@@ -599,6 +624,7 @@ def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
     assert window._autonomous_timer.isActive()
 
     # 2. Trigger autonomous routine: plays an activity
+    window._scheduler = _DeterministicScheduler()
     window._start_autonomous_routine()
     assert window._in_autonomous_routine is True
     assert window._autonomous_done_timer.isActive()
@@ -621,6 +647,39 @@ def test_autonomous_life_routine_and_nap_waking(tmp_path: Path) -> None:
     assert window._autonomous_timer.isActive()
 
 
+def test_life_context_snapshot_reflects_sanctuary_state(tmp_path: Path) -> None:
+    """WP-6 wiring: the window's LifeContext snapshot carries the sanctuary flag."""
+    calico_dir = Path("assets") / "pets" / "calico"
+    window = _isolated_window(calico_dir, tmp_path, scale=0.5)
+
+    captured: list[LifeContext] = []
+
+    class _CapturingScheduler(LifeScheduler):
+        def consider(
+            self,
+            registry: ActivityRegistry,
+            *,
+            active_request: BehaviorRequest | None = None,
+            context: LifeContext | None = None,
+        ) -> tuple[BehaviorIntent | None, float]:
+            if context is not None:
+                captured.append(context)
+            return None, 20.0
+
+    window._scheduler = _CapturingScheduler()
+
+    window.notify_sanctuary_state(True)
+    window._start_autonomous_routine()
+    assert len(captured) == 1
+    assert captured[0].sanctuary_active is True
+    assert captured[0].agent_active is False
+
+    window.notify_sanctuary_state(False)
+    window._start_autonomous_routine()
+    assert captured[-1].sanctuary_active is False
+    window.close()
+
+
 def test_vasu_native_idle_and_core_interactions(tmp_path: Path) -> None:
     """Test sparse native idle blink while keeping Core interaction states available."""
     from PySide6.QtCore import QPointF, Qt
@@ -633,7 +692,7 @@ def test_vasu_native_idle_and_core_interactions(tmp_path: Path) -> None:
     assert window._native_idle_frames is not None
     assert not window._player._timer.isActive()
     assert window._native_blink_timer.isActive()
-    assert not window._autonomous_timer.isActive()
+    assert window._autonomous_timer.isActive()
 
     neutral, blink = window._native_idle_frames
     window._start_native_blink()
